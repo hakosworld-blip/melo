@@ -1,0 +1,292 @@
+name: Android release
+
+# Builds, signs, verifies and publishes the melo APK.
+#
+#   * push a tag like v1.0.1   -> signed APK attached to a GitHub Release
+#   * run manually             -> signed APK as a workflow artifact
+#   * run manually with a tag  -> signed APK attached to a Release with that tag
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   ANDROID_KEYSTORE_BASE64    base64 of the release .jks file
+#   ANDROID_KEYSTORE_PASSWORD  keystore password
+#   ANDROID_KEY_ALIAS          key alias inside the keystore
+#   ANDROID_KEY_PASSWORD       password for that key
+#
+# The keystore only ever exists as a temporary file on the runner; it is never
+# committed, printed, cached or uploaded.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name (e.g. 1.0.1). Defaults to the tag, or 1.0.0.'
+        required: false
+        type: string
+      release_tag:
+        description: 'Optional: create a GitHub Release with this tag (e.g. v1.0.1).'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing secret::$name is not set. Add it under Settings -> Secrets and variables -> Actions. See android/README.md."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Refusing to publish an unsigned release. Configure the four signing secrets first."
+            exit 1
+          fi
+          echo "All four signing secrets are present."
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Make the Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_VERSION" ]; then
+            NAME="$INPUT_VERSION"
+          elif [ "$REF_TYPE" = "tag" ]; then
+            NAME="${REF_NAME#v}"
+          else
+            NAME="1.0.0"
+          fi
+          if ! printf '%s' "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$'; then
+            echo "::error title=Bad version::'$NAME' is not a valid version name (expected e.g. 1.0.0)."
+            exit 1
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          if [ "$REF_TYPE" = "tag" ]; then
+            echo "release_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
+          elif [ -n "$INPUT_TAG" ]; then
+            echo "release_tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_tag=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building melo $NAME (code ${GITHUB_RUN_NUMBER})"
+
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Publish test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: melo-test-report
+          path: android/app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Decode keystore to a temporary file
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KS_PATH="$RUNNER_TEMP/melo-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "$KS_PATH"
+          if [ ! -s "$KS_PATH" ]; then
+            echo "::error title=Bad keystore::Decoded keystore is empty. Re-encode the .jks file with base64."
+            exit 1
+          fi
+          chmod 600 "$KS_PATH"
+          keytool -list -keystore "$KS_PATH" -storepass "$ANDROID_KEYSTORE_PASSWORD" > /dev/null
+          echo "MELO_KEYSTORE_PATH=$KS_PATH" >> "$GITHUB_ENV"
+          echo "Keystore decoded and readable."
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          MELO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MELO_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MELO_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          MELO_VERSION_NAME: ${{ steps.version.outputs.name }}
+          MELO_VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          APK="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK" ]; then
+            echo "::error title=No APK::assembleRelease produced no APK at $APK"
+            exit 1
+          fi
+          if [ ! -s "$APK" ]; then
+            echo "::error title=Empty APK::The APK is zero bytes."
+            exit 1
+          fi
+          echo "APK size: $(du -h "$APK" | cut -f1)"
+
+      - name: Verify signature, package id and checksum
+        id: verify
+        working-directory: android
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+
+          echo "--- apksigner ---"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apksigner.txt
+          if ! grep -q "^Verifies" /tmp/apksigner.txt; then
+            echo "::error title=Bad signature::apksigner did not verify the APK."
+            exit 1
+          fi
+          if grep -q "CN=Android Debug" /tmp/apksigner.txt; then
+            echo "::error title=Wrong key::The APK was signed with a debug key."
+            exit 1
+          fi
+          CERT_SHA256=$(grep "Signer #1 certificate SHA-256 digest" /tmp/apksigner.txt | awk '{print $NF}')
+          echo "cert_sha256=$CERT_SHA256" >> "$GITHUB_OUTPUT"
+
+          echo "--- package ---"
+          BADGING=$("$BT/aapt2" dump badging "$APK")
+          echo "$BADGING" | grep -E "^package:|^application-label:|^sdkVersion|^targetSdkVersion"
+          PKG=$(echo "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          VNAME=$(echo "$BADGING" | sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p")
+          VCODE=$(echo "$BADGING" | sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p")
+          if [ "$PKG" != "app.melo.player" ]; then
+            echo "::error title=Wrong package::Expected app.melo.player but found '$PKG'."
+            exit 1
+          fi
+          if [ "$VNAME" != "$VERSION_NAME" ]; then
+            echo "::error title=Wrong version::APK says $VNAME but the build asked for $VERSION_NAME."
+            exit 1
+          fi
+          echo "package=$PKG" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VNAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VCODE" >> "$GITHUB_OUTPUT"
+
+          OUT="melo-${VERSION_NAME}.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          echo "apk=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: melo-${{ steps.version.outputs.name }}
+          path: |
+            android/melo-${{ steps.version.outputs.name }}.apk
+            android/melo-${{ steps.version.outputs.name }}.apk.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish GitHub Release
+        if: steps.version.outputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.release_tag }}
+          name: melo ${{ steps.version.outputs.name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          body: |
+            **melo ${{ steps.version.outputs.name }}** — Android music player
+
+            | | |
+            |---|---|
+            | Package | `${{ steps.verify.outputs.package }}` |
+            | Version | `${{ steps.verify.outputs.version_name }}` (code `${{ steps.verify.outputs.version_code }}`) |
+            | Minimum Android | 8.0 (API 26) |
+            | Signing cert SHA-256 | `${{ steps.verify.outputs.cert_sha256 }}` |
+
+            **Install**
+
+            1. Download the `.apk` below.
+            2. Open it on the phone and allow installing from this source when prompted.
+            3. Allow notifications so the playback controls appear on the lock screen.
+
+            **Verify the download**
+
+            ```
+            sha256sum -c melo-${{ steps.version.outputs.name }}.apk.sha256
+            ```
+
+            Builds are reproducible from source with `android/gradlew assembleRelease`.
+            Keep the same signing key for every release so updates install over older
+            versions.
+
+            melo plays public catalog streams (YouTube Music, SoundCloud) and reads
+            metadata from iTunes/Deezer and lyrics from LRCLIB/NetEase. It is not
+            affiliated with any of those services.
+          files: |
+            android/melo-${{ steps.version.outputs.name }}.apk
+            android/melo-${{ steps.version.outputs.name }}.apk.sha256
+
+      - name: Remove temporary keystore
+        if: always()
+        run: |
+          if [ -n "${MELO_KEYSTORE_PATH:-}" ] && [ -f "$MELO_KEYSTORE_PATH" ]; then
+            rm -f "$MELO_KEYSTORE_PATH"
+            echo "Temporary keystore removed."
+          fi
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## melo ${{ steps.version.outputs.name }}"
+            echo ""
+            echo "- APK: \`${{ steps.verify.outputs.apk }}\`"
+            echo "- Package: \`${{ steps.verify.outputs.package }}\`"
+            echo "- Signing cert SHA-256: \`${{ steps.verify.outputs.cert_sha256 }}\`"
+            echo "- Release tag: \`${{ steps.version.outputs.release_tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

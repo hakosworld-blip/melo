@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Melo" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/melo_ink</item>
+        <item name="android:statusBarColor">@color/melo_transparent</item>
+        <item name="android:navigationBarColor">@color/melo_transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+</resources>

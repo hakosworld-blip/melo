@@ -12,3 +12,15 @@ bin/ffprobe.exe
 dev-app-update.yml
 plugins/lastfm-scrobbler.js
 test/lastfm-scrobbler.test.js
+
+# ---- Android (melo) ----
+android/.gradle/
+android/.idea/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+# never commit signing material or decoded keystores
+*.jks
+*.keystore
+android/release-keystore*

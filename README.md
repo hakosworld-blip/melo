@@ -47,6 +47,23 @@
 
 > [!NOTE]
 > **Pull requests are temporarily closed due to merge conflicts with an update coming soon (w global architecture change). Will be open when Riff updates.**
+## melo — the Android app
+
+This repository also contains **melo**, a native Android music player built from the same
+providers and ideas as the desktop app: Kotlin + Jetpack Compose, a Media3 background
+playback service with lock-screen controls, synced lyrics with word-level timing where
+the source really has it, playlists, downloads and offline playback.
+
+```bash
+cd android && ./gradlew assembleDebug   # or: ./gradlew testDebugUnitTest
+```
+
+`.github/workflows/android-release.yml` builds, signs, verifies and publishes the APK
+(tag `v1.0.0` → GitHub Release). Everything about the Android app — architecture,
+feature parity, the four signing secrets, keystore instructions for computer **or
+phone only**, permissions and honest limitations — is documented in
+[android/README.md](android/README.md).
+
 ## What is Riff?
 
 Riff is an open-source, telemetry-free desktop music app and player for **Windows, Linux, and macOS**. It unifies playback across **YouTube Music**, **YouTube**, **SoundCloud**, and offline local media into a single high-performance interface without ads, subscriptions, or login constraints. Provides very fancy UI and layout.
