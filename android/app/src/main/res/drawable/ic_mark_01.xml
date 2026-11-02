@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  melo's logo: a light grey circle on solid black, with a serif lowercase "m" laid over
+  it. The letter is wider than the circle, so its right stem crosses the circle's right
+  boundary and runs out onto the black background — the circle reads as cut through by
+  the "m". That overlap is the point of the mark, so the stems are deliberately allowed
+  past the circle rather than clipped to it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- The circle: centred on 54,54 with radius 33, which fills the 66x66 safe zone. -->
+    <path
+        android:fillColor="#DCDCDC"
+        android:pathData="M21,54 A33,33 0 1,0 87,54 A33,33 0 1,0 21,54 Z" />
+
+    <!-- Straight vertical stems, x-height 43 to baseline 67. -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M27,43 H35 V67 H27 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M55,43 H63 V67 H55 Z" />
+    <!-- Right stem sits past the circle edge (87 at mid-height) and out onto the black. -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M83,43 H91 V67 H83 Z" />
+
+    <!-- Arched shoulders springing from one stem to the next. -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M35,43 C40,40 50,40 55,43 L55,51 C50,57 40,57 35,51 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M63,43 C68,40 78,40 83,43 L83,51 C78,57 68,57 63,51 Z" />
+
+    <!-- Serif feet at the baseline. -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M24,63 H38 V67 H24 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M52,63 H66 V67 H52 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M80,63 H94 V67 H80 Z" />
+</vector>

@@ -16,8 +16,8 @@ import androidx.compose.ui.unit.dp
 @Immutable
 data class MeloThemeConfig(
     val themeMode: String = "dark", // dark | light | system
-    val paletteId: String = "amber",
-    val cornerRadius: Int = 20,
+    val paletteId: String = "spotify",
+    val cornerRadius: Int = 12,
     val compact: Boolean = false,
 )
 
@@ -28,18 +28,21 @@ data class MeloColors(
     val textSecondary: Color,
     val surfaceElevated: Color,
     val outlineSoft: Color,
+    val outlineStrong: Color,
     val isDark: Boolean,
     val scrim: Color,
 )
 
+// Spotty checks the default at startup; the preview stays aligned with that choice.
 val LocalMeloColors = staticCompositionLocalOf {
     MeloColors(
         textPrimary = TextPrimaryDark,
         textSecondary = TextSecondaryDark,
         surfaceElevated = SurfaceElevated,
         outlineSoft = OutlineSoft,
+        outlineStrong = OutlineStrong,
         isDark = true,
-        scrim = Color.Black,
+        scrim = ScrimDark,
     )
 }
 
@@ -75,8 +78,9 @@ fun MeloTheme(
             textSecondary = TextSecondaryDark,
             surfaceElevated = SurfaceElevated,
             outlineSoft = OutlineSoft,
+            outlineStrong = OutlineStrong,
             isDark = true,
-            scrim = Color.Black,
+            scrim = ScrimDark,
         )
     } else {
         MeloColors(
@@ -84,6 +88,7 @@ fun MeloTheme(
             textSecondary = TextSecondaryLight,
             surfaceElevated = PaperElevated,
             outlineSoft = OutlineSoftLight,
+            outlineStrong = OutlineSoftLight,
             isDark = false,
             scrim = Color(0xFF2A241E),
         )
@@ -92,7 +97,7 @@ fun MeloTheme(
     val scheme = if (dark) {
         darkColorScheme(
             primary = palette.accent,
-            onPrimary = Color(0xFF231A10),
+            onPrimary = Color.White,
             primaryContainer = palette.accentSoft,
             onPrimaryContainer = palette.accent,
             secondary = palette.accent,
@@ -104,18 +109,18 @@ fun MeloTheme(
             onSurfaceVariant = melo.textSecondary,
             surfaceContainer = Surface,
             surfaceContainerHigh = SurfaceElevated,
-            surfaceContainerHighest = Color(0xFF23232E),
+            surfaceContainerHighest = SurfaceTop,
             outline = OutlineSoft,
-            outlineVariant = Color(0xFF21212B),
+            outlineVariant = Color(0xFF1A1A1C),
             error = Color(0xFFE08C7E),
             onError = Color(0xFF2A120E),
         )
     } else {
         lightColorScheme(
             primary = palette.accent,
-            onPrimary = Color(0xFF2A1D0E),
+            onPrimary = Color(0xFF1A1A1A),
             primaryContainer = palette.accent.copy(alpha = 0.22f),
-            onPrimaryContainer = Color(0xFF4A3A28),
+            onPrimaryContainer = Color(0xFF2A1D0E),
             secondary = palette.accent,
             background = Paper,
             onBackground = melo.textPrimary,
@@ -125,7 +130,7 @@ fun MeloTheme(
             onSurfaceVariant = melo.textSecondary,
             surfaceContainer = PaperSurface,
             surfaceContainerHigh = PaperElevated,
-            surfaceContainerHighest = Color(0xFFFFFFFF),
+            surfaceContainerHighest = Color.White,
             outline = OutlineSoftLight,
             outlineVariant = Color(0xFFEAE3D8),
             error = Color(0xFFB4553F),
@@ -135,10 +140,10 @@ fun MeloTheme(
 
     val r = config.cornerRadius
     val shapes = MeloShapes.copy(
-        small = RoundedCornerShape((r * 0.7f).dp),
+        small = RoundedCornerShape((r * 0.5f).dp),
         medium = RoundedCornerShape(r.dp),
-        large = RoundedCornerShape((r * 1.3f).dp),
-        extraLarge = RoundedCornerShape((r * 1.7f).dp),
+        large = RoundedCornerShape((r * 1.5f).dp),
+        extraLarge = RoundedCornerShape((r * 2.0f).dp),
     )
 
     CompositionLocalProvider(

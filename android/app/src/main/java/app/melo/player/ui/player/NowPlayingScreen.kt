@@ -64,8 +64,8 @@ import app.melo.player.ui.components.LocalTrackActions
 import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.formatDuration
 import app.melo.player.ui.theme.LocalMeloColors
-import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun NowPlayingScreen(
@@ -82,7 +82,6 @@ fun NowPlayingScreen(
     val track = state.current
 
     var isFavorite by remember(track?.key) { mutableStateOf(false) }
-    var scrub by remember(track?.key) { mutableStateOf<Float?>(null) }
 
     LaunchedEffect(track?.key) {
         isFavorite = track?.let { ServiceLocator.library.isFavorite(it.key) } ?: false
@@ -145,9 +144,9 @@ fun NowPlayingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .shadow(24.dp, RoundedCornerShape(MeloTheme.radius))
-                    .clip(RoundedCornerShape(MeloTheme.radius)),
-                corner = MeloTheme.radius,
+                    .shadow(24.dp, RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(12.dp)),
+                corner = 12.dp,
                 contentDescription = "Album artwork",
             )
 
@@ -187,35 +186,12 @@ fun NowPlayingScreen(
 
             Spacer(Modifier.height(Spacing.md))
 
-            val duration = state.durationMs.takeIf { it > 0 } ?: (track?.durationMs ?: 0L)
-            val position = (scrub?.times(duration)?.toLong() ?: state.positionMs).coerceIn(0L, maxOf(duration, 1L))
-            Slider(
-                value = if (duration > 0) position.toFloat() / duration else 0f,
-                onValueChange = { scrub = it },
-                onValueChangeFinished = {
-                    val d = state.durationMs.takeIf { it > 0 } ?: (track?.durationMs ?: 0L)
-                    scrub?.let { if (d > 0) app.playback.seekTo((it * d).toLong()) }
-                    scrub = null
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = LocalMeloColors.current.outlineSoft,
-                ),
+            SeekBar(
+                position = app.playback.position,
+                durationMs = state.durationMs.takeIf { it > 0 } ?: (track?.durationMs ?: 0L),
+                trackKey = track?.key,
+                onSeek = { app.playback.seekTo(it) },
             )
-            Row(Modifier.fillMaxWidth()) {
-                Text(
-                    formatDuration(position),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LocalMeloColors.current.textSecondary,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "-" + formatDuration((duration - position).coerceAtLeast(0L)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LocalMeloColors.current.textSecondary,
-                )
-            }
 
             Spacer(Modifier.height(Spacing.sm))
 
@@ -239,7 +215,7 @@ fun NowPlayingScreen(
 
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(68.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable { app.playback.toggle() },
@@ -248,7 +224,7 @@ fun NowPlayingScreen(
                     Icon(
                         if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (state.isPlaying) "Pause" else "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(34.dp),
                     )
                 }
@@ -302,6 +278,47 @@ fun NowPlayingScreen(
 }
 
 @Composable
+private fun SeekBar(
+    position: StateFlow<Long>,
+    durationMs: Long,
+    trackKey: String?,
+    onSeek: (Long) -> Unit,
+) {
+    val duration = durationMs.coerceAtLeast(0L)
+    var scrub by remember(trackKey) { mutableStateOf<Float?>(null) }
+    val positionMs by position.collectAsStateWithLifecycle()
+    val shown = (scrub?.times(duration)?.toLong() ?: positionMs)
+        .coerceIn(0L, maxOf(duration, 1L))
+
+    Slider(
+        value = if (duration > 0) shown.toFloat() / duration else 0f,
+        onValueChange = { scrub = it },
+        onValueChangeFinished = {
+            if (duration > 0) scrub?.let { onSeek((it * duration).toLong()) }
+            scrub = null
+        },
+        colors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = LocalMeloColors.current.outlineSoft,
+        ),
+    )
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            formatDuration(shown),
+            style = MaterialTheme.typography.labelSmall,
+            color = LocalMeloColors.current.textSecondary,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            "-" + formatDuration((duration - shown).coerceAtLeast(0L)),
+            style = MaterialTheme.typography.labelSmall,
+            color = LocalMeloColors.current.textSecondary,
+        )
+    }
+}
+
+@Composable
 private fun ToggleIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     active: Boolean,
@@ -324,7 +341,7 @@ private fun PillAction(
 ) {
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
