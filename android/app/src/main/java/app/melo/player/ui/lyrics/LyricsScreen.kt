@@ -40,10 +40,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,11 +73,13 @@ import app.melo.player.data.lyrics.LyricsMode
 import app.melo.player.data.lyrics.LyricsSync
 import app.melo.player.data.model.Track
 import app.melo.player.data.remote.LyricsRemote
+import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
 import app.melo.player.ui.components.CircleIconButton
 import app.melo.player.ui.components.EmptyState
 import app.melo.player.ui.components.LoadingRow
 import app.melo.player.ui.components.MeloTextButton
+import app.melo.player.ui.components.NetworkStatus
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
 import app.melo.player.ui.theme.lyricsFamily
@@ -99,21 +103,46 @@ class LyricsViewModel : ViewModel() {
     private val _state = MutableStateFlow<LyricsUi>(LyricsUi.Loading)
     val state: StateFlow<LyricsUi> = _state.asStateFlow()
 
+    /**
+     * The cover melo saved beside this song in its folder, when there is one. Preferred over
+     * the provider's artwork URL, so a downloaded song keeps its picture with no connection.
+     * Null — while the folder is being checked, or for a song melo never saved — falls back
+     * to the artwork the track itself carries.
+     */
+    private val _backdrop = MutableStateFlow<String?>(null)
+    val backdrop: StateFlow<String?> = _backdrop.asStateFlow()
+
     private var loadedKey: String? = null
 
     fun load(track: Track?) {
         if (track == null) {
             _state.value = LyricsUi.Empty
+            _backdrop.value = null
             return
         }
         if (loadedKey == track.key && _state.value is LyricsUi.Ready) return
         loadedKey = track.key
+        // Cleared straight away: the previous song's cover must never linger over this one.
+        _backdrop.value = null
         viewModelScope.launch {
             _state.value = LyricsUi.Loading
-            val outcome = runCatching { LyricsRemote.fetch(track) }
+            // A song in the melo folder carries its own `.lrc` and `.jpg`: read them off the
+            // disk first, so a downloaded song shows its lyrics and its picture with no
+            // connection at all. The lyrics services are only asked when the folder has
+            // nothing for this song.
+            val saved = runCatching { ServiceLocator.downloads.savedLyrics(track) }.getOrNull()
+            _backdrop.value = runCatching { ServiceLocator.downloads.savedArtwork(track) }.getOrNull()
+            val outcome = runCatching { LyricsRemote.fetch(track, custom = saved) }
             _state.value = outcome.fold(
                 onSuccess = { doc ->
-                    if (doc.isEmpty) LyricsUi.Empty else LyricsUi.Ready(doc)
+                    when {
+                        !doc.isEmpty -> LyricsUi.Ready(doc)
+                        saved != null -> LyricsUi.Empty
+                        !NetworkStatus.isOnline() -> LyricsUi.Failed(
+                            "You're offline, and melo hasn't saved lyrics for this song.",
+                        )
+                        else -> LyricsUi.Empty
+                    }
                 },
                 onFailure = { LyricsUi.Failed("Couldn't reach the lyrics service.") },
             )
@@ -148,23 +177,34 @@ private fun rememberReducedMotion(): Boolean {
 /**
  * Smoother playback position than the 500 ms player tick: interpolates from the last
  * reported position so word highlighting advances evenly.
+ *
+ * It returns a reader rather than a value on purpose. A number that changes 20 times a
+ * second must not be read during composition: the lyric list asks for it inside
+ * `graphicsLayer` draw lambdas and behind `derivedStateOf`, so a tick repaints the words
+ * that are actually fading instead of recomposing the screen.
  */
 @Composable
-private fun rememberSmoothPosition(app: AppViewModel, playing: Boolean, base: Long, speed: Float): Long {
-    var smooth by remember { mutableLongStateOf(base) }
-    LaunchedEffect(playing, base, speed) {
-        if (!playing) {
-            smooth = base
-            return@LaunchedEffect
-        }
+private fun rememberSmoothPosition(
+    base: StateFlow<Long>,
+    playing: Boolean,
+    speed: Float,
+    enabled: Boolean,
+): () -> Long {
+    val smooth = remember { mutableLongStateOf(0L) }
+    val baseMs by base.collectAsStateWithLifecycle()
+    LaunchedEffect(playing, baseMs, speed, enabled) {
+        smooth.longValue = baseMs
+        if (!playing || !enabled) return@LaunchedEffect
         val started = android.os.SystemClock.elapsedRealtime()
         while (isActive) {
             val elapsed = android.os.SystemClock.elapsedRealtime() - started
-            smooth = base + (elapsed * speed).toLong()
+            smooth.longValue = baseMs + (elapsed * speed).toLong()
             delay(50)
         }
     }
-    return smooth
+    // Remembered so the reader keeps one identity across recompositions and the lyric
+    // list below stays skippable.
+    return remember { { smooth.longValue } }
 }
 
 @Composable
@@ -173,28 +213,40 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
     val settings by app.settings.collectAsStateWithLifecycle()
     val vm: LyricsViewModel = viewModel(factory = LyricsViewModel.Factory)
     val ui by vm.state.collectAsStateWithLifecycle()
+    val savedBackdrop by vm.backdrop.collectAsStateWithLifecycle()
     val track = playback.current
+    // The cover in the melo folder wins: it is already on the disk, so it draws with no
+    // network at all.
+    val backdrop = savedBackdrop ?: track?.artwork
     val reducedMotion = rememberReducedMotion()
 
     LaunchedEffect(track?.key) { vm.load(track) }
-
-    val position = rememberSmoothPosition(app, playback.isPlaying, playback.positionMs, playback.speed) +
-        settings.lyricsOffsetMs
 
     val doc = (ui as? LyricsUi.Ready)?.doc
     val mode = remember(doc, settings.lyricsMode) {
         doc?.supportedMode(LyricsMode.fromId(settings.lyricsMode)) ?: LyricsMode.fromId(settings.lyricsMode)
     }
+    val offsetMs = settings.lyricsOffsetMs.toLong()
+    val position = rememberSmoothPosition(
+        base = app.playback.position,
+        playing = playback.isPlaying,
+        speed = playback.speed,
+        enabled = mode != LyricsMode.PLAIN,
+    )
 
     val blurDp = if (Build.VERSION.SDK_INT >= 31) (settings.backgroundBlur / 100f * 48f).dp else 0.dp
     val extraScrim = if (Build.VERSION.SDK_INT >= 31) 0f else settings.backgroundBlur / 100f * 0.25f
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Artwork backdrop
-        if (settings.lyricsBackgroundArtwork && !track?.artwork.isNullOrBlank()) {
+        if (settings.lyricsBackgroundArtwork && !backdrop.isNullOrBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(track?.artwork)
+                    .data(backdrop)
+                    // Blur cost scales with the area being blurred, so the backdrop is decoded
+                    // small and scaled up: at this radius it looks the same and costs a
+                    // fraction of the memory and GPU time.
+                    .size(512)
                     .crossfade(500)
                     .build(),
                 contentDescription = null,
@@ -301,7 +353,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 if (track == null) "Start a song to see its lyrics."
-                                else "LRCLIB, NetEase and custom lyrics all came back empty.",
+                                else "LRCLIB and NetEase came back empty, and melo has no lyrics file saved for this song.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.6f),
                             )
@@ -320,6 +372,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                         doc = state.doc,
                         mode = mode,
                         position = position,
+                        offsetMs = offsetMs,
                         app = app,
                         reducedMotion = reducedMotion,
                         fontSize = settings.lyricsTextSize.sp,
@@ -364,7 +417,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                     when (doc?.source?.id) {
                         "lrclib" -> "LRCLIB"
                         "netease" -> "NetEase"
-                        "custom" -> "Custom"
+                        "custom" -> "saved in the melo folder"
                         else -> ""
                     },
                     style = MaterialTheme.typography.labelSmall,
@@ -393,7 +446,8 @@ private fun ModeChip(label: String, onClick: () -> Unit) {
 private fun LyricsBody(
     doc: LyricDocument,
     mode: LyricsMode,
-    position: Long,
+    position: () -> Long,
+    offsetMs: Long,
     app: AppViewModel,
     reducedMotion: Boolean,
     fontSize: androidx.compose.ui.unit.TextUnit,
@@ -409,6 +463,7 @@ private fun LyricsBody(
             doc = doc,
             mode = mode,
             position = position,
+            offsetMs = offsetMs,
             reducedMotion = reducedMotion,
             fontSize = fontSize,
             fontFamily = fontFamily,
@@ -456,7 +511,8 @@ private fun PlainLyrics(
 private fun SyncedLyrics(
     doc: LyricDocument,
     mode: LyricsMode,
-    position: Long,
+    position: () -> Long,
+    offsetMs: Long,
     reducedMotion: Boolean,
     fontSize: androidx.compose.ui.unit.TextUnit,
     fontFamily: androidx.compose.ui.text.font.FontFamily,
@@ -468,7 +524,11 @@ private fun SyncedLyrics(
 ) {
     val lines = doc.lines
     val listState = rememberLazyListState()
-    val activeIndex = LyricsSync.activeLine(lines, position)
+    // Derived from the interpolated position: only the scopes that display the active line
+    // wake up when it moves.
+    val activeIndex by remember(lines, offsetMs) {
+        derivedStateOf { LyricsSync.activeLine(lines, position() + offsetMs) }
+    }
     val isDragged by listState.interactionSource.collectIsDraggedAsState()
     var follow by remember { mutableStateOf(true) }
 
@@ -499,6 +559,14 @@ private fun SyncedLyrics(
             itemsIndexed(lines, key = { i, line -> "$i-${line.startMs}" }) { index, line ->
                 val distance = kotlin.math.abs(index - activeIndex)
                 val active = index == activeIndex
+                val activeLine = rememberUpdatedState(active)
+                // One derived value per line, so the word highlight wakes the line that owns
+                // it and nothing else.
+                val activeWord by remember(line) {
+                    derivedStateOf {
+                        if (activeLine.value) LyricsSync.activeWord(line, position() + offsetMs) else -1
+                    }
+                }
                 val lineAlpha = when {
                     active -> 1f
                     distance == 1 -> 0.55f
@@ -529,10 +597,8 @@ private fun SyncedLyrics(
                                 .graphicsLayer { scaleX = scale; scaleY = scale },
                             horizontalArrangement = if (center) Arrangement.Center else Arrangement.Start,
                         ) {
-                            val activeWord = if (active) LyricsSync.activeWord(line, position) else -1
                             line.words.forEachIndexed { wIndex, word ->
                                 val isActiveWord = wIndex == activeWord
-                                val progress = if (isActiveWord) LyricsSync.wordProgress(word, position) else 0f
                                 val wordColor by animateColorAsState(
                                     targetValue = when {
                                         isActiveWord && karaoke -> MaterialTheme.colorScheme.primary
@@ -559,7 +625,12 @@ private fun SyncedLyrics(
                                     color = wordColor,
                                     modifier = Modifier
                                         .padding(end = 6.dp)
+                                        // Draw-time read: the karaoke fade on the sung word runs
+                                        // without recomposing a single word 20 times a second.
                                         .graphicsLayer {
+                                            val progress = if (isActiveWord) {
+                                                LyricsSync.wordProgress(word, position() + offsetMs)
+                                            } else 0f
                                             scaleX = wordScale
                                             scaleY = wordScale
                                             this.alpha = if (isActiveWord && karaoke) {
@@ -585,8 +656,7 @@ private fun SyncedLyrics(
                                 .graphicsLayer { scaleX = scale; scaleY = scale },
                         )
                         if (active && line.words.isEmpty() && lines[index].endMs > line.startMs) {
-                            // Line-level progress bar for line-by-line mode.
-                            val progress = LyricsSync.lineProgress(line, position)
+                            // Line-level progress bar for line-by-line mode, read at draw time.
                             Box(
                                 Modifier
                                     .padding(top = 6.dp)
@@ -594,7 +664,10 @@ private fun SyncedLyrics(
                                     .height(2.dp)
                                     .clip(RoundedCornerShape(2.dp))
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
-                                    .graphicsLayer { scaleX = progress; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f) },
+                                    .graphicsLayer {
+                                        scaleX = LyricsSync.lineProgress(line, position() + offsetMs)
+                                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                                    },
                             )
                         }
                     }

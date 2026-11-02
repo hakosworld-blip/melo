@@ -84,7 +84,9 @@ fun MeloArt(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(url)
-                    .crossfade(220)
+                    // No crossfade: thumbnails recycle through long lists, and a fade keeps
+                    // the outgoing bitmap alive while it runs.
+                    .crossfade(false)
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,

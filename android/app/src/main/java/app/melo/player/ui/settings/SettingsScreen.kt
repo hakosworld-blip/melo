@@ -14,15 +14,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,7 +43,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.melo.player.BuildConfig
 import app.melo.player.data.lyrics.LyricsMode
@@ -46,6 +54,10 @@ import app.melo.player.data.model.StreamQuality
 import app.melo.player.data.prefs.Settings
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
+import app.melo.player.ui.brand.IconVariant
+import app.melo.player.ui.brand.IconVariants
+import app.melo.player.ui.brand.MeloMark
+import app.melo.player.ui.brand.iconVariantById
 import app.melo.player.ui.components.ConfirmDialog
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.ScreenHeader
@@ -68,6 +80,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
     var confirmClearDownloads by remember { mutableStateOf(false) }
     var confirmClearHistory by remember { mutableStateOf(false) }
     var showLicenses by remember { mutableStateOf(false) }
+    var showIconPicker by remember { mutableStateOf(false) }
+    var showLogoPicker by remember { mutableStateOf(false) }
 
     val downloadBytes by ServiceLocator.database.downloadDao().totalBytes()
         .collectAsStateWithLifecycle(initialValue = 0L)
@@ -186,6 +200,59 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingSwitch("Compact layout", "Tighter spacing for smaller screens", settings.compact) {
                         app.setCompact(it)
+                    }
+                }
+
+                /* ------------------------ customization ---------------------- */
+                item { GroupTitle("Customization") }
+                item {
+                    SettingBlock("App icon") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MeloMark(settings.appIconId, size = 54.dp)
+                            Spacer(Modifier.width(Spacing.md))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    iconVariantById(settings.appIconId).label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    "The icon on your home screen. Pick any of the 27 styles, then let your launcher refresh.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = LocalMeloColors.current.textSecondary,
+                                )
+                            }
+                            Text(
+                                "Change",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.clickable { showIconPicker = true }.padding(8.dp),
+                            )
+                        }
+                    }
+                }
+                item {
+                    SettingBlock("Logo in the app") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MeloMark(settings.logoId, size = 54.dp)
+                            Spacer(Modifier.width(Spacing.md))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    iconVariantById(settings.logoId).label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    "The mark beside the greeting on your home screen. It can differ from the app icon.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = LocalMeloColors.current.textSecondary,
+                                )
+                            }
+                            Text(
+                                "Change",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.clickable { showLogoPicker = true }.padding(8.dp),
+                            )
+                        }
                     }
                 }
 
@@ -495,6 +562,102 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
     }
     if (showLicenses) {
         LicensesDialog(onDismiss = { showLicenses = false })
+    }
+    if (showIconPicker) {
+        IconPickerDialog(
+            title = "App icon",
+            subtitle = "Your pick is applied straight away. Most launchers show the new icon right away; a few need a moment or a redraw.",
+            selected = settings.appIconId,
+            onSelect = { id ->
+                app.setAppIcon(id)
+                showIconPicker = false
+            },
+            onDismiss = { showIconPicker = false },
+        )
+    }
+    if (showLogoPicker) {
+        IconPickerDialog(
+            title = "Logo in the app",
+            subtitle = "Used wherever melo shows its own mark inside the app.",
+            selected = settings.logoId,
+            onSelect = { id ->
+                app.setLogo(id)
+                showLogoPicker = false
+            },
+            onDismiss = { showLogoPicker = false },
+        )
+    }
+}
+
+@Composable
+private fun IconPickerDialog(
+    title: String,
+    subtitle: String,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = RoundedCornerShape(26.dp),
+            color = LocalMeloColors.current.surfaceElevated,
+            modifier = Modifier.fillMaxWidth(0.94f),
+        ) {
+            Column(Modifier.padding(vertical = Spacing.md)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = Spacing.screenH),
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalMeloColors.current.textSecondary,
+                    modifier = Modifier.padding(horizontal = Spacing.screenH, vertical = 4.dp),
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    items(IconVariants, key = { it.id }) { variant ->
+                        IconChoice(
+                            variant = variant,
+                            selected = variant.id == selected,
+                            onClick = { onSelect(variant.id) },
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End).padding(end = Spacing.sm),
+                ) { Text("Close") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IconChoice(variant: IconVariant, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 2.dp),
+    ) {
+        MeloMark(variant.id, size = 52.dp, highlighted = selected)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            variant.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) MaterialTheme.colorScheme.primary else LocalMeloColors.current.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

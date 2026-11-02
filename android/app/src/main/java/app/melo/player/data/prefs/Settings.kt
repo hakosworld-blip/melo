@@ -32,6 +32,9 @@ data class Settings(
     val backgroundDim: Int = 45,
     val backgroundGradient: Boolean = true,
     val dynamicAccent: Boolean = true,
+    // brand: which launcher icon and which in-app mark the user picked
+    val appIconId: String = "default",
+    val logoId: String = "default",
     // lyrics
     val lyricsMode: String = LyricsMode.LINE.id,
     val lyricsTextSize: Int = 30,
@@ -78,6 +81,8 @@ class SettingsRepository(private val context: Context) {
         val dim = intPreferencesKey("bg_dim")
         val gradient = booleanPreferencesKey("bg_gradient")
         val dynamicAccent = booleanPreferencesKey("dynamic_accent")
+        val appIcon = stringPreferencesKey("app_icon")
+        val logo = stringPreferencesKey("logo_id")
 
         val lyricsMode = stringPreferencesKey("lyrics_mode")
         val lyricsSize = intPreferencesKey("lyrics_size")
@@ -121,6 +126,8 @@ class SettingsRepository(private val context: Context) {
             backgroundDim = p[K.dim] ?: 45,
             backgroundGradient = p[K.gradient] ?: true,
             dynamicAccent = p[K.dynamicAccent] ?: true,
+            appIconId = p[K.appIcon] ?: "default",
+            logoId = p[K.logo] ?: "default",
             lyricsMode = p[K.lyricsMode] ?: LyricsMode.LINE.id,
             lyricsTextSize = p[K.lyricsSize] ?: 30,
             lyricsFont = p[K.lyricsFont] ?: "sans",
@@ -160,6 +167,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setBackgroundDim(value: Int) = edit { it[K.dim] = value.coerceIn(0, 90) }
     suspend fun setBackgroundGradient(value: Boolean) = edit { it[K.gradient] = value }
     suspend fun setDynamicAccent(value: Boolean) = edit { it[K.dynamicAccent] = value }
+    suspend fun setAppIcon(id: String) = edit { it[K.appIcon] = id }
+    suspend fun setLogo(id: String) = edit { it[K.logo] = id }
 
     suspend fun setLyricsMode(mode: String) = edit { it[K.lyricsMode] = mode }
     suspend fun setLyricsTextSize(size: Int) = edit { it[K.lyricsSize] = size.coerceIn(18, 52) }

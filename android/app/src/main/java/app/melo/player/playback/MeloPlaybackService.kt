@@ -42,13 +42,31 @@ class MeloPlaybackService : MediaSessionService() {
 
     private var player: ExoPlayer? = null
     private var session: MediaSession? = null
-    private var audioCache: SimpleCache? = null
+
+    /** Built on the playback thread, released from the main thread. */
+    @Volatile private var audioCache: SimpleCache? = null
+
+    /**
+     * Building the source chain opens the audio cache (a SQLite-backed file store) and reads
+     * the user's cache size from DataStore. Both are disk work, and this service is created
+     * while the app is still starting — the controller binds to it during launch — so the
+     * chain is built on first read (a playback thread) instead of in onCreate.
+     */
+    private val dataSourceFactory: DataSource.Factory by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        buildDataSourceFactory()
+    }
 
     override fun onCreate() {
         super.onCreate()
         ServiceLocator.init(this)
 
-        val mediaSourceFactory = DefaultMediaSourceFactory(buildDataSourceFactory())
+        // Swap Media3's stock notification for melo's: melo small icon, "Playback"
+        // channel, and a compact row that is always previous / play-pause / next.
+        setMediaNotificationProvider(MeloNotificationProvider(this))
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(
+            DeferredDataSourceFactory { dataSourceFactory },
+        )
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 30_000,
@@ -191,7 +209,8 @@ class MeloPlaybackService : MediaSessionService() {
                         dataSpec.withUri(android.net.Uri.parse(resolved.url)).buildUpon()
                             .setKey(track.key).build()
                     is ResolvedStream.Local ->
-                        dataSpec.withUri(android.net.Uri.fromFile(File(resolved.path))).buildUpon()
+                        // A plain file path below Android 10, a content URI above it.
+                        dataSpec.withUri(android.net.Uri.parse(resolved.ref)).buildUpon()
                             .setKey(track.key).build()
                     is ResolvedStream.Failure ->
                         throw IOException(resolved.message)
@@ -200,6 +219,17 @@ class MeloPlaybackService : MediaSessionService() {
         }
         return ResolvingDataSource.Factory(cacheFactory, resolver)
     }
+}
+
+/**
+ * Defers building the real source chain until the first read, which happens on a playback
+ * thread rather than while the service is being created on the main thread.
+ */
+@OptIn(UnstableApi::class)
+class DeferredDataSourceFactory(
+    private val delegate: () -> DataSource.Factory,
+) : DataSource.Factory {
+    override fun createDataSource(): DataSource = delegate().createDataSource()
 }
 
 /**

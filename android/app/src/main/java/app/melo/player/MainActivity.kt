@@ -12,13 +12,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
 import app.melo.player.ui.MeloRoot
+import app.melo.player.ui.brand.DefaultIconId
+import app.melo.player.ui.brand.LauncherIcon
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.MeloThemeConfig
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -26,6 +30,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ServiceLocator.init(this)
         enableEdgeToEdge()
+
+        // The enabled launcher alias is the icon the home screen shows. Reconcile it once per
+        // launch so an app update, a cleared preference or a launcher reset cannot leave melo
+        // with the wrong icon (or with two).
+        lifecycleScope.launch {
+            val saved = runCatching { ServiceLocator.settings.current().appIconId }
+                .getOrDefault(DefaultIconId)
+            LauncherIcon.ensureApplied(this@MainActivity, saved)
+        }
 
         setContent {
             val app: AppViewModel = viewModel()

@@ -126,7 +126,10 @@ data class HomeSection(
 /** Result of resolving a playable URL for [Track]. */
 sealed interface ResolvedStream {
     data class Remote(val url: String, val hls: Boolean = false) : ResolvedStream
-    data class Local(val path: String) : ResolvedStream
+
+    /** A file in the melo folder: a plain path, or a `content://` URI on Android 10+. */
+    data class Local(val ref: String) : ResolvedStream
+
     data class Failure(val message: String) : ResolvedStream
 }
 

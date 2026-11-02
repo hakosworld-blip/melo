@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification small icon: melo's three-bar mark, pure white. The system tints/masks
+     small icons, so they must be a flat silhouette on a transparent background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.5,9.5 a1.5,1.5 0 0 1 3,0 V14.5 a1.5,1.5 0 0 1 -3,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.5,5.5 a1.5,1.5 0 0 1 3,0 V18.5 a1.5,1.5 0 0 1 -3,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.5,11.5 a1.5,1.5 0 0 1 3,0 V13.5 a1.5,1.5 0 0 1 -3,0 Z" />
+</vector>

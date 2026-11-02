@@ -7,6 +7,8 @@ import app.melo.player.data.prefs.Settings
 import app.melo.player.di.ServiceLocator
 import app.melo.player.playback.PlaybackController
 import app.melo.player.playback.PlaybackState
+import app.melo.player.ui.brand.DefaultIconId
+import app.melo.player.ui.brand.LauncherIcon
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -26,6 +28,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         playback.connect()
+        // Pick up anything already sitting in the melo folder: songs downloaded by an
+        // earlier install, or files the user copied in themselves.
+        viewModelScope.launch { runCatching { ServiceLocator.downloads.scanFolder() } }
     }
 
     fun setThemeMode(mode: String) = apply { ServiceLocator.settings.setThemeMode(mode) }
@@ -39,6 +44,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDim(value: Int) = apply { ServiceLocator.settings.setBackgroundDim(value) }
     fun setGradient(value: Boolean) = apply { ServiceLocator.settings.setBackgroundGradient(value) }
     fun setDynamicAccent(value: Boolean) = apply { ServiceLocator.settings.setDynamicAccent(value) }
+
+    /** Persists the choice, then flips the enabled launcher alias. */
+    fun setAppIcon(id: String) {
+        apply { ServiceLocator.settings.setAppIcon(id) }
+        LauncherIcon.apply(context, id)
+    }
+
+    fun setLogo(id: String) = apply { ServiceLocator.settings.setLogo(id) }
 
     fun setLyricsMode(mode: String) = apply { ServiceLocator.settings.setLyricsMode(mode) }
     fun setLyricsSize(value: Int) = apply { ServiceLocator.settings.setLyricsTextSize(value) }
@@ -73,7 +86,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDownloadWifiOnly(value: Boolean) = apply { ServiceLocator.settings.setDownloadWifiOnly(value) }
     fun setCacheLimit(mb: Int) = apply { ServiceLocator.settings.setCacheLimit(mb) }
     fun setShowStatsSource(value: Boolean) = apply { ServiceLocator.settings.setShowStatsSource(value) }
-    fun resetSettings() = apply { ServiceLocator.settings.resetToDefaults() }
+    fun resetSettings() {
+        apply { ServiceLocator.settings.resetToDefaults() }
+        // Resetting the preferences also resets the icon, so the launcher has to follow.
+        LauncherIcon.apply(context, DefaultIconId)
+    }
 
     fun clearError() = playback.clearError()
 

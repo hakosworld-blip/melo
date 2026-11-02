@@ -1,0 +1,271 @@
+=====================================================================
+ MELO — DO EVERYTHING FROM YOUR PHONE
+ Signing secrets, GitHub Actions, and releasing a signed APK
+=====================================================================
+
+Read this once from top to bottom before you start. Nothing here needs
+a computer, and nothing here needs Android Studio.
+
+---------------------------------------------------------------------
+THE THREE PARTS (so the rest makes sense)
+---------------------------------------------------------------------
+
+1. THE KEYSTORE — a small file on your phone that proves an APK is
+   yours. You make it once with a tool called keytool. Every future
+   melo update must be signed with the SAME file, or Android refuses
+   to install the update over the old app.
+
+2. THE SECRETS — four short values you paste into your GitHub
+   repository. The build server reads them, signs the APK, and then
+   forgets them. They are never written into the code.
+
+3. GITHUB ACTIONS — the build server of GitHub. It builds, tests,
+   signs and publishes melo. It runs in GitHub's cloud, NOT on your
+   phone. Your phone only asks it to start.
+
+No part of the build happens on your phone. That is why this works
+from a phone: you are pressing buttons, not compiling code.
+
+---------------------------------------------------------------------
+WHAT TO INSTALL ON THE PHONE FIRST
+---------------------------------------------------------------------
+
+* Termux — a terminal app, from F-Droid (https://f-droid.org) or from
+  the Termux GitHub releases page. Do NOT use the old Play Store build;
+  it is abandoned and its packages fail.
+* Optional but nicer: the Termux:API app, if you want to copy text to
+  the clipboard straight from Termux.
+* The GitHub app, or just your phone's browser on github.com. For the
+  Secrets page the browser in "Desktop site" mode is more reliable than
+  the GitHub app.
+
+Open Termux and run this once:
+
+    pkg update && pkg install openjdk-17 gh -y
+
+`openjdk-17` gives you `keytool`. `gh` is GitHub's command line tool,
+the easiest way to set secrets from a phone.
+
+---------------------------------------------------------------------
+STEP 1 — MAKE YOUR KEYSTORE (once, on the phone, in Termux)
+---------------------------------------------------------------------
+
+    keytool -genkeypair -v \
+      -keystore melo-release.jks \
+      -alias melo \
+      -keyalg RSA -keysize 4096 -validity 10000 \
+      -dname "CN=melo, O=melo, C=US"
+
+It will ask you for:
+
+  * "Enter keystore password:"  -> make one up, long, and WRITE IT DOWN
+  * "Re-enter new password:"    -> same again
+  * (a "What is your first and last name?" block only appears if you
+     leave out -dname; we passed -dname, so it should not ask)
+  * "Enter key password for <melo>:" -> just press Enter to use the
+     same password as the keystore. Simpler, and the workflow accepts
+     either.
+
+When it finishes you have a file called `melo-release.jks` in your
+Termux home directory.
+
+CHECK IT:
+
+    keytool -list -keystore melo-release.jks -alias melo
+
+You should see `Your keystore contains 1 entry` and the alias `melo`.
+If it says "keytool error: java.io.IOException", you typed the
+password wrong.
+
+BACK IT UP RIGHT NOW (two separate places, e.g. Google Drive AND an SD
+card). Termux's home directory is erased if you uninstall or clear the
+app data, and a lost keystore means you can never update melo again —
+you would have to publish under a new app identity.
+
+    cp melo-release.jks ~/storage/shared/Download/
+    cp melo-release.jks ~/storage/shared/Download/melo-release-BACKUP.jks
+
+If `~/storage/shared` does not exist, run `termux-setup-storage` first
+and allow the permission prompt.
+
+---------------------------------------------------------------------
+STEP 2 — TURN THE KEYSTORE INTO TEXT (the secret value)
+---------------------------------------------------------------------
+
+GitHub secrets are text, so the .jks file has to be encoded as one
+long line of Base64 text:
+
+    base64 -w0 melo-release.jks > melo-release.jks.b64
+    wc -c melo-release.jks.b64
+
+`-w0` is important: it means "no line breaks". A wrapped value is the
+number one reason a release build fails with
+"Decoded keystore is empty" or a keytool error.
+
+Now you have the text. Copy it straight into GitHub from Termux so it
+never passes through a clipboard or another app:
+
+    gh auth login
+
+Choose: GitHub.com -> HTTPS -> Login with a web browser. It shows a
+short code; open the link it prints in your phone browser and paste the
+code. When it finishes you are authenticated inside Termux.
+
+---------------------------------------------------------------------
+STEP 3 — ADD THE FOUR SECRETS TO YOUR REPOSITORY
+---------------------------------------------------------------------
+
+Open the repository on github.com in your phone browser (Desktop site
+if the layout is cramped), then:
+
+  Settings (the gear)  ->  Secrets and variables  ->  Actions
+  ->  New repository secret
+
+Add these four, one at a time. The names must be EXACTLY:
+
+  1. ANDROID_KEYSTORE_BASE64
+     Value: the entire contents of melo-release.jks.b64 (one long line)
+
+  2. ANDROID_KEYSTORE_PASSWORD
+     Value: the keystore password you chose in Step 1
+
+  3. ANDROID_KEY_ALIAS
+     Value: melo            (the alias you passed to -alias)
+
+  4. ANDROID_KEY_PASSWORD
+     Value: the key password (the same one, if you pressed Enter)
+
+FASTER, ALL FROM TERMUX (no copy-paste, no clipboard):
+
+    gh secret set ANDROID_KEYSTORE_BASE64     < melo-release.jks.b64
+    gh secret set ANDROID_KEYSTORE_PASSWORD
+    gh secret set ANDROID_KEY_ALIAS
+    gh secret set ANDROID_KEY_PASSWORD
+
+For the last three it waits for you to paste the value and press Enter
+(they are invisible as you type — that is normal). `gh secret list`
+shows the four names back; it never shows the values.
+
+NOTE: Settings in the GitHub app is per-repository. If you cannot find
+"Secrets and variables", you are probably in the app's own settings or
+in the wrong repository — use the browser.
+
+---------------------------------------------------------------------
+STEP 4 — RUN THE WORKFLOW
+---------------------------------------------------------------------
+
+Option A — browser (easiest from a phone)
+
+  1. Repository -> "Actions" tab.
+  2. Left side: "Android release".
+  3. Button "Run workflow" (right side; if missing, the workflow file
+     is not in the default branch yet, or Actions are disabled in
+     Settings -> Actions -> General).
+  4. Fill the boxes:
+       version_name : 1.0.1
+       release_tag  : v1.0.1     (must start with a "v")
+  5. Press the green "Run workflow".
+  6. Give it 5-10 minutes. The run turns green when it is done.
+
+Option B — push a version tag from Termux (makes a Release too)
+
+    cd /path/to/your/melo/checkout      # only if you have the repo here
+    git tag v1.0.1
+    git push origin v1.0.1
+
+Option C — start it with gh from Termux, no browser at all
+
+    gh workflow run android-release.yml -f version_name=1.0.1 -f release_tag=v1.0.1
+    gh run watch
+
+What the workflow does, in order: checks that all four secrets exist
+(it FAILS immediately if one is missing, on purpose — an unsigned APK
+is never published as a release), sets up Java and the Android SDK,
+runs the unit tests, decodes your keystore into a temporary file,
+builds the release APK, verifies with `apksigner` that it is signed and
+NOT with a debug key, checks the package id is `app.melo.player` and
+the version matches, writes a SHA-256 checksum, uploads all of it, and
+publishes the GitHub Release.
+
+---------------------------------------------------------------------
+STEP 5 — INSTALL IT
+---------------------------------------------------------------------
+
+  1. Repository -> "Releases" (right side of the main page).
+  2. Download `melo-1.0.1.apk` to the phone.
+  3. Tap it. Android asks permission to install from this source
+     (Chrome / Files): allow it, then Install.
+  4. Open melo and allow notifications — that is what puts the playback
+     controls on the lock screen.
+
+CHECK THE DOWNLOAD IS INTACT (optional, nice to do in Termux):
+
+    cd ~/storage/shared/Download
+    sha256sum -c melo-1.0.1.apk.sha256
+
+It should print `melo-1.0.1.apk: OK`.
+
+IMPORTANT: this APK is signed with YOUR key. If you previously
+installed a test build signed with a different key, Android will refuse
+("App not installed"). Uninstall the old melo first, then install this
+one. From here on, every release signed with the same keystore installs
+as a normal update.
+
+---------------------------------------------------------------------
+RELEASING THE NEXT VERSION
+---------------------------------------------------------------------
+
+1. Change nothing about the keystore — same file, same passwords.
+2. Start the workflow again with a higher version_name (1.0.2, 1.0.3…)
+   and a matching release_tag (v1.0.2…).
+   The version code is filled in automatically from the run number, so
+   each release is installable over the one before it.
+
+---------------------------------------------------------------------
+WHEN SOMETHING GOES WRONG
+---------------------------------------------------------------------
+
+"MELO_KEYSTORE... is not set" / "Missing secret"
+  -> One of the four secret names is missing or spelled differently.
+     Names are case-sensitive. Re-add it.
+
+"Decoded keystore is empty"
+  -> The Base64 value has line breaks, or you pasted only part of it.
+     Re-run: base64 -w0 melo-release.jks > melo-release.jks.b64
+     and set the secret again from that file.
+
+"keytool error: ... password was incorrect"
+  -> ANDROID_KEYSTORE_PASSWORD does not match the keystore.
+
+"apksigner did not verify" / "signed with a debug key"
+  -> The secrets are wrong or the alias does not exist in the keystore.
+     Check with: keytool -list -keystore melo-release.jks
+
+Unit tests fail (red step, "Run unit tests")
+  -> Nothing was published. Open the failing test in the log; the APK
+     step never ran.
+
+No "Run workflow" button
+  -> Settings -> Actions -> General -> make sure Actions are allowed,
+     and that .github/workflows/android-release.yml is on the default
+     branch (main).
+
+"App not installed" on the phone
+  -> A different signing key already has melo installed. Uninstall the
+     old one, then install this APK.
+
+I cannot remember the passwords
+  -> If the keystore is still there you can check the store password
+     with `keytool -list`. The key password cannot be recovered; if it
+     is lost, make a new keystore and ship under a new app id.
+
+---------------------------------------------------------------------
+THE ONE RULE
+---------------------------------------------------------------------
+
+Back up `melo-release.jks` and both passwords somewhere you will still
+have in five years. Anyone who has that file plus the passwords can
+publish melo updates as you — and if you lose it, you cannot update
+the app you already installed.
+
+=====================================================================

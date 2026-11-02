@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">melo</string>
+
+    <!-- Playback notification (background playback media controls) -->
+    <string name="notification_channel_playback">Playback</string>
+    <string name="notification_channel_playback_desc">Controls shown while melo is playing music in the background</string>
+    <string name="notification_control_play">Play</string>
+    <string name="notification_control_pause">Pause</string>
+    <string name="notification_control_previous">Previous track</string>
+    <string name="notification_control_next">Next track</string>
 </resources>
