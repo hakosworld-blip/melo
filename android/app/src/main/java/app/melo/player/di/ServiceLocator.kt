@@ -43,7 +43,7 @@ object ServiceLocator {
             settings = SettingsRepository(app)
             library = LibraryRepository(database.libraryDao())
             folder = MeloFolder(app)
-            resolver = StreamResolver(database.downloadDao(), settings, folder)
+            resolver = StreamResolver(database.downloadDao(), settings, folder, app)
             music = MusicRepository(library, database.downloadDao(), settings)
             downloads = DownloadManager(app, database.downloadDao(), settings, resolver, folder)
             initialised = true

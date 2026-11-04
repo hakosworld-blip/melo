@@ -1,5 +1,7 @@
 package app.melo.player.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,12 +52,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.melo.player.AppInfo
 import app.melo.player.BuildConfig
 import app.melo.player.data.lyrics.LyricsMode
 import app.melo.player.data.model.StreamQuality
 import app.melo.player.data.prefs.Settings
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
+import app.melo.player.ui.ExtractorStatus
 import app.melo.player.ui.brand.IconVariant
 import app.melo.player.ui.brand.IconVariants
 import app.melo.player.ui.brand.MeloMark
@@ -64,14 +70,17 @@ import app.melo.player.ui.components.ScreenHeader
 import app.melo.player.ui.components.formatBytes
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Palettes
+import app.melo.player.ui.theme.paletteById
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
     val settings by app.settings.collectAsStateWithLifecycle()
     val playback by app.playback.state.collectAsStateWithLifecycle()
+    val extractor by app.extractor.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -120,32 +129,6 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                             options = listOf("dark" to "Dark", "light" to "Light", "system" to "System"),
                             selected = settings.themeMode,
                             onSelect = { app.setThemeMode(it) },
-                        )
-                    }
-                }
-                item {
-                    SettingBlock("Accent colour") {
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            Palettes.forEach { palette ->
-                                val selected = palette.id == settings.paletteId
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(palette.accent)
-                                        .then(
-                                            if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.onBackground, CircleShape)
-                                            else Modifier,
-                                        )
-                                        .clickable { app.setPalette(palette.id) },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            Palettes.first { it.id == settings.paletteId }.label,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = LocalMeloColors.current.textSecondary,
                         )
                     }
                 }
@@ -205,6 +188,45 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
 
                 /* ------------------------ customization ---------------------- */
                 item { GroupTitle("Customization") }
+                item {
+                    SettingBlock("Accent colour") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            Palettes.forEach { palette ->
+                                // A custom colour takes the selection away from every preset.
+                                val selected = !settings.customAccent && palette.id == settings.paletteId
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(palette.accent)
+                                        .then(
+                                            if (selected) {
+                                                Modifier.border(2.dp, MaterialTheme.colorScheme.onBackground, CircleShape)
+                                            } else {
+                                                Modifier
+                                            },
+                                        )
+                                        .clickable { app.setPalette(palette.id) },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (settings.customAccent) "Custom colour" else paletteById(settings.paletteId).label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LocalMeloColors.current.textSecondary,
+                        )
+                        Spacer(Modifier.height(Spacing.sm))
+                        SettingSwitch(
+                            "Custom accent",
+                            "Mix any colour you like with the sliders",
+                            settings.customAccent,
+                        ) { app.setCustomAccent(it) }
+                        if (settings.customAccent) {
+                            AccentMixer(argb = settings.accentColor, onPick = { app.setAccentColor(it) })
+                        }
+                    }
+                }
                 item {
                     SettingBlock("App icon") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -373,6 +395,22 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
+                    SettingRow(
+                        "yt-dlp nightly",
+                        extractorSummary(extractor),
+                        action = {
+                            Text(
+                                if (extractor.busy) "Working…" else "Update",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable(enabled = !extractor.busy) { app.refreshExtractor() }
+                                    .padding(8.dp),
+                            )
+                        },
+                    )
+                }
+                item {
                     SettingSwitch("Stream on mobile data", "Off means playback waits for Wi-Fi", settings.mobileDataStreaming) {
                         app.setMobileData(it)
                     }
@@ -493,9 +531,25 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item { GroupTitle("About") }
                 item {
                     SettingRow(
-                        "melo",
-                        "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.BUILD_TYPE}",
+                        "Version",
+                        "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}) · ${BuildConfig.BUILD_TYPE}",
                         action = {},
+                    )
+                }
+                item {
+                    SettingRow(
+                        "GitHub repository",
+                        AppInfo.RepoLabel,
+                        action = {
+                            Text(
+                                "Open",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable { openUrl(context, AppInfo.RepoUrl) }
+                                    .padding(8.dp),
+                            )
+                        },
                     )
                 }
                 item {
@@ -734,6 +788,7 @@ private fun SettingSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
+    onChangeFinished: (() -> Unit)? = null,
     onChange: (Float) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.screenH, vertical = Spacing.xs)) {
@@ -741,7 +796,13 @@ private fun SettingSlider(
             Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Text(valueLabel, style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps)
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = range,
+            steps = steps,
+            onValueChangeFinished = onChangeFinished,
+        )
     }
 }
 
@@ -814,4 +875,71 @@ private fun LicensesDialog(onDismiss: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
     )
+}
+
+/**
+ * Hue / saturation / brightness mixer for a custom accent.
+ *
+ * The sliders keep their own HSV state while dragging, so the hue survives low saturation
+ * instead of collapsing to grey, and the colour is written to settings when a drag ends rather
+ * than on every frame.
+ */
+@Composable
+private fun AccentMixer(argb: Int, onPick: (Int) -> Unit) {
+    val seed = remember { FloatArray(3).also { android.graphics.Color.colorToHSV(argb, it) } }
+    var hue by remember { mutableFloatStateOf(seed[0]) }
+    var saturation by remember { mutableFloatStateOf(seed[1].coerceAtLeast(0.35f)) }
+    var brightness by remember { mutableFloatStateOf(seed[2].coerceAtLeast(0.45f)) }
+
+    val preview = Color.hsv(hue, saturation, brightness)
+    val commit = { onPick(preview.toArgb()) }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(preview)
+                .border(1.dp, LocalMeloColors.current.outlineStrong, CircleShape),
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            String.format(Locale.US, "#%06X", preview.toArgb() and 0xFFFFFF),
+            style = MaterialTheme.typography.titleMedium,
+            color = LocalMeloColors.current.textPrimary,
+        )
+    }
+    Spacer(Modifier.height(Spacing.sm))
+    SettingSlider("Hue", "${hue.toInt()}°", hue, 0f..360f, onChangeFinished = commit) { hue = it }
+    SettingSlider(
+        "Saturation",
+        "${(saturation * 100).toInt()}%",
+        saturation,
+        0f..1f,
+        onChangeFinished = commit,
+    ) { saturation = it }
+    SettingSlider(
+        "Brightness",
+        "${(brightness * 100).toInt()}%",
+        brightness,
+        0.15f..1f,
+        onChangeFinished = commit,
+    ) { brightness = it }
+}
+
+/** One-line description of the fallback extractor, for its settings row. */
+private fun extractorSummary(status: ExtractorStatus): String = when {
+    status.busy -> "Fetching the newest nightly build…"
+    status.version != null -> "Nightly ${status.version} · used when the fast path fails"
+    status.error != null -> "Unavailable · ${status.error}"
+    else -> "Not installed yet · tap Update to fetch the nightly extractor"
+}
+
+/** Opens a link outside the app; a device with no browser simply ignores it. */
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
 }

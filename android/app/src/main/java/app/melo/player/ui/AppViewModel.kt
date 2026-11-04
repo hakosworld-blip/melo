@@ -4,15 +4,24 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.melo.player.data.prefs.Settings
+import app.melo.player.data.remote.YtDlp
 import app.melo.player.di.ServiceLocator
 import app.melo.player.playback.PlaybackController
 import app.melo.player.playback.PlaybackState
 import app.melo.player.ui.brand.DefaultIconId
 import app.melo.player.ui.brand.LauncherIcon
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** What the settings screen knows about the yt-dlp-nightly fallback extractor. */
+data class ExtractorStatus(
+    val busy: Boolean = false,
+    val version: String? = null,
+    val error: String? = null,
+)
 
 /** Process-wide app state: preferences plus the one playback controller. */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -23,6 +32,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
 
     val playback: PlaybackController = PlaybackController(context, viewModelScope)
+
+    /**
+     * yt-dlp state is fetched on demand, never at start-up: initialising the embedded Python
+     * unpacks megabytes, and the fallback is only needed when InnerTube fails.
+     */
+    val extractor: MutableStateFlow<ExtractorStatus> = MutableStateFlow(ExtractorStatus())
 
     val playbackState: StateFlow<PlaybackState> get() = playback.state
 
@@ -44,6 +59,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDim(value: Int) = apply { ServiceLocator.settings.setBackgroundDim(value) }
     fun setGradient(value: Boolean) = apply { ServiceLocator.settings.setBackgroundGradient(value) }
     fun setDynamicAccent(value: Boolean) = apply { ServiceLocator.settings.setDynamicAccent(value) }
+
+    fun setCustomAccent(value: Boolean) = apply { ServiceLocator.settings.setCustomAccent(value) }
+    fun setAccentColor(argb: Int) = apply { ServiceLocator.settings.setAccentColor(argb) }
+
+    /** Fetches the newest nightly yt-dlp build and reports how it went. */
+    fun refreshExtractor() {
+        if (extractor.value.busy) return
+        extractor.value = extractor.value.copy(busy = true)
+        viewModelScope.launch {
+            val version = YtDlp.updateNightly(context) ?: YtDlp.version(context)
+            extractor.value = if (version != null) {
+                ExtractorStatus(version = version)
+            } else {
+                ExtractorStatus(error = YtDlp.lastError() ?: "check your connection")
+            }
+        }
+    }
 
     /** Persists the choice, then flips the enabled launcher alias. */
     fun setAppIcon(id: String) {

@@ -2,6 +2,8 @@ package app.melo.player.ui.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 
 /**
  * melo palette — Spotify-inspired dark surface language.
@@ -30,6 +32,21 @@ val Palettes = listOf(
 )
 
 fun paletteById(id: String?): MeloPalette = Palettes.firstOrNull { it.id == id } ?: Palettes.first()
+
+/**
+ * Companion container colour for an accent: the accent pulled back into the base surface so
+ * chips and filled buttons stay readable instead of glowing. Used for both the presets and a
+ * colour the user mixed, which is why it is derived rather than stored per palette.
+ */
+fun accentSoftFor(accent: Color, dark: Boolean): Color =
+    lerp(if (dark) Ink else Paper, accent, if (dark) 0.20f else 0.16f)
+
+/**
+ * Foreground that stays legible on top of [accent]. A pale accent needs dark text; a deep one
+ * needs white. Checked against relative luminance rather than assuming white always works.
+ */
+fun onAccentFor(accent: Color): Color =
+    if (accent.luminance() > 0.5f) Color(0xFF111111) else Color.White
 
 // Spotify-style dark surface stack.
 val Ink = Color(0xFF121212)              // app background / base

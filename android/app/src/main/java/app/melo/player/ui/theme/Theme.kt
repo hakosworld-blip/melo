@@ -19,6 +19,8 @@ data class MeloThemeConfig(
     val paletteId: String = "spotify",
     val cornerRadius: Int = 12,
     val compact: Boolean = false,
+    /** A colour the user mixed in Customization; it takes over from the preset palette. */
+    val customAccent: Color? = null,
 )
 
 /** Extra tokens Material3 does not model. */
@@ -71,6 +73,10 @@ fun MeloTheme(
         else -> true
     }
     val palette = paletteById(config.paletteId)
+    // A colour the user mixed wins over the preset; otherwise the preset supplies the accent.
+    val accent = config.customAccent ?: palette.accent
+    val accentSoft = accentSoftFor(accent, dark)
+    val onAccent = onAccentFor(accent)
 
     val melo = if (dark) {
         MeloColors(
@@ -96,11 +102,11 @@ fun MeloTheme(
 
     val scheme = if (dark) {
         darkColorScheme(
-            primary = palette.accent,
-            onPrimary = Color.White,
-            primaryContainer = palette.accentSoft,
-            onPrimaryContainer = palette.accent,
-            secondary = palette.accent,
+            primary = accent,
+            onPrimary = onAccent,
+            primaryContainer = accentSoft,
+            onPrimaryContainer = onAccent,
+            secondary = accent,
             background = Ink,
             onBackground = melo.textPrimary,
             surface = Surface,
@@ -117,11 +123,11 @@ fun MeloTheme(
         )
     } else {
         lightColorScheme(
-            primary = palette.accent,
-            onPrimary = Color(0xFF1A1A1A),
-            primaryContainer = palette.accent.copy(alpha = 0.22f),
-            onPrimaryContainer = Color(0xFF2A1D0E),
-            secondary = palette.accent,
+            primary = accent,
+            onPrimary = onAccent,
+            primaryContainer = accentSoft,
+            onPrimaryContainer = onAccent,
+            secondary = accent,
             background = Paper,
             onBackground = melo.textPrimary,
             surface = Paper,

@@ -96,7 +96,7 @@ class OfflineDownloadedSongTest {
         dao = db.downloadDao()
         folder = MeloFolder(context, appFolderOnly = true)
         val settings = SettingsRepository(context)
-        resolver = StreamResolver(dao, settings, folder)
+        resolver = StreamResolver(dao, settings, folder, context)
         downloads = DownloadManager(context, dao, settings, resolver, folder)
     }
 

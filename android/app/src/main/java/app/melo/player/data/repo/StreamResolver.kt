@@ -1,5 +1,6 @@
 package app.melo.player.data.repo
 
+import android.content.Context
 import app.melo.player.data.db.DownloadDao
 import app.melo.player.data.local.MeloFolder
 import app.melo.player.data.model.ResolvedStream
@@ -8,6 +9,7 @@ import app.melo.player.data.model.StreamQuality
 import app.melo.player.data.model.Track
 import app.melo.player.data.prefs.SettingsRepository
 import app.melo.player.data.remote.SoundCloud
+import app.melo.player.data.remote.YtDlp
 import app.melo.player.data.remote.YouTubeMusic
 
 /**
@@ -16,11 +18,15 @@ import app.melo.player.data.remote.YouTubeMusic
  * Order of preference: a finished download, then the provider that produced the
  * track. Metadata-only tracks (imports, third-party album pages) are matched against
  * the catalog first, exactly like the desktop app's `searchQuery` fallback.
+ *
+ * When InnerTube answers without a direct media URL, the yt-dlp-nightly extractor is tried
+ * for the same video id before giving up, so age-gated and freshly-broken videos still play.
  */
 class StreamResolver(
     private val downloads: DownloadDao,
     private val settings: SettingsRepository,
     private val folder: MeloFolder,
+    private val context: Context,
 ) {
 
     suspend fun resolve(track: Track): ResolvedStream {
@@ -42,6 +48,8 @@ class StreamResolver(
                 if (id.isNotBlank()) {
                     val result = YouTubeMusic.resolveAudio(id, highQuality)
                     if (result is ResolvedStream.Remote) return result
+                    // InnerTube had nothing usable for this id; the nightly extractor may.
+                    YtDlp.resolveAudio(context, id, highQuality)?.let { return it }
                 }
                 return resolveByQuery(track, highQuality)
             }
@@ -77,9 +85,11 @@ class StreamResolver(
             ?.first
             ?: hits.first()
 
-        val result = YouTubeMusic.resolveAudio(best.id, highQuality)
-        return if (result is ResolvedStream.Remote) result
-        else ResolvedStream.Failure("This track is not streamable right now.")
+        val direct = YouTubeMusic.resolveAudio(best.id, highQuality)
+        if (direct is ResolvedStream.Remote) return direct
+
+        YtDlp.resolveAudio(context, best.id, highQuality)?.let { return it }
+        return ResolvedStream.Failure("This track is not streamable right now.")
     }
 
     private fun searchText(track: Track): String =

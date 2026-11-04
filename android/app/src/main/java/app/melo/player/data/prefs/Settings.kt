@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
+/** Spotify green, the accent a fresh install starts on. */
+val DefaultAccentArgb: Int = 0xFF1DB954.toInt()
+
 /**
  * Every preference below is read by real UI or playback code. Nothing here is
  * decorative: if a setting exists it changes behaviour.
@@ -32,6 +35,9 @@ data class Settings(
     val backgroundDim: Int = 45,
     val backgroundGradient: Boolean = true,
     val dynamicAccent: Boolean = true,
+    // accent: a preset palette id, or a colour the user mixed in Customization
+    val customAccent: Boolean = false,
+    val accentColor: Int = DefaultAccentArgb,
     // brand: which launcher icon and which in-app mark the user picked
     val appIconId: String = "default",
     val logoId: String = "default",
@@ -81,6 +87,8 @@ class SettingsRepository(private val context: Context) {
         val dim = intPreferencesKey("bg_dim")
         val gradient = booleanPreferencesKey("bg_gradient")
         val dynamicAccent = booleanPreferencesKey("dynamic_accent")
+        val customAccent = booleanPreferencesKey("custom_accent")
+        val accentColor = intPreferencesKey("accent_color")
         val appIcon = stringPreferencesKey("app_icon")
         val logo = stringPreferencesKey("logo_id")
 
@@ -126,6 +134,8 @@ class SettingsRepository(private val context: Context) {
             backgroundDim = p[K.dim] ?: 45,
             backgroundGradient = p[K.gradient] ?: true,
             dynamicAccent = p[K.dynamicAccent] ?: true,
+            customAccent = p[K.customAccent] ?: false,
+            accentColor = p[K.accentColor] ?: DefaultAccentArgb,
             appIconId = p[K.appIcon] ?: "default",
             logoId = p[K.logo] ?: "default",
             lyricsMode = p[K.lyricsMode] ?: LyricsMode.LINE.id,
@@ -167,6 +177,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setBackgroundDim(value: Int) = edit { it[K.dim] = value.coerceIn(0, 90) }
     suspend fun setBackgroundGradient(value: Boolean) = edit { it[K.gradient] = value }
     suspend fun setDynamicAccent(value: Boolean) = edit { it[K.dynamicAccent] = value }
+    suspend fun setCustomAccent(value: Boolean) = edit { it[K.customAccent] = value }
+    suspend fun setAccentColor(argb: Int) = edit { it[K.accentColor] = argb }
     suspend fun setAppIcon(id: String) = edit { it[K.appIcon] = id }
     suspend fun setLogo(id: String) = edit { it[K.logo] = id }
 

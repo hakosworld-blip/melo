@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -66,6 +67,9 @@ class MainActivity : ComponentActivity() {
                     paletteId = settings.paletteId,
                     cornerRadius = settings.cornerRadius,
                     compact = settings.compact,
+                    // Only hand the theme a custom accent while the user has one switched on,
+                    // so the preset palette still drives everything otherwise.
+                    customAccent = if (settings.customAccent) Color(settings.accentColor) else null,
                 ),
             ) {
                 MeloRoot(app = app, onRequestNotificationPermission = askForNotifications)

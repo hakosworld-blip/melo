@@ -101,6 +101,9 @@ android {
             "/META-INF/{AL2.0,LGPL2.1}",
             "/META-INF/versions/9/previous-compilation-data.bin",
         )
+        // youtubedl-android ships its embedded Python as `.so` payloads that it copies out
+        // of the APK on first use, which only works with legacy packaging.
+        jniLibs.useLegacyPackaging = true
     }
 
     testOptions {
@@ -140,6 +143,9 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:1.5.1")
     implementation("androidx.media3:media3-datasource:1.5.1")
     implementation("com.google.guava:guava:33.3.1-android")
+
+    // yt-dlp-nightly: the fallback extractor used when InnerTube hands back no direct URL.
+    implementation("com.github.yausername.youtubedl-android:library:0.15.0")
 
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
