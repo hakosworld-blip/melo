@@ -125,7 +125,16 @@ object YouTubeMusic {
             .firstOrNull { it.name.equals(name, true) }
             ?: searchArtists(name, 6).firstOrNull { it.name.contains(name, true) }
             ?: return 0L
-        val json = browse(artist.id) ?: return 0L
+        return monthlyListenersFor(artist.id)
+    }
+
+    /**
+     * The same count for an artist whose browse id is already known, e.g. from a search row.
+     * One request instead of the search plus browse that [monthlyListeners] needs.
+     */
+    suspend fun monthlyListenersFor(browseId: String): Long {
+        if (browseId.isBlank()) return 0L
+        val json = browse(browseId) ?: return 0L
         return parseListenerCount(allStrings(json))
     }
 

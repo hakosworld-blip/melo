@@ -94,10 +94,16 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
     var showIconPicker by remember { mutableStateOf(false) }
     var showLogoPicker by remember { mutableStateOf(false) }
 
-    val downloadBytes by ServiceLocator.database.downloadDao().totalBytes()
+    // Remembered: calling the DAO from composition builds a fresh Flow on every recomposition,
+    // and this screen recomposes on every preference change.
+    val downloadDao = remember { ServiceLocator.database.downloadDao() }
+    val downloadBytes by remember(downloadDao) { downloadDao.totalBytes() }
         .collectAsStateWithLifecycle(initialValue = 0L)
-    val downloadCount by ServiceLocator.database.downloadDao().completed()
+    val downloadCount by remember(downloadDao) { downloadDao.completed() }
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val qualityOptions = remember {
+        StreamQuality.entries.map { it.id to it.label.split(" ").first() }
+    }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -177,9 +183,9 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingSlider(
                         "Corner radius",
-                        "${settings.cornerRadius}dp",
                         settings.cornerRadius.toFloat(),
                         0f..34f,
+                        format = { "${it.toInt()}dp" },
                     ) { app.setCornerRadius(it.toInt()) }
                 }
                 item {
@@ -300,10 +306,10 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingSlider(
                         "Text size",
-                        "${settings.lyricsTextSize}sp",
                         settings.lyricsTextSize.toFloat(),
                         18f..52f,
                         steps = 33,
+                        format = { "${it.toInt()}sp" },
                     ) { app.setLyricsSize(it.toInt()) }
                 }
                 item {
@@ -321,9 +327,12 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
-                    SettingSlider("Line spacing", "${settings.lyricsLineSpacing}", settings.lyricsLineSpacing.toFloat(), 0f..40f) {
-                        app.setLyricsSpacing(it.toInt())
-                    }
+                    SettingSlider(
+                        "Line spacing",
+                        settings.lyricsLineSpacing.toFloat(),
+                        0f..40f,
+                        format = { "${it.toInt()}" },
+                    ) { app.setLyricsSpacing(it.toInt()) }
                 }
                 item {
                     SettingSwitch("Word karaoke", "Animate the active word", settings.lyricsWordKaraoke) {
@@ -341,22 +350,28 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
-                    SettingSlider("Backdrop blur", "${settings.backgroundBlur}%", settings.backgroundBlur.toFloat(), 0f..100f) {
-                        app.setBlur(it.toInt())
-                    }
+                    SettingSlider(
+                        "Backdrop blur",
+                        settings.backgroundBlur.toFloat(),
+                        0f..100f,
+                        format = { "${it.toInt()}%" },
+                    ) { app.setBlur(it.toInt()) }
                 }
                 item {
-                    SettingSlider("Backdrop dim", "${settings.backgroundDim}%", settings.backgroundDim.toFloat(), 0f..90f) {
-                        app.setDim(it.toInt())
-                    }
+                    SettingSlider(
+                        "Backdrop dim",
+                        settings.backgroundDim.toFloat(),
+                        0f..90f,
+                        format = { "${it.toInt()}%" },
+                    ) { app.setDim(it.toInt()) }
                 }
                 item {
                     SettingSlider(
                         "Sync offset",
-                        "${settings.lyricsOffsetMs / 1000.0}s",
                         settings.lyricsOffsetMs.toFloat(),
                         -5000f..5000f,
                         steps = 19,
+                        format = { "${it.toInt() / 1000.0}s" },
                     ) { app.setLyricsOffset(it.toInt()) }
                 }
 
@@ -377,14 +392,18 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
-                    SettingSlider("Speed", "%.2fx".format(settings.playbackSpeed), settings.playbackSpeed, 0.5f..2f, steps = 14) {
-                        app.setPlaybackSpeed((it * 20).toInt() / 20f)
-                    }
+                    SettingSlider(
+                        "Speed",
+                        settings.playbackSpeed,
+                        0.5f..2f,
+                        steps = 14,
+                        format = { "%.2fx".format(it) },
+                    ) { app.setPlaybackSpeed((it * 20).toInt() / 20f) }
                 }
                 item {
                     SettingBlock("Streaming quality") {
                         Segmented(
-                            options = StreamQuality.entries.map { it.id to it.label.split(" ").first() },
+                            options = qualityOptions,
                             selected = settings.streamQuality,
                             onSelect = { app.setStreamQuality(it) },
                         )
@@ -428,7 +447,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingBlock("Download quality") {
                         Segmented(
-                            options = StreamQuality.entries.map { it.id to it.label.split(" ").first() },
+                            options = qualityOptions,
                             selected = settings.downloadQuality,
                             onSelect = { app.setDownloadQuality(it) },
                         )
@@ -497,10 +516,10 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingSlider(
                         "Streaming cache limit",
-                        "${settings.cacheLimitMb} MB · applies after restart",
                         settings.cacheLimitMb.toFloat(),
                         128f..2048f,
                         steps = 14,
+                        format = { "${it.toInt()} MB · applies after restart" },
                     ) { app.setCacheLimit(it.toInt()) }
                 }
                 item {
@@ -827,24 +846,36 @@ private fun SettingSwitch(title: String, subtitle: String, checked: Boolean, onC
 @Composable
 private fun SettingSlider(
     title: String,
-    valueLabel: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
-    onChangeFinished: (() -> Unit)? = null,
-    onChange: (Float) -> Unit,
+    format: (Float) -> String,
+    onDrag: ((Float) -> Unit)? = null,
+    onCommit: (Float) -> Unit,
 ) {
+    // The thumb and its label follow the finger locally; the preference is written once, when
+    // the drag ends. Writing on every frame queued dozens of DataStore edits per drag and
+    // repainted the whole screen each time, which is exactly what a drag must not do.
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val shown = dragging ?: value
+
     Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.screenH, vertical = Spacing.xs)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Text(valueLabel, style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
+            Text(format(shown), style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
         }
         Slider(
-            value = value,
-            onValueChange = onChange,
+            value = shown,
+            onValueChange = {
+                dragging = it
+                onDrag?.invoke(it)
+            },
             valueRange = range,
             steps = steps,
-            onValueChangeFinished = onChangeFinished,
+            onValueChangeFinished = {
+                dragging?.let(onCommit)
+                dragging = null
+            },
         )
     }
 }
@@ -935,7 +966,9 @@ private fun AccentMixer(argb: Int, onPick: (Int) -> Unit) {
     var brightness by remember { mutableFloatStateOf(seed[2].coerceAtLeast(0.45f)) }
 
     val preview = Color.hsv(hue, saturation, brightness)
-    val commit = { onPick(preview.toArgb()) }
+    // Reads the live HSV state, so the colour saved is the one on screen even when a slider
+    // commits before the next recomposition.
+    val commit = { onPick(Color.hsv(hue, saturation, brightness).toArgb()) }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -953,21 +986,31 @@ private fun AccentMixer(argb: Int, onPick: (Int) -> Unit) {
         )
     }
     Spacer(Modifier.height(Spacing.sm))
-    SettingSlider("Hue", "${hue.toInt()}°", hue, 0f..360f, onChangeFinished = commit) { hue = it }
+    // onDrag keeps the preview swatch live; onCommit writes the colour once, per slider.
+    SettingSlider(
+        "Hue",
+        hue,
+        0f..360f,
+        format = { "${it.toInt()}°" },
+        onDrag = { hue = it },
+        onCommit = { hue = it; commit() },
+    )
     SettingSlider(
         "Saturation",
-        "${(saturation * 100).toInt()}%",
         saturation,
         0f..1f,
-        onChangeFinished = commit,
-    ) { saturation = it }
+        format = { "${(it * 100).toInt()}%" },
+        onDrag = { saturation = it },
+        onCommit = { saturation = it; commit() },
+    )
     SettingSlider(
         "Brightness",
-        "${(brightness * 100).toInt()}%",
         brightness,
         0.15f..1f,
-        onChangeFinished = commit,
-    ) { brightness = it }
+        format = { "${(it * 100).toInt()}%" },
+        onDrag = { brightness = it },
+        onCommit = { brightness = it; commit() },
+    )
 }
 
 /** One-line description of the update check, for its settings row. */

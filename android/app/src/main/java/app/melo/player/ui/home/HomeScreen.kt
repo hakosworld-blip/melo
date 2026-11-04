@@ -51,6 +51,7 @@ import app.melo.player.data.model.Album
 import app.melo.player.data.model.HomeSection
 import app.melo.player.data.model.Playlist
 import app.melo.player.data.model.Track
+import app.melo.player.data.model.isVerifiedArtist
 import app.melo.player.data.prefs.Settings
 import app.melo.player.di.ServiceLocator
 import app.melo.player.playback.PlaybackState
@@ -59,6 +60,7 @@ import app.melo.player.ui.brand.MeloMark
 import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.SectionHeader
+import app.melo.player.ui.components.VerifiedBadge
 import app.melo.player.ui.components.formatDuration
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
@@ -394,7 +396,22 @@ private fun ArtistCard(artist: Artist, onClick: () -> Unit) {
     ) {
         MeloArt(artist.artwork, modifier = Modifier.size(84.dp), corner = 84.dp)
         Spacer(Modifier.height(Spacing.sm))
-        Text(artist.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                artist.name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (artist.isVerifiedArtist) {
+                Spacer(Modifier.width(3.dp))
+                VerifiedBadge(size = 13.dp)
+            }
+        }
     }
 }
 

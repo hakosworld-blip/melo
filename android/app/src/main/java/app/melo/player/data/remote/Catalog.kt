@@ -6,6 +6,9 @@ import app.melo.player.data.model.Artist
 import app.melo.player.data.model.ArtistPage
 import app.melo.player.data.model.Source
 import app.melo.player.data.model.Track
+import app.melo.player.data.model.VerifiedMonthlyListeners
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -23,6 +26,42 @@ object Catalog {
     private const val DEEZER = "https://api.deezer.com"
 
     private val artistCache = HashMap<String, ArtistPage>()
+
+    /**
+     * Monthly listeners already looked up, keyed by browse id (or name when there is none).
+     * Badges are shown wherever an artist appears, so the same artist must not cost a request
+     * every time a search or profile screen is opened.
+     */
+    private val listenerCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** The four parts of a profile that can be fetched at the same time. */
+    private data class ArtistParts(
+        val albums: List<Album>,
+        val topTracks: List<Track>,
+        val related: List<Artist>,
+        val monthly: Long,
+    )
+
+    /**
+     * Monthly listeners for an artist, from cache when possible. [browseId] is optional and
+     * saves the extra search that a name-only lookup requires. A failed lookup returns 0 so
+     * the caller can simply leave the badge off.
+     */
+    suspend fun listeners(name: String, browseId: String = ""): Long {
+        val key = browseId.ifBlank { name }.trim().lowercase()
+        if (key.isBlank()) return 0L
+        listenerCache[key]?.let { return it }
+        val value = runCatching {
+            if (browseId.isNotBlank()) {
+                YouTubeMusic.monthlyListenersFor(browseId)
+            } else {
+                YouTubeMusic.monthlyListeners(name)
+            }
+        }.getOrNull() ?: 0L
+        // Only real answers are cached: a timeout should be retried, not remembered as zero.
+        if (value > 0) listenerCache[key] = value
+        return value
+    }
 
     /* ------------------------------ charts ------------------------------ */
 
@@ -132,14 +171,21 @@ object Catalog {
             }
         }
 
-        val albums = runCatching { artistAlbums(clean) }.getOrElse { emptyList() }
-        val topTracks = runCatching { YouTubeMusic.searchSongs(clean, 20) }.getOrElse { emptyList() }
-            .filter { matchesArtist(it.artist, clean) }
-            .ifEmpty { runCatching { YouTubeMusic.searchSongs(clean, 20) }.getOrElse { emptyList() } }
-        val related = runCatching { relatedArtists(dzId) }.getOrElse { emptyList() }
-
-        // Monthly listeners are an artist-level metric and only exist on YouTube Music.
-        val monthly = runCatching { YouTubeMusic.monthlyListeners(clean) }.getOrNull() ?: 0L
+        // Four independent lookups, run together: a profile used to wait for the albums, then
+        // the songs, then the related artists, then the listener count, one round trip after
+        // another. The screen opens in the time of the slowest one instead of their sum.
+        val (albums, topTracks, related, monthly) = coroutineScope {
+            val albumsJob = async { runCatching { artistAlbums(clean) }.getOrElse { emptyList() } }
+            val songsJob = async {
+                // One request, reused for the fallback: the old code searched twice.
+                val songs = runCatching { YouTubeMusic.searchSongs(clean, 20) }.getOrElse { emptyList() }
+                songs.filter { matchesArtist(it.artist, clean) }.ifEmpty { songs }
+            }
+            val relatedJob = async { runCatching { relatedArtists(dzId) }.getOrElse { emptyList() } }
+            // Monthly listeners are an artist-level metric and only exist on YouTube Music.
+            val monthlyJob = async { listeners(clean) }
+            ArtistParts(albumsJob.await(), songsJob.await(), relatedJob.await(), monthlyJob.await())
+        }
 
         val page = ArtistPage(
             artist = Artist(
@@ -149,7 +195,9 @@ object Catalog {
                 banner = banner.ifBlank { artwork },
                 monthlyListeners = monthly,
                 bio = bio,
-                verified = itunesArtist != null,
+                // An iTunes match only says the artist exists there; the mark is earned by
+                // audience, so it follows the monthly listener count.
+                verified = monthly >= VerifiedMonthlyListeners,
             ),
             topTracks = topTracks,
             albums = albums.filter { !it.title.contains("single", true) }.take(20),

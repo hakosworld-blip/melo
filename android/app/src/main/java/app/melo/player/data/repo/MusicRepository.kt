@@ -189,6 +189,9 @@ class MusicRepository(
 
     suspend fun artistPage(name: String): ArtistPage = Catalog.artistPage(name)
 
+    /** Monthly listeners for a search row's artist, cached after the first lookup. */
+    suspend fun artistListeners(name: String, browseId: String): Long = Catalog.listeners(name, browseId)
+
     suspend fun albumPage(album: Album): AlbumPage = Catalog.albumPage(album)
 
     suspend fun providerPlaylist(browseId: String): List<Track> = YouTubeMusic.browseTracks(browseId)
