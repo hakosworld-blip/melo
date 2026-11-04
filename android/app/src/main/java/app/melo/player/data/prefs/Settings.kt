@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.melo.player.data.lyrics.LyricsMode
@@ -69,6 +70,9 @@ data class Settings(
     // misc
     val cacheLimitMb: Int = 512,
     val showStatsSource: Boolean = true,
+    // updates: an automatic check at most once a day, plus when it last succeeded
+    val autoUpdateCheck: Boolean = true,
+    val lastUpdateCheckMs: Long = 0L,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("melo_settings")
@@ -119,6 +123,9 @@ class SettingsRepository(private val context: Context) {
 
         val cacheLimit = intPreferencesKey("cache_limit")
         val showStats = booleanPreferencesKey("show_stats")
+
+        val autoUpdateCheck = booleanPreferencesKey("auto_update_check")
+        val lastUpdateCheck = longPreferencesKey("last_update_check")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -161,6 +168,8 @@ class SettingsRepository(private val context: Context) {
             downloadWifiOnly = p[K.downloadWifiOnly] ?: true,
             cacheLimitMb = p[K.cacheLimit] ?: 512,
             showStatsSource = p[K.showStats] ?: true,
+            autoUpdateCheck = p[K.autoUpdateCheck] ?: true,
+            lastUpdateCheckMs = p[K.lastUpdateCheck] ?: 0L,
         )
     }
 
@@ -209,6 +218,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setCacheLimit(mb: Int) = edit { it[K.cacheLimit] = mb.coerceIn(128, 4096) }
     suspend fun setShowStatsSource(value: Boolean) = edit { it[K.showStats] = value }
+
+    suspend fun setAutoUpdateCheck(value: Boolean) = edit { it[K.autoUpdateCheck] = value }
+    suspend fun setLastUpdateCheck(epochMs: Long) = edit { it[K.lastUpdateCheck] = epochMs }
 
     /** Reset appearance + playback prefs back to defaults, leaving the library intact. */
     suspend fun resetToDefaults() {

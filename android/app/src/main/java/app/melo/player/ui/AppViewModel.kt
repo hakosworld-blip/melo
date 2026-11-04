@@ -3,7 +3,10 @@ package app.melo.player.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.melo.player.BuildConfig
 import app.melo.player.data.prefs.Settings
+import app.melo.player.data.remote.AppRelease
+import app.melo.player.data.remote.Updater
 import app.melo.player.data.remote.YtDlp
 import app.melo.player.di.ServiceLocator
 import app.melo.player.playback.PlaybackController
@@ -23,6 +26,19 @@ data class ExtractorStatus(
     val error: String? = null,
 )
 
+/** What the settings screen knows about the newest release on the repository. */
+data class UpdateStatus(
+    val checking: Boolean = false,
+    /** Non-null only when the release is genuinely newer than the running build. */
+    val available: AppRelease? = null,
+    /** Newest version seen, even when this build is already current. */
+    val latestVersion: String? = null,
+    val error: String? = null,
+)
+
+/** A day between automatic update checks. */
+private const val UPDATE_CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
+
 /** Process-wide app state: preferences plus the one playback controller. */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -39,6 +55,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     val extractor: MutableStateFlow<ExtractorStatus> = MutableStateFlow(ExtractorStatus())
 
+    /** Result of the last update check; the automatic one fills this silently. */
+    val updates: MutableStateFlow<UpdateStatus> = MutableStateFlow(UpdateStatus())
+
     val playbackState: StateFlow<PlaybackState> get() = playback.state
 
     init {
@@ -46,6 +65,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Pick up anything already sitting in the melo folder: songs downloaded by an
         // earlier install, or files the user copied in themselves.
         viewModelScope.launch { runCatching { ServiceLocator.downloads.scanFolder() } }
+        // Automatic update check: once a day at most, and silent. A device that is offline
+        // then simply tries again next launch, because only a successful check is recorded.
+        viewModelScope.launch {
+            val prefs = ServiceLocator.settings.current()
+            val due = System.currentTimeMillis() - prefs.lastUpdateCheckMs > UPDATE_CHECK_INTERVAL_MS
+            if (prefs.autoUpdateCheck && due) checkForUpdates(silent = true)
+        }
     }
 
     fun setThemeMode(mode: String) = apply { ServiceLocator.settings.setThemeMode(mode) }
@@ -76,6 +102,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    /**
+     * Asks GitHub for the newest release and compares it with this build. [silent] is the
+     * automatic check: it never reports a failure the user did not ask about.
+     */
+    fun checkForUpdates(silent: Boolean = false) {
+        if (updates.value.checking) return
+        updates.value = updates.value.copy(checking = true, error = null)
+        viewModelScope.launch {
+            val release = Updater.fetchLatest()
+            updates.value = when {
+                release == null && silent -> UpdateStatus(
+                    available = updates.value.available,
+                    latestVersion = updates.value.latestVersion,
+                )
+                release == null -> UpdateStatus(error = "Couldn't reach GitHub")
+                Updater.isNewerVersion(release.version, BuildConfig.VERSION_NAME) ->
+                    UpdateStatus(available = release, latestVersion = release.version)
+                else -> UpdateStatus(latestVersion = release.version)
+            }
+            if (release != null) {
+                ServiceLocator.settings.setLastUpdateCheck(System.currentTimeMillis())
+            }
+        }
+    }
+
+    fun setAutoUpdateCheck(value: Boolean) = apply { ServiceLocator.settings.setAutoUpdateCheck(value) }
 
     /** Persists the choice, then flips the enabled launcher alias. */
     fun setAppIcon(id: String) {

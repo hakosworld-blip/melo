@@ -60,6 +60,7 @@ import app.melo.player.data.prefs.Settings
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
 import app.melo.player.ui.ExtractorStatus
+import app.melo.player.ui.UpdateStatus
 import app.melo.player.ui.brand.IconVariant
 import app.melo.player.ui.brand.IconVariants
 import app.melo.player.ui.brand.MeloMark
@@ -81,6 +82,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
     val settings by app.settings.collectAsStateWithLifecycle()
     val playback by app.playback.state.collectAsStateWithLifecycle()
     val extractor by app.extractor.collectAsStateWithLifecycle()
+    val updates by app.updates.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -538,6 +540,47 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 }
                 item {
                     SettingRow(
+                        "App update",
+                        updateSummary(updates),
+                        action = {
+                            Text(
+                                if (updates.checking) "Checking…" else "Check",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable(enabled = !updates.checking) { app.checkForUpdates() }
+                                    .padding(8.dp),
+                            )
+                        },
+                    )
+                }
+                item {
+                    SettingSwitch(
+                        "Check automatically",
+                        "Looks for a newer release once a day when melo starts",
+                        settings.autoUpdateCheck,
+                    ) { app.setAutoUpdateCheck(it) }
+                }
+                updates.available?.let { release ->
+                    item {
+                        SettingRow(
+                            "Download version ${release.version}",
+                            "Opens the release page in your browser",
+                            action = {
+                                Text(
+                                    "Get",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clickable { openUrl(context, release.pageUrl) }
+                                        .padding(8.dp),
+                                )
+                            },
+                        )
+                    }
+                }
+                item {
+                    SettingRow(
                         "GitHub repository",
                         AppInfo.RepoLabel,
                         action = {
@@ -925,6 +968,15 @@ private fun AccentMixer(argb: Int, onPick: (Int) -> Unit) {
         0.15f..1f,
         onChangeFinished = commit,
     ) { brightness = it }
+}
+
+/** One-line description of the update check, for its settings row. */
+private fun updateSummary(status: UpdateStatus): String = when {
+    status.checking -> "Checking the newest release…"
+    status.available != null -> "Version ${status.available.version} is available"
+    status.error != null -> status.error
+    status.latestVersion != null -> "Up to date · ${status.latestVersion}"
+    else -> "Not checked yet"
 }
 
 /** One-line description of the fallback extractor, for its settings row. */
