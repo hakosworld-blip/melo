@@ -68,7 +68,6 @@ import app.melo.player.ui.brand.iconVariantById
 import app.melo.player.ui.components.ConfirmDialog
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.ScreenHeader
-import app.melo.player.ui.components.formatBytes
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Palettes
 import app.melo.player.ui.theme.paletteById
@@ -78,7 +77,7 @@ import java.io.File
 import java.util.Locale
 
 @Composable
-fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
+fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> Unit) {
     val settings by app.settings.collectAsStateWithLifecycle()
     val playback by app.playback.state.collectAsStateWithLifecycle()
     val extractor by app.extractor.collectAsStateWithLifecycle()
@@ -88,7 +87,6 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
 
     var confirmReset by remember { mutableStateOf(false) }
     var confirmClearLibrary by remember { mutableStateOf(false) }
-    var confirmClearDownloads by remember { mutableStateOf(false) }
     var confirmClearHistory by remember { mutableStateOf(false) }
     var showLicenses by remember { mutableStateOf(false) }
     var showIconPicker by remember { mutableStateOf(false) }
@@ -97,8 +95,6 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
     // Remembered: calling the DAO from composition builds a fresh Flow on every recomposition,
     // and this screen recomposes on every preference change.
     val downloadDao = remember { ServiceLocator.database.downloadDao() }
-    val downloadBytes by remember(downloadDao) { downloadDao.totalBytes() }
-        .collectAsStateWithLifecycle(initialValue = 0L)
     val downloadCount by remember(downloadDao) { downloadDao.completed() }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val qualityOptions = remember {
@@ -460,17 +456,17 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 }
                 item {
                     SettingRow(
-                        title = "Storage used",
-                        subtitle = "${downloadCount.size} tracks · ${formatBytes(downloadBytes ?: 0L)}",
+                        title = "Storage",
+                        subtitle = "${downloadCount.size} downloads · clear lyrics, cache and your data",
                         action = {
-                            if (downloadCount.isNotEmpty()) {
-                                Text(
-                                    "Clear",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    modifier = Modifier.clickable { confirmClearDownloads = true }.padding(8.dp),
-                                )
-                            }
+                            Text(
+                                "Manage",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable(onClick = onOpenStorage)
+                                    .padding(8.dp),
+                            )
                         },
                     )
                 }
@@ -493,25 +489,6 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                             modifier = Modifier.clickable { confirmClearHistory = true }.padding(8.dp),
                         )
                     })
-                }
-                item {
-                    SettingRow(
-                        "Clear image cache",
-                        "Frees downloaded artwork; it reloads as needed",
-                        {
-                            Text(
-                                "Clear",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable {
-                                    scope.launch {
-                                        coil.Coil.imageLoader(context).diskCache?.clear()
-                                        coil.Coil.imageLoader(context).memoryCache?.clear()
-                                    }
-                                }.padding(8.dp),
-                            )
-                        },
-                    )
                 }
                 item {
                     SettingSlider(
@@ -656,15 +633,6 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
             confirmLabel = "Delete",
             onConfirm = { app.clearLibrary() },
             onDismiss = { confirmClearLibrary = false },
-        )
-    }
-    if (confirmClearDownloads) {
-        ConfirmDialog(
-            title = "Delete all downloads?",
-            message = "Files are removed from this device. You can download them again later.",
-            confirmLabel = "Delete",
-            onConfirm = { app.clearAllDownloads() },
-            onDismiss = { confirmClearDownloads = false },
         )
     }
     if (confirmClearHistory) {

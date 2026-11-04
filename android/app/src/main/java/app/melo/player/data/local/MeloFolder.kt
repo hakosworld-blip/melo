@@ -309,6 +309,21 @@ class MeloFolder(
 
     fun deleteFile(fileName: String): Boolean = index()[fileName]?.let { deleteRef(it.ref) } ?: false
 
+    /** The lyrics melo saved beside songs. Nothing else in the folder matches these types. */
+    fun lyricsFiles(): List<FolderFile> =
+        index(maxAgeMs = 0L).values.filter { MeloNames.extensionOf(it.name) in LYRICS_TYPES }
+
+    /**
+     * Removes only the saved lyrics, leaving the audio, its cover and the artist metadata in
+     * place — the opposite of [deleteSong], which removes the whole set.
+     */
+    fun deleteLyrics(): Int {
+        var removed = 0
+        lyricsFiles().forEach { file -> if (deleteRef(file.ref)) removed += 1 }
+        if (removed > 0) invalidate()
+        return removed
+    }
+
     /**
      * Deletes a song completely: the audio plus every file melo wrote to describe it —
      * the cover picture, the lyrics and the artist details in the sidecar.
@@ -343,6 +358,11 @@ class MeloFolder(
      * name. The same song keeps its name, so re-downloading replaces it instead of piling
      * up copies.
      */
+    private companion object {
+        /** Extensions melo uses for lyrics, matching what [sidecarKinds] reports. */
+        val LYRICS_TYPES = setOf("lrc", "txt")
+    }
+
     fun uniqueName(base: String, extension: String, trackKey: String): String {
         val files = index(maxAgeMs = 0L)
         var candidate = "$base.$extension"

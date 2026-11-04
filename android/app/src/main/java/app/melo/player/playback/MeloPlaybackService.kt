@@ -59,6 +59,7 @@ class MeloPlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         ServiceLocator.init(this)
+        live = this
 
         // Swap Media3's stock notification for melo's: melo small icon, "Playback"
         // channel, and a compact row that is always previous / play-pause / next.
@@ -131,7 +132,29 @@ class MeloPlaybackService : MediaSessionService() {
         player = null
         audioCache?.release()
         audioCache = null
+        live = null
         super.onDestroy()
+    }
+
+    /**
+     * Empties the streaming cache through [SimpleCache]. Deleting its files behind its back
+     * would leave the index pointing at data that is gone, so this is the only safe way in.
+     * Returns false when no cache is open.
+     */
+    private fun evictCache(): Boolean = runCatching {
+        val cache = audioCache ?: return false
+        cache.keys.toList().forEach { cache.removeResource(it) }
+        true
+    }.getOrDefault(false)
+
+    companion object {
+        /**
+         * The running service, so the storage screen can report and clear the audio cache.
+         * Media3 owns that cache; a second SimpleCache on the same directory would corrupt it.
+         */
+        @Volatile private var live: MeloPlaybackService? = null
+
+        fun clearAudioCache(): Boolean = live?.evictCache() ?: false
     }
 
     private inner class MeloSessionCallback : MediaSession.Callback {

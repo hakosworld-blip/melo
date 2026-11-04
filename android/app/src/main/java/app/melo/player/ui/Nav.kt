@@ -15,6 +15,7 @@ object Routes {
     const val PLAYER = "player"
     const val LYRICS = "lyrics"
     const val SETTINGS = "settings"
+    const val STORAGE = "storage"
     const val QUEUE = "queue"
     const val ARTIST = "artist/{name}"
     const val ALBUM = "album/{payload}"

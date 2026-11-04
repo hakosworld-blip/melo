@@ -7,6 +7,7 @@ import app.melo.player.data.prefs.SettingsRepository
 import app.melo.player.data.repo.DownloadManager
 import app.melo.player.data.repo.LibraryRepository
 import app.melo.player.data.repo.MusicRepository
+import app.melo.player.data.repo.StorageRepository
 import app.melo.player.data.repo.StreamResolver
 
 /**
@@ -29,6 +30,8 @@ object ServiceLocator {
         private set
     lateinit var resolver: StreamResolver
         private set
+    lateinit var storage: StorageRepository
+        private set
 
     /** The `melo` folder every download is written to and read back from. */
     lateinit var folder: MeloFolder
@@ -46,6 +49,7 @@ object ServiceLocator {
             resolver = StreamResolver(database.downloadDao(), settings, folder, app)
             music = MusicRepository(library, database.downloadDao(), settings)
             downloads = DownloadManager(app, database.downloadDao(), settings, resolver, folder)
+            storage = StorageRepository(app, folder, database.downloadDao())
             initialised = true
         }
     }

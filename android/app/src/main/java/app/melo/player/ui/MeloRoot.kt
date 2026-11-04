@@ -88,6 +88,7 @@ import app.melo.player.ui.player.NowPlayingScreen
 import app.melo.player.ui.player.QueueScreen
 import app.melo.player.ui.search.SearchScreen
 import app.melo.player.ui.settings.SettingsScreen
+import app.melo.player.ui.settings.StorageScreen
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.StateFlow
@@ -290,7 +291,18 @@ fun MeloRoot(
                         )
                     }
                     composable(Routes.SETTINGS) {
-                        SettingsScreen(app = app, onBack = { nav.popBackStack() })
+                        SettingsScreen(
+                            app = app,
+                            onBack = { nav.popBackStack() },
+                            onOpenStorage = { nav.navigate(Routes.STORAGE) },
+                        )
+                    }
+                    composable(Routes.STORAGE) {
+                        StorageScreen(
+                            app = app,
+                            onBack = { nav.popBackStack() },
+                            notify = { message -> scope.launch { snackbar.showSnackbar(message) } },
+                        )
                     }
                 }
             }
