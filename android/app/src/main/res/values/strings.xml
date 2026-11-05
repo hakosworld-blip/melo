@@ -7,6 +7,10 @@
     <string name="storage_cache">Cache</string>
     <string name="storage_user_data">Your data</string>
 
+    <string name="storage_breakdown_title">Where it goes</string>
+    <string name="storage_breakdown_empty">Nothing stored yet</string>
+    <string name="storage_breakdown_free">%1$s free</string>
+
     <string name="storage_low_space_title">Storage is almost full</string>
     <string name="storage_low_space_body">Only %1$s free on this device. Clearing downloads or lyrics makes room.</string>
 

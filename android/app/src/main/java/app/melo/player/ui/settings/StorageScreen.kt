@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cached
@@ -34,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,6 +47,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import app.melo.player.R
 import app.melo.player.data.repo.StorageReport
+import app.melo.player.data.repo.StorageUsage
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
 import app.melo.player.ui.components.ConfirmDialog
@@ -52,13 +56,15 @@ import app.melo.player.ui.components.ScreenHeader
 import app.melo.player.ui.components.formatBytes
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
+import kotlin.math.roundToInt
 
 /**
  * Everything melo keeps on the device, in the four groups that can be cleared separately.
  *
- * Each row states what it holds before the button is pressed, and the confirmations say what
- * survives: deleting downloaded music takes the audio, the cover picture and the artist
- * metadata with it, while clearing lyrics leaves the song itself untouched.
+ * The bar at the top makes the split visible at a glance, and each row below states what it
+ * holds before the button is pressed. The confirmations say what survives: deleting downloaded
+ * music takes the audio, the cover picture and the artist metadata with it, while clearing
+ * lyrics leaves the song itself untouched.
  */
 @Composable
 fun StorageScreen(
@@ -99,7 +105,11 @@ fun StorageScreen(
             ScreenHeader(
                 title = "Storage",
                 onBack = onBack,
-                subtitle = "${formatBytes(report.measuredBytes)} used by melo",
+                subtitle = if (report.measuredBytes > 0L) {
+                    "${formatBytes(report.measuredBytes)} used by melo"
+                } else {
+                    stringResource(R.string.storage_breakdown_empty)
+                },
             )
             LazyColumn(Modifier.fillMaxSize()) {
                 if (lowSpace) {
@@ -112,6 +122,7 @@ fun StorageScreen(
                         )
                     }
                 }
+                item { StorageBreakdown(report) }
                 item {
                     StorageItem(
                         icon = Icons.Rounded.Download,
@@ -236,6 +247,139 @@ fun StorageScreen(
         )
     }
 }
+
+/** One category of the bar: what it is called, how big it is, and the colour it gets. */
+private data class StorageSlice(
+    val label: String,
+    val usage: StorageUsage,
+    val color: Color,
+)
+
+/** The four categories, in the same order as the rows below the bar. */
+@Composable
+private fun storageSlices(report: StorageReport): List<StorageSlice> {
+    val colors = LocalMeloColors.current
+    return listOf(
+        StorageSlice(stringResource(R.string.storage_downloads), report.downloads, MaterialTheme.colorScheme.primary),
+        StorageSlice(stringResource(R.string.storage_lyrics), report.lyrics, MaterialTheme.colorScheme.tertiary),
+        StorageSlice(stringResource(R.string.storage_cache), report.cache, MaterialTheme.colorScheme.secondary),
+        // Personal data is the smallest part on almost every device, so it gets the quiet
+        // colour rather than competing with the music.
+        StorageSlice(stringResource(R.string.storage_user_data), report.userData, colors.textSecondary),
+    )
+}
+
+/**
+ * The visual breakdown: one bar split in proportion to each category, with a legend that
+ * repeats the numbers so the bar never has to be read precisely.
+ */
+@Composable
+private fun StorageBreakdown(report: StorageReport) {
+    val colors = LocalMeloColors.current
+    val slices = storageSlices(report)
+    val total = report.measuredBytes
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screenH, vertical = Spacing.xs)
+            .clip(RoundedCornerShape(20.dp))
+            .background(colors.surfaceElevated.copy(alpha = 0.6f))
+            .padding(Spacing.md),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.storage_breakdown_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.textPrimary,
+                )
+                Text(
+                    if (total > 0L) {
+                        "${formatBytes(total)} in melo"
+                    } else {
+                        stringResource(R.string.storage_breakdown_empty)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+            if (report.freeBytes > 0L) {
+                Text(
+                    stringResource(R.string.storage_breakdown_free, formatBytes(report.freeBytes)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textSecondary,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.sm))
+
+        StorageBar(slices)
+
+        Spacer(Modifier.height(Spacing.sm))
+
+        slices.forEach { slice -> StorageLegendRow(slice, total) }
+    }
+}
+
+/** Proportional segments in a rounded track; an empty device shows the bare track. */
+@Composable
+private fun StorageBar(slices: List<StorageSlice>) {
+    val total = slices.sumOf { it.usage.bytes }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(14.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(LocalMeloColors.current.surfaceElevated),
+    ) {
+        if (total > 0L) {
+            slices.filter { it.usage.bytes > 0L }.forEach { slice ->
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .weight(slice.usage.bytes.toFloat())
+                        .background(slice.color),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageLegendRow(slice: StorageSlice, total: Long) {
+    val colors = LocalMeloColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Box(
+            Modifier
+                .size(9.dp)
+                .clip(CircleShape)
+                .background(slice.color),
+        )
+        Text(
+            slice.label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textPrimary,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "${formatBytes(slice.usage.bytes)} · ${sharePercent(slice.usage.bytes, total)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+    }
+}
+
+/** Rounded share, so the four numbers read as a whole and never add up to 101%. */
+private fun sharePercent(part: Long, total: Long): String =
+    if (total <= 0L) "0%" else "${((part * 100.0) / total).roundToInt()}%"
 
 @Composable
 private fun StorageItem(
