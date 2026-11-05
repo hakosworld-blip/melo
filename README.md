@@ -4,7 +4,17 @@ Your Personal Music App.
 
 A free, open-source music player designed to make your music experience better.
 
-￼ ￼ ￼
+<p align="center">
+  <a href="https://github.com/hakosworld-blip/melo/stargazers">
+    <img src="https://img.shields.io/github/stars/hakosworld-blip/melo?style=flat-square" alt="Stars">
+  </a>
+  <a href="https://github.com/hakosworld-blip/melo/releases/latest">
+    <img src="https://img.shields.io/github/v/release/hakosworld-blip/melo?style=flat-square" alt="Latest Release">
+  </a>
+  <a href="https://github.com/hakosworld-blip/melo/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/hakosworld-blip/melo?style=flat-square" alt="License">
+  </a>
+</p>
 
 About
 
