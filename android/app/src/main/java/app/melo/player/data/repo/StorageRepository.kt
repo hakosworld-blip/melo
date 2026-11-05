@@ -89,6 +89,8 @@ class StorageRepository(
         val before = cacheBytes()
         runCatching { Coil.imageLoader(context).diskCache?.clear() }
         Coil.imageLoader(context).memoryCache?.clear()
+        // The saved home rows are derived data: the next refresh rebuilds them.
+        CatalogCache.clear(context)
         if (!app.melo.player.playback.MeloPlaybackService.clearAudioCache()) {
             runCatching { audioCacheDir().deleteRecursively() }
         }

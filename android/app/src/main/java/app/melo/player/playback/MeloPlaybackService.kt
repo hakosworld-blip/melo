@@ -27,9 +27,14 @@ import app.melo.player.data.remote.Api
 import app.melo.player.data.local.LowSpaceNotifier
 import app.melo.player.data.local.StorageDetector
 import app.melo.player.di.ServiceLocator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -67,6 +72,19 @@ class MeloPlaybackService : MediaSessionService() {
     /** Polls free space for the low-space alert; cancelled with the service. */
     private var lowSpaceJob: Job? = null
 
+    /** Latest boundary settings, so the ramp loop does not read DataStore ten times a second. */
+    @Volatile private var crossfadeSeconds = 0
+    @Volatile private var gaplessEnabled = true
+
+    /** Drives the volume ramp between tracks; cancelled with the service. */
+    private var fadeJob: Job? = null
+
+    /**
+     * The ramp writes to the player, and ExoPlayer may only be touched from the thread that
+     * created it, so this scope is pinned to the main thread rather than a background one.
+     */
+    private val rampScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     override fun onCreate() {
         super.onCreate()
         ServiceLocator.init(this)
@@ -87,6 +105,23 @@ class MeloPlaybackService : MediaSessionService() {
             }
         }
 
+
+        // Fade settings follow the user's changes for as long as the service lives.
+        ServiceLocator.lifecycleScope?.launch {
+            ServiceLocator.settings.settings.collect { s ->
+                crossfadeSeconds = s.crossfadeSeconds
+                gaplessEnabled = s.gapless
+            }
+        }
+
+        // The ramp writes to the player, which is only safe on the thread that built it, so it
+        // runs on the main dispatcher rather than the default one.
+        fadeJob = rampScope.launch {
+            while (isActive) {
+                applyVolumeRamp()
+                delay(RAMP_TICK_MS)
+            }
+        }
 
         val mediaSourceFactory = DefaultMediaSourceFactory(
             DeferredDataSourceFactory { dataSourceFactory },
@@ -157,8 +192,35 @@ class MeloPlaybackService : MediaSessionService() {
         audioCache = null
         live = null
         lowSpaceJob?.cancel()
+        fadeJob?.cancel()
+        rampScope.cancel()
         LowSpaceNotifier.clear(this)
         super.onDestroy()
+    }
+
+    /**
+     * Applies the boundary envelope: a fade down over the end of a track and a fade up over
+     * the start of the next.
+     *
+     * The envelope is flat when crossfade is off and gapless is on, which leaves the boundary
+     * to ExoPlayer's own gapless handling. Turning gapless off inserts a short dip instead, so
+     * consecutive tracks are heard as separate songs.
+     */
+    private fun applyVolumeRamp() {
+        val exo = player ?: return
+        val fadeMs = when {
+            crossfadeSeconds > 0 -> crossfadeSeconds * 1_000L
+            !gaplessEnabled -> GAP_DIP_MS
+            else -> 0L
+        }
+        val duration = exo.duration
+        val target = if (!exo.isPlaying || duration <= 0L || duration == C.TIME_UNSET) {
+            // Paused, live or not resolved yet: never leave the player stuck at low volume.
+            1f
+        } else {
+            FadeEnvelope.volume(exo.currentPosition, duration, fadeMs)
+        }
+        if (exo.volume != target) exo.volume = target
     }
 
     /**
@@ -178,6 +240,12 @@ class MeloPlaybackService : MediaSessionService() {
          * Media3 owns that cache; a second SimpleCache on the same directory would corrupt it.
          */
         @Volatile private var live: MeloPlaybackService? = null
+
+        /** The deliberate dip between tracks when gapless playback is turned off. */
+        private const val GAP_DIP_MS = 350L
+
+        /** Ten checks a second sounds smooth and costs almost nothing. */
+        private const val RAMP_TICK_MS = 100L
 
         fun clearAudioCache(): Boolean = live?.evictCache() ?: false
     }

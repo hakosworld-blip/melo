@@ -109,6 +109,7 @@ data class SearchPlaylist(
     val source: Source = Source.YOUTUBE,
 )
 
+@Serializable
 data class HomeSection(
     val id: String,
     val title: String,

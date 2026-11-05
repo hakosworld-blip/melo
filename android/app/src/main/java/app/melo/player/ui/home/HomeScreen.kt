@@ -50,8 +50,10 @@ import app.melo.player.data.model.Artist
 import app.melo.player.data.model.Album
 import app.melo.player.data.model.HomeSection
 import app.melo.player.data.model.Playlist
+import app.melo.player.MeloApp
 import app.melo.player.data.model.Track
 import app.melo.player.data.model.isVerifiedArtist
+import app.melo.player.data.repo.CatalogCache
 import app.melo.player.data.prefs.Settings
 import app.melo.player.di.ServiceLocator
 import app.melo.player.playback.PlaybackState
@@ -59,6 +61,8 @@ import app.melo.player.ui.AppViewModel
 import app.melo.player.ui.brand.MeloMark
 import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.MeloBackground
+import app.melo.player.ui.components.NetworkStatus
+import app.melo.player.ui.components.OfflineState
 import app.melo.player.ui.components.SectionHeader
 import app.melo.player.ui.components.VerifiedBadge
 import app.melo.player.ui.components.formatDuration
@@ -73,8 +77,14 @@ import kotlinx.coroutines.launch
 
 sealed interface ProviderState {
     data object Loading : ProviderState
-    data class Ready(val sections: List<HomeSection>) : ProviderState
+
+    /** [cached] means these rows came off the disk because the catalog could not be reached. */
+    data class Ready(val sections: List<HomeSection>, val cached: Boolean = false) : ProviderState
+
     data class Failed(val message: String) : ProviderState
+
+    /** No connection and nothing saved yet, so the screen offers the local library instead. */
+    data object Offline : ProviderState
 }
 
 class HomeViewModel : ViewModel() {
@@ -96,11 +106,37 @@ class HomeViewModel : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
+            val context = MeloApp.instance
+
+            // Offline is not a failure: the saved catalog and the user's own library are still
+            // there, and asking the network would only spend a timeout finding that out.
+            if (!NetworkStatus.isOnline()) {
+                val cached = CatalogCache.read(context)
+                _provider.value = if (cached.isEmpty()) {
+                    ProviderState.Offline
+                } else {
+                    ProviderState.Ready(cached, cached = true)
+                }
+                return@launch
+            }
+
             _provider.value = ProviderState.Loading
             _provider.value = runCatching { music.providerSections() }
                 .fold(
-                    onSuccess = { ProviderState.Ready(it) },
-                    onFailure = { ProviderState.Failed("Could not reach the catalog.") },
+                    onSuccess = { sections ->
+                        CatalogCache.write(context, sections)
+                        ProviderState.Ready(sections)
+                    },
+                    onFailure = {
+                        // A dropped connection mid-refresh is the common case here, so fall
+                        // back to the saved rows rather than emptying the home screen.
+                        val cached = CatalogCache.read(context)
+                        if (cached.isEmpty()) {
+                            ProviderState.Failed("Could not reach the catalog.")
+                        } else {
+                            ProviderState.Ready(cached, cached = true)
+                        }
+                    },
                 )
         }
     }
@@ -203,6 +239,9 @@ fun HomeScreen(
 
             when (val state = provider) {
                 is ProviderState.Loading -> item { LoadingRow("Finding music for you") }
+                ProviderState.Offline -> item {
+                    OfflineState(onRetry = { vm.refresh() })
+                }
                 is ProviderState.Failed -> item {
                     EmptyState(
                         title = "Catalog unreachable",
@@ -211,6 +250,9 @@ fun HomeScreen(
                     )
                 }
                 is ProviderState.Ready -> {
+                    if (state.cached) {
+                        item { CachedCatalogNote() }
+                    }
                     if (state.sections.isEmpty() && history.isEmpty() && playlists.isEmpty()) {
                         item { EmptyState(title = "Nothing here yet", message = "Play something and melo will start building your home.") }
                     }
@@ -228,6 +270,17 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/** Shown when the rows below came off the disk instead of the network. */
+@Composable
+private fun CachedCatalogNote() {
+    Text(
+        "Offline — showing the catalog saved from your last connection.",
+        style = MaterialTheme.typography.bodySmall,
+        color = LocalMeloColors.current.textSecondary,
+        modifier = Modifier.padding(horizontal = Spacing.screenH, vertical = Spacing.xs),
+    )
 }
 
 @Composable

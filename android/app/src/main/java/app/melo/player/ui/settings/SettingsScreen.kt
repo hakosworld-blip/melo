@@ -388,6 +388,22 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                     }
                 }
                 item {
+                    SettingSwitch(
+                        "Gapless playback",
+                        "Tracks join without a pause when the audio allows it",
+                        settings.gapless,
+                    ) { app.setGapless(it) }
+                }
+                item {
+                    SettingSlider(
+                        "Crossfade",
+                        settings.crossfadeSeconds.toFloat(),
+                        0f..12f,
+                        steps = 11,
+                        format = { if (it < 0.5f) "Off" else "${it.toInt()}s" },
+                    ) { app.setCrossfade(it.toInt()) }
+                }
+                item {
                     SettingSlider(
                         "Speed",
                         settings.playbackSpeed,

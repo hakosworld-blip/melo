@@ -157,6 +157,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playback.setRepeat(mode)
     }
 
+    fun setGapless(value: Boolean) = apply { ServiceLocator.settings.setGapless(value) }
+
+    /** The service reads this itself, so no player call is needed here. */
+    fun setCrossfade(seconds: Int) = apply { ServiceLocator.settings.setCrossfade(seconds) }
+
     fun setPlaybackSpeed(value: Float) {
         apply { ServiceLocator.settings.setPlaybackSpeed(value) }
         playback.setSpeed(value)
