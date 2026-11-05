@@ -239,7 +239,11 @@ fun NowPlayingScreen(
                 ToggleIcon(
                     icon = if (state.repeatMode == 2) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                     active = state.repeatMode != 0,
-                    description = "Repeat",
+                    description = when (state.repeatMode) {
+                        1 -> "Repeat playlist"
+                        2 -> "Repeat song"
+                        else -> "Repeat off"
+                    },
                 ) {
                     app.setRepeat((state.repeatMode + 1) % 3)
                 }

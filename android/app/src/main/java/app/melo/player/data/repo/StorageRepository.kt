@@ -110,7 +110,11 @@ class StorageRepository(
      * Clears playlists, favourites, followed artists, listening history and recent searches.
      * Downloads, saved lyrics and settings are deliberately left alone.
      */
-    suspend fun clearUserData() = withContext(Dispatchers.IO) { library.clearAllLibraryData() }
+    suspend fun clearUserData() = withContext(Dispatchers.IO) {
+        library.clearAllLibraryData()
+        // Cover images are files, not rows: the playlists they belong to are gone now.
+        File(context.filesDir, "playlist_covers").deleteRecursively()
+    }
 
     fun cacheBytes(): Long = imageCacheDir().dirBytes() + maxOf(audioCacheDir().dirBytes(), 0L)
 
