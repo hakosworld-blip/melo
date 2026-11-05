@@ -3,8 +3,17 @@
 Your Personal Music App.
 
 A better way to experience the music you love.
-
-￼ ￼ ￼ 
+<p align="center">
+  <a href="https://github.com/hakosworld-blip/melo/releases">
+    <img src="https://img.shields.io/github/v/release/hakosworld-blip/melo?style=for-the-badge&color=9B7EDE" alt="Latest Release">
+  </a>
+  <a href="https://github.com/hakosworld-blip/melo/stargazers">
+    <img src="https://img.shields.io/github/stars/hakosworld-blip/melo?style=for-the-badge&color=9B7EDE" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/hakosworld-blip/melo/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/hakosworld-blip/melo?style=for-the-badge&color=9B7EDE" alt="License">
+  </a>
+</p> 
 
 🎵 About
 
