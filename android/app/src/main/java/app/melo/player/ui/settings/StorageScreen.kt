@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Subtitles
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,9 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import app.melo.player.R
 import app.melo.player.data.repo.StorageReport
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
@@ -46,7 +52,6 @@ import app.melo.player.ui.components.ScreenHeader
 import app.melo.player.ui.components.formatBytes
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
-import kotlinx.coroutines.launch
 
 /**
  * Everything melo keeps on the device, in the four groups that can be cleared separately.
@@ -70,11 +75,20 @@ fun StorageScreen(
     var confirmLyrics by remember { mutableStateOf(false) }
     var confirmUserData by remember { mutableStateOf(false) }
 
-    val reload = suspend {
-        report = runCatching { ServiceLocator.storage.report() }.getOrDefault(report)
+    LaunchedEffect(Unit) {
+        try {
+            report = ServiceLocator.storage.report()
+        } catch (_: Throwable) {
+            report = StorageReport()
+        }
+        ServiceLocator.storage.reportFlow()
+            .catch { report = StorageReport() }
+            .collect { report = it }
     }
 
-    LaunchedEffect(Unit) { reload() }
+    // Free space comes back with the report, so the warning tracks reality instead of a guess.
+    val lowSpace = report.freeBytes > 0L &&
+        report.freeBytes < settings.storageLowSpaceThresholdMb * 1_048_576L
 
     MeloBackground(
         style = settings.backgroundStyle,
@@ -88,10 +102,20 @@ fun StorageScreen(
                 subtitle = "${formatBytes(report.measuredBytes)} used by melo",
             )
             LazyColumn(Modifier.fillMaxSize()) {
+                if (lowSpace) {
+                    item {
+                        LowSpaceBanner(
+                            stringResource(
+                                R.string.storage_low_space_body,
+                                formatBytes(report.freeBytes),
+                            ),
+                        )
+                    }
+                }
                 item {
                     StorageItem(
                         icon = Icons.Rounded.Download,
-                        title = "Downloaded music",
+                        title = stringResource(R.string.storage_downloads),
                         subtitle = downloadsSummary(report),
                         enabled = !busy && report.downloads.items > 0,
                     ) { confirmDownloads = true }
@@ -99,7 +123,7 @@ fun StorageScreen(
                 item {
                     StorageItem(
                         icon = Icons.Rounded.Subtitles,
-                        title = "Lyrics",
+                        title = stringResource(R.string.storage_lyrics),
                         subtitle = lyricsSummary(report),
                         enabled = !busy && report.lyrics.items > 0,
                     ) { confirmLyrics = true }
@@ -107,7 +131,7 @@ fun StorageScreen(
                 item {
                     StorageItem(
                         icon = Icons.Rounded.Cached,
-                        title = "Cache",
+                        title = stringResource(R.string.storage_cache),
                         subtitle = if (report.cache.bytes > 0) {
                             "${formatBytes(report.cache.bytes)} · artwork and streamed audio"
                         } else {
@@ -117,8 +141,8 @@ fun StorageScreen(
                     ) {
                         scope.launch {
                             busy = true
-                            val freed = runCatching { ServiceLocator.storage.clearCache() }.getOrDefault(0L)
-                            reload()
+                            val freed = ServiceLocator.storage.clearCache()
+                            report = ServiceLocator.storage.report()
                             busy = false
                             notify("Freed ${formatBytes(freed)} of cache")
                         }
@@ -127,7 +151,7 @@ fun StorageScreen(
                 item {
                     StorageItem(
                         icon = Icons.Rounded.Person,
-                        title = "Your data",
+                        title = stringResource(R.string.storage_user_data),
                         subtitle = "Playlists, favourites, followed artists, history and searches",
                         enabled = !busy,
                     ) { confirmUserData = true }
@@ -147,19 +171,26 @@ fun StorageScreen(
         }
     }
 
+    val clearedDownloadsMessage = stringResource(R.string.storage_cleared_downloads)
+    val clearedLyricsMessage = stringResource(R.string.storage_cleared_lyrics)
+    val clearedUserDataMessage = stringResource(R.string.storage_cleared_user_data)
+    val clearLabel = stringResource(R.string.action_clear)
+
     if (confirmDownloads) {
         ConfirmDialog(
-            title = "Delete downloaded music?",
-            message = "${report.downloads.items} songs are removed from this device, with the cover " +
-                "picture and artist metadata saved beside each one. Playlists and favourites stay.",
-            confirmLabel = "Delete",
+            title = stringResource(R.string.storage_clear_downloads_title),
+            message = stringResource(
+                R.string.storage_clear_downloads_message,
+                report.downloads.items,
+            ),
+            confirmLabel = clearLabel,
             onConfirm = {
                 scope.launch {
                     busy = true
-                    runCatching { ServiceLocator.downloads.clearAll() }
-                    reload()
+                    runCatching { ServiceLocator.storage.clearDownloads() }
+                    report = ServiceLocator.storage.report()
                     busy = false
-                    notify("Downloaded music removed")
+                    notify(clearedDownloadsMessage)
                 }
             },
             onDismiss = { confirmDownloads = false },
@@ -168,17 +199,19 @@ fun StorageScreen(
 
     if (confirmLyrics) {
         ConfirmDialog(
-            title = "Remove saved lyrics?",
-            message = "${report.lyrics.items} lyric files are deleted. The songs, their covers and " +
-                "the artist metadata stay, and lyrics are fetched again when you open them.",
-            confirmLabel = "Remove",
+            title = stringResource(R.string.storage_clear_lyrics_title),
+            message = stringResource(
+                R.string.storage_clear_lyrics_message,
+                report.lyrics.items,
+            ),
+            confirmLabel = clearLabel,
             onConfirm = {
                 scope.launch {
                     busy = true
-                    val removed = runCatching { ServiceLocator.storage.clearLyrics() }.getOrDefault(0)
-                    reload()
+                    runCatching { ServiceLocator.storage.clearLyrics() }
+                    report = ServiceLocator.storage.report()
                     busy = false
-                    notify(if (removed > 0) "Removed $removed lyric files" else "Nothing to remove")
+                    notify(clearedLyricsMessage)
                 }
             },
             onDismiss = { confirmLyrics = false },
@@ -187,32 +220,21 @@ fun StorageScreen(
 
     if (confirmUserData) {
         ConfirmDialog(
-            title = "Clear your data?",
-            message = "Playlists, favourites, followed artists, listening history and recent searches " +
-                "are removed from this device. Downloads and settings stay.",
-            confirmLabel = "Clear",
+            title = stringResource(R.string.storage_clear_user_data_title),
+            message = stringResource(R.string.storage_clear_user_data_message),
+            confirmLabel = clearLabel,
             onConfirm = {
                 scope.launch {
                     busy = true
-                    runCatching { ServiceLocator.library.clearAllLibraryData() }
-                    reload()
+                    runCatching { ServiceLocator.storage.clearUserData() }
+                    report = ServiceLocator.storage.report()
                     busy = false
-                    notify("Your data was cleared")
+                    notify(clearedUserDataMessage)
                 }
             },
             onDismiss = { confirmUserData = false },
         )
     }
-}
-
-private fun downloadsSummary(report: StorageReport): String = when {
-    report.downloads.items <= 0 -> "Nothing downloaded"
-    else -> "${formatBytes(report.downloads.bytes)} · ${report.downloads.items} songs, with covers and metadata"
-}
-
-private fun lyricsSummary(report: StorageReport): String = when {
-    report.lyrics.items <= 0 -> "No saved lyrics"
-    else -> "${formatBytes(report.lyrics.bytes)} · ${report.lyrics.items} files saved beside songs"
 }
 
 @Composable
@@ -255,7 +277,7 @@ private fun StorageItem(
         }
         Spacer(Modifier.width(4.dp))
         Text(
-            "Clear",
+            stringResource(R.string.storage_clear_label),
             style = MaterialTheme.typography.labelLarge,
             color = if (enabled) MaterialTheme.colorScheme.primary else colors.textSecondary.copy(alpha = 0.5f),
             modifier = Modifier
@@ -264,4 +286,49 @@ private fun StorageItem(
                 .padding(horizontal = 10.dp, vertical = 7.dp),
         )
     }
+}
+
+@Composable
+private fun LowSpaceBanner(message: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screenH, vertical = Spacing.xs)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
+            .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Icon(
+            Icons.Rounded.Warning,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(20.dp),
+        )
+        Column {
+            Text(
+                stringResource(R.string.storage_low_space_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = LocalMeloColors.current.textPrimary,
+            )
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = LocalMeloColors.current.textSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun downloadsSummary(report: StorageReport): String = when {
+    report.downloads.items <= 0 -> stringResource(R.string.storage_empty)
+    else -> "${formatBytes(report.downloads.bytes)} · ${report.downloads.items} songs, with covers and metadata"
+}
+
+@Composable
+private fun lyricsSummary(report: StorageReport): String = when {
+    report.lyrics.items <= 0 -> stringResource(R.string.storage_empty)
+    else -> "${formatBytes(report.lyrics.bytes)} · ${report.lyrics.items} files saved beside songs"
 }

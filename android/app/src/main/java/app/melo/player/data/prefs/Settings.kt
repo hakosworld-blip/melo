@@ -70,6 +70,7 @@ data class Settings(
     // misc
     val cacheLimitMb: Int = 512,
     val showStatsSource: Boolean = true,
+    val storageLowSpaceThresholdMb: Int = 512,
     // updates: an automatic check at most once a day, plus when it last succeeded
     val autoUpdateCheck: Boolean = true,
     val lastUpdateCheckMs: Long = 0L,
@@ -123,6 +124,7 @@ class SettingsRepository(private val context: Context) {
 
         val cacheLimit = intPreferencesKey("cache_limit")
         val showStats = booleanPreferencesKey("show_stats")
+        val storageLowSpaceThresholdMb = intPreferencesKey("storage_low_space_threshold_mb")
 
         val autoUpdateCheck = booleanPreferencesKey("auto_update_check")
         val lastUpdateCheck = longPreferencesKey("last_update_check")
@@ -168,6 +170,7 @@ class SettingsRepository(private val context: Context) {
             downloadWifiOnly = p[K.downloadWifiOnly] ?: true,
             cacheLimitMb = p[K.cacheLimit] ?: 512,
             showStatsSource = p[K.showStats] ?: true,
+            storageLowSpaceThresholdMb = p[K.storageLowSpaceThresholdMb] ?: 512,
             autoUpdateCheck = p[K.autoUpdateCheck] ?: true,
             lastUpdateCheckMs = p[K.lastUpdateCheck] ?: 0L,
         )
@@ -218,9 +221,14 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setCacheLimit(mb: Int) = edit { it[K.cacheLimit] = mb.coerceIn(128, 4096) }
     suspend fun setShowStatsSource(value: Boolean) = edit { it[K.showStats] = value }
+    suspend fun setStorageLowSpaceThresholdMb(mb: Int) = edit { it[K.storageLowSpaceThresholdMb] = mb.coerceIn(256, 4096) }
 
     suspend fun setAutoUpdateCheck(value: Boolean) = edit { it[K.autoUpdateCheck] = value }
     suspend fun setLastUpdateCheck(epochMs: Long) = edit { it[K.lastUpdateCheck] = epochMs }
+
+    /** A cold flow that emits the low-space threshold, used by the playback service. */
+    fun storageLowSpaceThresholdMbFlow(): kotlinx.coroutines.flow.Flow<Int> =
+        context.dataStore.data.map { p -> p[K.storageLowSpaceThresholdMb] ?: 512 }
 
     /** Reset appearance + playback prefs back to defaults, leaving the library intact. */
     suspend fun resetToDefaults() {

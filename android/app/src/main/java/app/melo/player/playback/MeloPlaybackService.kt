@@ -24,7 +24,15 @@ import androidx.media3.session.MediaSessionService
 import app.melo.player.MainActivity
 import app.melo.player.data.model.ResolvedStream
 import app.melo.player.data.remote.Api
+import app.melo.player.data.local.LowSpaceNotifier
+import app.melo.player.data.local.StorageDetector
 import app.melo.player.di.ServiceLocator
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.IOException
@@ -56,6 +64,9 @@ class MeloPlaybackService : MediaSessionService() {
         buildDataSourceFactory()
     }
 
+    /** Polls free space for the low-space alert; cancelled with the service. */
+    private var lowSpaceJob: Job? = null
+
     override fun onCreate() {
         super.onCreate()
         ServiceLocator.init(this)
@@ -64,6 +75,18 @@ class MeloPlaybackService : MediaSessionService() {
         // Swap Media3's stock notification for melo's: melo small icon, "Playback"
         // channel, and a compact row that is always previous / play-pause / next.
         setMediaNotificationProvider(MeloNotificationProvider(this))
+
+        // Watch free space while the service lives: once at start, then every minute, so the
+        // alert appears when the device runs out mid-session instead of only at launch.
+        lowSpaceJob = ServiceLocator.lifecycleScope?.launch {
+            while (true) {
+                val thresholdMb = ServiceLocator.settings.settings.first().storageLowSpaceThresholdMb
+                val free = StorageDetector.freeBytes(this@MeloPlaybackService)
+                LowSpaceNotifier.refresh(this@MeloPlaybackService, free, thresholdMb)
+                delay(60_000L)
+            }
+        }
+
 
         val mediaSourceFactory = DefaultMediaSourceFactory(
             DeferredDataSourceFactory { dataSourceFactory },
@@ -133,6 +156,8 @@ class MeloPlaybackService : MediaSessionService() {
         audioCache?.release()
         audioCache = null
         live = null
+        lowSpaceJob?.cancel()
+        LowSpaceNotifier.clear(this)
         super.onDestroy()
     }
 

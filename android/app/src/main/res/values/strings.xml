@@ -2,11 +2,42 @@
 <resources>
     <string name="app_name">melo</string>
 
-    <!-- Playback notification (background playback media controls) -->
+    <string name="storage_downloads">Downloaded music</string>
+    <string name="storage_lyrics">Lyrics</string>
+    <string name="storage_cache">Cache</string>
+    <string name="storage_user_data">Your data</string>
+
+    <string name="storage_low_space_title">Storage is almost full</string>
+    <string name="storage_low_space_body">Only %1$s free on this device. Clearing downloads or lyrics makes room.</string>
+
+    <string name="storage_clear_label">Clear</string>
+    <string name="storage_empty">Nothing here</string>
+
+    <string name="storage_clear_downloads_title">Delete downloaded music?</string>
+    <string name="storage_clear_downloads_message">%1$d songs are removed from this device, with the cover picture and artist metadata saved beside each one. Playlists and favourites stay.</string>
+
+    <string name="storage_clear_lyrics_title">Remove saved lyrics?</string>
+    <string name="storage_clear_lyrics_message">%1$d lyric files are deleted. The songs, their covers and the artist metadata stay, and lyrics are fetched again when you open them.</string>
+
+    <string name="storage_clear_user_data_title">Clear your data?</string>
+    <string name="storage_clear_user_data_message">Playlists, favourites, followed artists, listening history and recent searches are removed from this device. Downloads and settings stay.</string>
+
+    <string name="storage_cleared_downloads">Downloaded music removed</string>
+    <string name="storage_cleared_lyrics">Lyrics removed</string>
+    <string name="storage_cleared_user_data">Your data was cleared</string>
+
+    <string name="action_clear">Clear</string>
+    <string name="action_cancel">Cancel</string>
+
     <string name="notification_channel_playback">Playback</string>
-    <string name="notification_channel_playback_desc">Controls shown while melo is playing music in the background</string>
+    <string name="notification_title_now_playing">Now playing</string>
+    <string name="notification_subtitle_ready">Tap to open</string>
     <string name="notification_control_play">Play</string>
+    <string name="notification_control_play_pause">Play / pause</string>
     <string name="notification_control_pause">Pause</string>
     <string name="notification_control_previous">Previous track</string>
     <string name="notification_control_next">Next track</string>
+
+    <string name="low_space_notif_lines">%1$s — only %2$s free</string>
+    <string name="low_space_notif_details">%1$s of free space remains. Free it in Settings → Storage, or downloads may stop. The notification clears once enough space is available.</string>
 </resources>
