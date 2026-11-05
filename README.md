@@ -1,55 +1,42 @@
-🎧 melo
+melo
 
 Your Personal Music App.
 
-A better way to experience the music you love.
-<p align="center">
-  <a href="https://github.com/hakosworld-blip/melo/releases">
-    <img src="https://img.shields.io/github/v/release/hakosworld-blip/melo?style=for-the-badge&color=9B7EDE" alt="Latest Release">
-  </a>
-  <a href="https://github.com/hakosworld-blip/melo/stargazers">
-    <img src="https://img.shields.io/github/stars/hakosworld-blip/melo?style=for-the-badge&color=9B7EDE" alt="GitHub Stars">
-  </a>
-  <a href="https://github.com/hakosworld-blip/melo/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/hakosworld-blip/melo?style=for-the-badge&color=9B7EDE" alt="License">
-  </a>
-</p> 
+A free, open-source music player designed to make your music experience better.
 
-🎵 About
+￼ ￼ ￼
+
+About
 
 melo is a free, open-source music player built for people who just want to enjoy music.
 
-Designed with a clean, customizable interface and powerful playback features, melo brings your music experience together in one place.
-
-Discover music, explore artists, organize your library, create playlists, and enjoy synchronized lyrics.
+Discover music, explore artists, organize your library, create playlists, and enjoy synchronized lyrics through a clean and customizable interface.
 
 No subscriptions. No advertisements. No telemetry. Just music.
 
-✨ Features
+Features
 
-🎶 Background Playback — Keep listening while using other apps or with your screen turned off.
+Background Playback — Listen while using other apps or with your screen turned off.
 
-🎛️ Media Controls — Control your music through notifications, your lock screen, and connected headphones.
+Media Controls — Control playback through notifications, your lock screen, and connected headphones.
 
-🎤 Synchronized Lyrics — Enjoy line-by-line and word-by-word lyrics synchronized with the music when available.
+Synchronized Lyrics — Enjoy line-by-line and word-by-word synchronized lyrics when available.
 
-🌌 Beautiful Lyrics Experience — Customize your lyrics screen with blurred album artwork and backgrounds.
+Custom Lyrics Experience — Customize your lyrics screen with blurred album artwork and backgrounds.
 
-🔎 Music Discovery — Explore recommendations, trending tracks, new releases, albums, and artists.
+Music Discovery — Explore recommendations, trending tracks, new releases, albums, and artists.
 
-💿 Your Music Library — Create playlists, save favorites, follow artists, and organize your music.
+Music Library — Create playlists, save favorites, follow artists, and organize your music.
 
-📥 Spotify Playlist Import — Import public Spotify playlists into your melo library.
+Spotify Playlist Import — Import public Spotify playlists into your melo library.
 
-🎨 Deep Customization — Personalize themes, accent colors, backgrounds, layouts, and app icons.
+Deep Customization — Personalize themes, colors, backgrounds, layouts, and app icons.
 
-🔒 Privacy First — No analytics, tracking, or telemetry.
+Privacy First — No analytics, tracking, or telemetry.
 
-🆓 Completely Free — No subscriptions, premium tiers, or advertisements.
+Completely Free — No subscriptions, premium tiers, or advertisements.
 
-🎨 Customization
-
-Your music player should feel like yours.
+Customization
 
 Make melo your own with:
 
@@ -67,19 +54,19 @@ Multiple app icon options.
 
 Personalized interface appearance.
 
-💻 Platform Availability
+Platform Availability
 
-PlatformStatusAndroid✅ AvailableWindows🚧 Work in ProgressmacOS🚧 Work in ProgressLinux🚧 Work in ProgressiOSNot currently available 
+PlatformStatusAndroidAvailableWindowsWork in ProgressmacOSWork in ProgressLinuxWork in ProgressiOSNot currently available 
 
-Android is currently the primary development target. Desktop versions for Windows, macOS, and Linux are a work in progress.
+Android is currently the primary development target. Desktop support for Windows, macOS, and Linux is a work in progress.
 
-📥 Download
+Download
 
-⬇️ Download melo — GitHub Releases
+Download melo
 
 Android Installation
 
-Visit the Releases page.
+Visit the GitHub Releases page.
 
 Download the latest available APK.
 
@@ -87,11 +74,7 @@ Install the APK on your Android device.
 
 Open melo and enjoy your music!
 
-If there are no releases available yet, check back later.
-
-🛠️ Build from Source
-
-Want to build melo yourself?
+Build from Source
 
 Requirements
 
@@ -119,11 +102,9 @@ Run Tests
 
 ./gradlew testDebugUnitTest 
 
-For release builds and signing instructions, see the Android documentation.
+For release builds and signing instructions, see the Android Build and Release Guide.
 
-Android Build & Release Guide
-
-🔒 Privacy
+Privacy
 
 Your privacy matters.
 
@@ -139,7 +120,7 @@ No mandatory account registration.
 
 Your playlists, favorites, listening history, and preferences are stored locally on your device where supported.
 
-⚠️ Disclaimer
+Disclaimer
 
 melo is an independent, community-developed project.
 
@@ -147,7 +128,7 @@ It is not affiliated with, endorsed by, or officially connected to YouTube, Goog
 
 Streaming providers and their services may change at any time. Users are responsible for complying with applicable laws and the terms of service of the platforms they use.
 
-📜 Credits & License
+Credits and License
 
 melo is derived from Riff, an open-source music player.
 
@@ -155,23 +136,21 @@ We appreciate the original developers and the open-source community whose work h
 
 Licensed under the MIT License. See the LICENSE file for details.
 
-💜 Support melo
+Support the Project
 
 Enjoying melo? Help the project grow!
 
-⭐ Star this repository.
+Star this repository.
 
-🐛 Report bugs through GitHub Issues.
+Report bugs through GitHub Issues.
 
-💡 Suggest new features.
+Suggest new features.
 
-🤝 Contribute to development.
+Contribute to development.
 
-💜 Share melo with your friends.
+Share melo with your friends.
 
-Made with 💜 for music lovers.
+Made with love for music lovers.
 
 melo — Your Personal Music App.
-
-GitHub Repository · Releases · Issues
 
