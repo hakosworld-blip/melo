@@ -28,6 +28,10 @@ object YtDlp {
     /** How long a downloaded nightly build counts as fresh before it is refreshed. */
     private const val NIGHTLY_TTL_MS = 24 * 60 * 60 * 1000L
 
+    /** Where the last nightly check is remembered, so it survives a restart. */
+    private const val PREFS = "melo_extractor"
+    private const val KEY_LAST_NIGHTLY_CHECK = "last_nightly_check"
+
     /** Best audio the provider offers, versus the best one that stays frugal. */
     private const val FORMAT_BEST = "bestaudio/best"
     private const val FORMAT_FRUGAL = "bestaudio[abr<=128]/bestaudio/best"
@@ -37,7 +41,6 @@ object YtDlp {
     private val initLock = Mutex()
 
     @Volatile private var ready = false
-    @Volatile private var lastNightlyCheck = 0L
     @Volatile private var failure: String? = null
 
     /** The last thing that went wrong, for the settings screen. */
@@ -58,7 +61,7 @@ object YtDlp {
             val app = context.applicationContext
             YoutubeDL.init(app)
             YoutubeDL.updateYoutubeDL(app, YoutubeDL.UpdateChannel.NIGHTLY)
-            lastNightlyCheck = System.currentTimeMillis()
+            stampNightlyCheck(app)
             ready = true
             failure = null
             versionOf(app)
@@ -115,9 +118,12 @@ object YtDlp {
             val app = context.applicationContext
             runCatching {
                 YoutubeDL.init(app)
-                if (System.currentTimeMillis() - lastNightlyCheck > NIGHTLY_TTL_MS) {
+                // The stamp is persisted: kept in memory only, every app launch looked stale and
+                // re-downloaded the whole nightly build — tens of megabytes, timed exactly when
+                // the user pressed play on the one track the fast path could not resolve.
+                if (System.currentTimeMillis() - lastNightlyCheck(app) > NIGHTLY_TTL_MS) {
                     runCatching { YoutubeDL.updateYoutubeDL(app, YoutubeDL.UpdateChannel.NIGHTLY) }
-                    lastNightlyCheck = System.currentTimeMillis()
+                    stampNightlyCheck(app)
                 }
                 ready = true
                 failure = null
@@ -125,6 +131,16 @@ object YtDlp {
 
             ready
         }
+    }
+
+    private fun lastNightlyCheck(context: Context): Long =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getLong(KEY_LAST_NIGHTLY_CHECK, 0L)
+
+    private fun stampNightlyCheck(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(KEY_LAST_NIGHTLY_CHECK, System.currentTimeMillis())
+            .apply()
     }
 
     private fun versionOf(context: Context): String? =

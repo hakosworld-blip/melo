@@ -111,9 +111,15 @@ function findFile(dir, fileName) {
   return null;
 }
 
+/**
+ * yt-dlp nightly is the channel melo installs, on both the desktop server and Android: the
+ * fixes that keep playback working when a provider changes ship there within hours. The
+ * nightly-builds repository publishes the same asset names and SHA2-256SUMS as the stable
+ * one, so the download and checksum path below is unchanged.
+ */
 async function installYtDlp() {
   const asset = ytDlpAsset();
-  const base = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download';
+  const base = 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download';
   const sums = await getText(`${base}/SHA2-256SUMS`);
   const want = expectedHash(sums, asset);
   if (!want) throw new Error(`No checksum published for ${asset}`);
@@ -185,7 +191,9 @@ async function updateYtDlpIfManaged() {
     if (Date.now() - last < 24 * 3600 * 1000) return false;
   } catch (e) {}
   try {
-    await run(bin, ['-U'], 120000);
+    // A nightly build only updates itself on the nightly track, so name the channel:
+    // plain -U would move it back onto stable releases.
+    await run(bin, ['-U', '--update-to', 'nightly'], 120000);
     fs.writeFileSync(STAMP, String(Date.now()));
     return true;
   } catch (e) {
