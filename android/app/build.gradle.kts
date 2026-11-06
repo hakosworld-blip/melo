@@ -50,6 +50,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         resourceConfigurations += listOf("en")
+
+        // youtubedl-android packages an embedded CPython for every ABI it is built for, and
+        // those payloads are ~9.6 MB each: four of them were 39 MB of a 49 MB APK. Every
+        // Android 8+ phone that can install this build is arm64, so ship that ABI and leave
+        // the others out. Add "armeabi-v7a" here if a 32-bit device ever needs a build.
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     signingConfigs {
@@ -139,7 +145,6 @@ dependencies {
     // Needed for providers that only expose an HLS manifest.
     implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
-    implementation("androidx.media3:media3-ui:1.5.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.5.1")
     implementation("androidx.media3:media3-datasource:1.5.1")
     implementation("com.google.guava:guava:33.3.1-android")
