@@ -54,6 +54,7 @@ import app.melo.player.data.model.Album
 import app.melo.player.data.model.SearchPlaylist
 import app.melo.player.data.model.SearchResults
 import app.melo.player.data.model.Track
+import app.melo.player.data.model.isVerifiedArtist
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
 import app.melo.player.ui.components.EmptyState
@@ -62,6 +63,7 @@ import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.OverflowButton
 import app.melo.player.ui.components.TrackRow
+import app.melo.player.ui.components.VerifiedBadge
 import app.melo.player.ui.components.formatCount
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
@@ -148,8 +150,35 @@ class SearchViewModel : ViewModel() {
         outcome.onSuccess {
             _results.value = it
             library.addSearch(value)
+            enrichArtists(it.artists)
         }.onFailure {
             _results.value = SearchResults()
+        }
+    }
+
+    /**
+     * Search rows carry no audience number, so listener counts are filled in after the results
+     * land, for the artists at the top of the list only. Three lookups at most, one request
+     * each, and Catalogue caches the answers: a badge must not turn a search into a storm of
+     * requests.
+     */
+    private fun enrichArtists(artists: List<app.melo.player.data.model.Artist>) {
+        val pending = artists.filter { it.monthlyListeners <= 0 && it.id.isNotBlank() }.take(3)
+        if (pending.isEmpty()) return
+        val query = _query.value
+        viewModelScope.launch {
+            val resolved = pending.mapNotNull { artist ->
+                val listeners = music.artistListeners(artist.name, artist.id)
+                if (listeners > 0) artist.id to listeners else null
+            }.toMap()
+            // The user may have searched again while these were in flight.
+            if (resolved.isEmpty() || _query.value != query) return@launch
+            _results.value = _results.value.copy(
+                artists = _results.value.artists.map { artist ->
+                    val listeners = resolved[artist.id] ?: return@map artist
+                    artist.copy(monthlyListeners = listeners)
+                },
+            )
         }
     }
 
@@ -299,7 +328,18 @@ fun SearchScreen(
                                 MeloArt(artist.artwork, Modifier.size(46.dp), circular = true)
                                 Spacer(Modifier.width(Spacing.md))
                                 Column(Modifier.weight(1f)) {
-                                    Text(artist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            artist.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            maxLines = 1,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                        )
+                                        if (artist.isVerifiedArtist) {
+                                            Spacer(Modifier.width(5.dp))
+                                            VerifiedBadge(size = 15.dp)
+                                        }
+                                    }
                                     Text(
                                         if (artist.monthlyListeners > 0) "Artist · ${formatCount(artist.monthlyListeners)} monthly listeners" else "Artist",
                                         style = MaterialTheme.typography.bodySmall,

@@ -55,6 +55,9 @@ fun MeloBackground(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(image)
+                    // A dimmed backdrop behind body text: decoding it at a sane size costs a
+                    // fraction of a full-resolution artwork and looks identical under the scrim.
+                    .size(720)
                     .crossfade(400)
                     .build(),
                 contentDescription = null,

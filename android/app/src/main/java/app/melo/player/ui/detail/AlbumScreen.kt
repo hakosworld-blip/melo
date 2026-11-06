@@ -43,6 +43,7 @@ import app.melo.player.data.model.Album
 import app.melo.player.data.model.AlbumPage
 import app.melo.player.data.model.Track
 import app.melo.player.di.ServiceLocator
+import app.melo.player.ui.components.AddToPlaylistButton
 import app.melo.player.ui.components.EmptyState
 import app.melo.player.ui.components.LoadingRow
 import app.melo.player.ui.components.LocalCurrentTrack
@@ -200,7 +201,12 @@ fun AlbumScreen(
                                 color = LocalMeloColors.current.textSecondary,
                             )
                         },
-                        trailing = { OverflowButton { actions.show(track) } },
+                        trailing = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AddToPlaylistButton(track)
+                                OverflowButton { actions.show(track) }
+                            }
+                        },
                     )
                 }
             }

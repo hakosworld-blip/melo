@@ -17,6 +17,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // youtubedl-android (the embedded CPython + yt-dlp extractor) is published here.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.yausername.youtubedl-android") }
+        }
     }
 }
 

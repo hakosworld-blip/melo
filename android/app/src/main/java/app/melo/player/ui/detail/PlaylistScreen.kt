@@ -1,5 +1,10 @@
 package app.melo.player.ui.detail
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,7 +64,10 @@ import app.melo.player.ui.components.formatDuration
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 @Composable
 fun PlaylistScreen(
@@ -79,6 +88,22 @@ fun PlaylistScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+
+    // Spotify-like cover picking: the picker hands back a content:// uri for one image, and
+    // that uri is only readable while permission lasts, so the bytes are copied into app
+    // storage and the saved file is what the playlist points at.
+    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                savePlaylistCover(context, playlistId, uri)?.let { library.setPlaylistCover(playlistId, it) }
+            }
+        }
+    }
+    val pickCover = {
+        coverPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
     val totalDuration = tracks.sumOf { it.durationMs }
 
     Column(Modifier.fillMaxSize()) {
@@ -96,6 +121,16 @@ fun PlaylistScreen(
                             menuOpen = false
                             renaming = true
                         })
+                        DropdownMenuItem(text = { Text("Change cover") }, onClick = {
+                            menuOpen = false
+                            pickCover()
+                        })
+                        if (!playlist?.coverArtwork.isNullOrBlank()) {
+                            DropdownMenuItem(text = { Text("Remove cover") }, onClick = {
+                                menuOpen = false
+                                scope.launch { library.setPlaylistCover(playlistId, "") }
+                            })
+                        }
                         DropdownMenuItem(text = { Text("Reorder / remove tracks") }, onClick = {
                             menuOpen = false
                             editing = !editing
@@ -134,10 +169,14 @@ fun PlaylistScreen(
                 .padding(horizontal = Spacing.screenH),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Tapping the art is the shortcut for the same action the menu offers.
             MeloArt(
                 playlist?.coverArtwork.orEmpty(),
-                Modifier.size(112.dp),
+                Modifier
+                    .size(112.dp)
+                    .clickable { pickCover() },
                 corner = MeloTheme.radius,
+                contentDescription = "Playlist cover. Tap to change",
             )
             Spacer(Modifier.width(Spacing.lg))
             Column(Modifier.weight(1f)) {
@@ -233,6 +272,27 @@ fun PlaylistScreen(
         )
     }
 }
+
+/**
+ * Copies a picked image into app storage and returns a file URL for Coil, or null when the
+ * image could not be read. The timestamp in the name makes a replacement look like a new
+ * image to Coil, which would otherwise keep serving the old cached cover.
+ */
+private suspend fun savePlaylistCover(context: Context, playlistId: Long, uri: Uri): String? =
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val folder = File(context.filesDir, "playlist_covers").apply { mkdirs() }
+            folder.listFiles()
+                ?.filter { it.name.startsWith("cover_${playlistId}_") }
+                ?.forEach { it.delete() }
+            val target = File(folder, "cover_${playlistId}_${System.currentTimeMillis()}.jpg")
+            val input = context.contentResolver.openInputStream(uri) ?: return@runCatching null
+            input.use { source ->
+                target.outputStream().use { output -> source.copyTo(output) }
+            }
+            Uri.fromFile(target).toString()
+        }.getOrNull()
+    }
 
 @Composable
 internal fun RoundButton(

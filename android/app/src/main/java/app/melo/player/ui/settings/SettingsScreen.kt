@@ -1,5 +1,7 @@
 package app.melo.player.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,20 +16,26 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,43 +44,62 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.melo.player.AppInfo
 import app.melo.player.BuildConfig
 import app.melo.player.data.lyrics.LyricsMode
 import app.melo.player.data.model.StreamQuality
 import app.melo.player.data.prefs.Settings
 import app.melo.player.di.ServiceLocator
 import app.melo.player.ui.AppViewModel
+import app.melo.player.ui.ExtractorStatus
+import app.melo.player.ui.UpdateStatus
+import app.melo.player.ui.brand.IconVariant
+import app.melo.player.ui.brand.IconVariants
+import app.melo.player.ui.brand.MeloMark
+import app.melo.player.ui.brand.iconVariantById
 import app.melo.player.ui.components.ConfirmDialog
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.ScreenHeader
-import app.melo.player.ui.components.formatBytes
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Palettes
+import app.melo.player.ui.theme.paletteById
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.Locale
 
 @Composable
-fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
+fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> Unit) {
     val settings by app.settings.collectAsStateWithLifecycle()
     val playback by app.playback.state.collectAsStateWithLifecycle()
+    val extractor by app.extractor.collectAsStateWithLifecycle()
+    val updates by app.updates.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var confirmReset by remember { mutableStateOf(false) }
     var confirmClearLibrary by remember { mutableStateOf(false) }
-    var confirmClearDownloads by remember { mutableStateOf(false) }
     var confirmClearHistory by remember { mutableStateOf(false) }
     var showLicenses by remember { mutableStateOf(false) }
+    var showIconPicker by remember { mutableStateOf(false) }
+    var showLogoPicker by remember { mutableStateOf(false) }
 
-    val downloadBytes by ServiceLocator.database.downloadDao().totalBytes()
-        .collectAsStateWithLifecycle(initialValue = 0L)
-    val downloadCount by ServiceLocator.database.downloadDao().completed()
+    // Remembered: calling the DAO from composition builds a fresh Flow on every recomposition,
+    // and this screen recomposes on every preference change.
+    val downloadDao = remember { ServiceLocator.database.downloadDao() }
+    val downloadCount by remember(downloadDao) { downloadDao.completed() }
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val qualityOptions = remember {
+        StreamQuality.entries.map { it.id to it.label.split(" ").first() }
+    }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -106,32 +133,6 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                             options = listOf("dark" to "Dark", "light" to "Light", "system" to "System"),
                             selected = settings.themeMode,
                             onSelect = { app.setThemeMode(it) },
-                        )
-                    }
-                }
-                item {
-                    SettingBlock("Accent colour") {
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            Palettes.forEach { palette ->
-                                val selected = palette.id == settings.paletteId
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(palette.accent)
-                                        .then(
-                                            if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.onBackground, CircleShape)
-                                            else Modifier,
-                                        )
-                                        .clickable { app.setPalette(palette.id) },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            Palettes.first { it.id == settings.paletteId }.label,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = LocalMeloColors.current.textSecondary,
                         )
                     }
                 }
@@ -178,14 +179,106 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingSlider(
                         "Corner radius",
-                        "${settings.cornerRadius}dp",
                         settings.cornerRadius.toFloat(),
                         0f..34f,
+                        format = { "${it.toInt()}dp" },
                     ) { app.setCornerRadius(it.toInt()) }
                 }
                 item {
                     SettingSwitch("Compact layout", "Tighter spacing for smaller screens", settings.compact) {
                         app.setCompact(it)
+                    }
+                }
+
+                /* ------------------------ customization ---------------------- */
+                item { GroupTitle("Customization") }
+                item {
+                    SettingBlock("Accent colour") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            Palettes.forEach { palette ->
+                                // A custom colour takes the selection away from every preset.
+                                val selected = !settings.customAccent && palette.id == settings.paletteId
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(palette.accent)
+                                        .then(
+                                            if (selected) {
+                                                Modifier.border(2.dp, MaterialTheme.colorScheme.onBackground, CircleShape)
+                                            } else {
+                                                Modifier
+                                            },
+                                        )
+                                        .clickable { app.setPalette(palette.id) },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (settings.customAccent) "Custom colour" else paletteById(settings.paletteId).label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LocalMeloColors.current.textSecondary,
+                        )
+                        Spacer(Modifier.height(Spacing.sm))
+                        SettingSwitch(
+                            "Custom accent",
+                            "Mix any colour you like with the sliders",
+                            settings.customAccent,
+                        ) { app.setCustomAccent(it) }
+                        if (settings.customAccent) {
+                            AccentMixer(argb = settings.accentColor, onPick = { app.setAccentColor(it) })
+                        }
+                    }
+                }
+                item {
+                    SettingBlock("App icon") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MeloMark(settings.appIconId, size = 54.dp)
+                            Spacer(Modifier.width(Spacing.md))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    iconVariantById(settings.appIconId).label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    "The icon on your home screen. Pick any of the 27 styles, then let your launcher refresh.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = LocalMeloColors.current.textSecondary,
+                                )
+                            }
+                            Text(
+                                "Change",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.clickable { showIconPicker = true }.padding(8.dp),
+                            )
+                        }
+                    }
+                }
+                item {
+                    SettingBlock("Logo in the app") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MeloMark(settings.logoId, size = 54.dp)
+                            Spacer(Modifier.width(Spacing.md))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    iconVariantById(settings.logoId).label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    "The mark beside the greeting on your home screen. It can differ from the app icon.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = LocalMeloColors.current.textSecondary,
+                                )
+                            }
+                            Text(
+                                "Change",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.clickable { showLogoPicker = true }.padding(8.dp),
+                            )
+                        }
                     }
                 }
 
@@ -209,10 +302,10 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingSlider(
                         "Text size",
-                        "${settings.lyricsTextSize}sp",
                         settings.lyricsTextSize.toFloat(),
                         18f..52f,
                         steps = 33,
+                        format = { "${it.toInt()}sp" },
                     ) { app.setLyricsSize(it.toInt()) }
                 }
                 item {
@@ -230,9 +323,12 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
-                    SettingSlider("Line spacing", "${settings.lyricsLineSpacing}", settings.lyricsLineSpacing.toFloat(), 0f..40f) {
-                        app.setLyricsSpacing(it.toInt())
-                    }
+                    SettingSlider(
+                        "Line spacing",
+                        settings.lyricsLineSpacing.toFloat(),
+                        0f..40f,
+                        format = { "${it.toInt()}" },
+                    ) { app.setLyricsSpacing(it.toInt()) }
                 }
                 item {
                     SettingSwitch("Word karaoke", "Animate the active word", settings.lyricsWordKaraoke) {
@@ -250,22 +346,28 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
-                    SettingSlider("Backdrop blur", "${settings.backgroundBlur}%", settings.backgroundBlur.toFloat(), 0f..100f) {
-                        app.setBlur(it.toInt())
-                    }
+                    SettingSlider(
+                        "Backdrop blur",
+                        settings.backgroundBlur.toFloat(),
+                        0f..100f,
+                        format = { "${it.toInt()}%" },
+                    ) { app.setBlur(it.toInt()) }
                 }
                 item {
-                    SettingSlider("Backdrop dim", "${settings.backgroundDim}%", settings.backgroundDim.toFloat(), 0f..90f) {
-                        app.setDim(it.toInt())
-                    }
+                    SettingSlider(
+                        "Backdrop dim",
+                        settings.backgroundDim.toFloat(),
+                        0f..90f,
+                        format = { "${it.toInt()}%" },
+                    ) { app.setDim(it.toInt()) }
                 }
                 item {
                     SettingSlider(
                         "Sync offset",
-                        "${settings.lyricsOffsetMs / 1000.0}s",
                         settings.lyricsOffsetMs.toFloat(),
                         -5000f..5000f,
                         steps = 19,
+                        format = { "${it.toInt() / 1000.0}s" },
                     ) { app.setLyricsOffset(it.toInt()) }
                 }
 
@@ -286,14 +388,34 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 item {
-                    SettingSlider("Speed", "%.2fx".format(settings.playbackSpeed), settings.playbackSpeed, 0.5f..2f, steps = 14) {
-                        app.setPlaybackSpeed((it * 20).toInt() / 20f)
-                    }
+                    SettingSwitch(
+                        "Gapless playback",
+                        "Tracks join without a pause when the audio allows it",
+                        settings.gapless,
+                    ) { app.setGapless(it) }
+                }
+                item {
+                    SettingSlider(
+                        "Crossfade",
+                        settings.crossfadeSeconds.toFloat(),
+                        0f..12f,
+                        steps = 11,
+                        format = { if (it < 0.5f) "Off" else "${it.toInt()}s" },
+                    ) { app.setCrossfade(it.toInt()) }
+                }
+                item {
+                    SettingSlider(
+                        "Speed",
+                        settings.playbackSpeed,
+                        0.5f..2f,
+                        steps = 14,
+                        format = { "%.2fx".format(it) },
+                    ) { app.setPlaybackSpeed((it * 20).toInt() / 20f) }
                 }
                 item {
                     SettingBlock("Streaming quality") {
                         Segmented(
-                            options = StreamQuality.entries.map { it.id to it.label.split(" ").first() },
+                            options = qualityOptions,
                             selected = settings.streamQuality,
                             onSelect = { app.setStreamQuality(it) },
                         )
@@ -304,6 +426,22 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                             color = LocalMeloColors.current.textSecondary,
                         )
                     }
+                }
+                item {
+                    SettingRow(
+                        "yt-dlp nightly",
+                        extractorSummary(extractor),
+                        action = {
+                            Text(
+                                if (extractor.busy) "Working…" else "Update",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable(enabled = !extractor.busy) { app.refreshExtractor() }
+                                    .padding(8.dp),
+                            )
+                        },
+                    )
                 }
                 item {
                     SettingSwitch("Stream on mobile data", "Off means playback waits for Wi-Fi", settings.mobileDataStreaming) {
@@ -321,7 +459,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item {
                     SettingBlock("Download quality") {
                         Segmented(
-                            options = StreamQuality.entries.map { it.id to it.label.split(" ").first() },
+                            options = qualityOptions,
                             selected = settings.downloadQuality,
                             onSelect = { app.setDownloadQuality(it) },
                         )
@@ -334,17 +472,17 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 }
                 item {
                     SettingRow(
-                        title = "Storage used",
-                        subtitle = "${downloadCount.size} tracks · ${formatBytes(downloadBytes ?: 0L)}",
+                        title = "Storage",
+                        subtitle = "${downloadCount.size} downloads · clear lyrics, cache and your data",
                         action = {
-                            if (downloadCount.isNotEmpty()) {
-                                Text(
-                                    "Clear",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    modifier = Modifier.clickable { confirmClearDownloads = true }.padding(8.dp),
-                                )
-                            }
+                            Text(
+                                "Manage",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable(onClick = onOpenStorage)
+                                    .padding(8.dp),
+                            )
                         },
                     )
                 }
@@ -369,31 +507,12 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                     })
                 }
                 item {
-                    SettingRow(
-                        "Clear image cache",
-                        "Frees downloaded artwork; it reloads as needed",
-                        {
-                            Text(
-                                "Clear",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable {
-                                    scope.launch {
-                                        coil.Coil.imageLoader(context).diskCache?.clear()
-                                        coil.Coil.imageLoader(context).memoryCache?.clear()
-                                    }
-                                }.padding(8.dp),
-                            )
-                        },
-                    )
-                }
-                item {
                     SettingSlider(
                         "Streaming cache limit",
-                        "${settings.cacheLimitMb} MB · applies after restart",
                         settings.cacheLimitMb.toFloat(),
                         128f..2048f,
                         steps = 14,
+                        format = { "${it.toInt()} MB · applies after restart" },
                     ) { app.setCacheLimit(it.toInt()) }
                 }
                 item {
@@ -426,9 +545,66 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
                 item { GroupTitle("About") }
                 item {
                     SettingRow(
-                        "melo",
-                        "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.BUILD_TYPE}",
+                        "Version",
+                        "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}) · ${BuildConfig.BUILD_TYPE}",
                         action = {},
+                    )
+                }
+                item {
+                    SettingRow(
+                        "App update",
+                        updateSummary(updates),
+                        action = {
+                            Text(
+                                if (updates.checking) "Checking…" else "Check",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable(enabled = !updates.checking) { app.checkForUpdates() }
+                                    .padding(8.dp),
+                            )
+                        },
+                    )
+                }
+                item {
+                    SettingSwitch(
+                        "Check automatically",
+                        "Looks for a newer release once a day when melo starts",
+                        settings.autoUpdateCheck,
+                    ) { app.setAutoUpdateCheck(it) }
+                }
+                updates.available?.let { release ->
+                    item {
+                        SettingRow(
+                            "Download version ${release.version}",
+                            "Opens the release page in your browser",
+                            action = {
+                                Text(
+                                    "Get",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clickable { openUrl(context, release.pageUrl) }
+                                        .padding(8.dp),
+                                )
+                            },
+                        )
+                    }
+                }
+                item {
+                    SettingRow(
+                        "GitHub repository",
+                        AppInfo.RepoLabel,
+                        action = {
+                            Text(
+                                "Open",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable { openUrl(context, AppInfo.RepoUrl) }
+                                    .padding(8.dp),
+                            )
+                        },
                     )
                 }
                 item {
@@ -475,15 +651,6 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
             onDismiss = { confirmClearLibrary = false },
         )
     }
-    if (confirmClearDownloads) {
-        ConfirmDialog(
-            title = "Delete all downloads?",
-            message = "Files are removed from this device. You can download them again later.",
-            confirmLabel = "Delete",
-            onConfirm = { app.clearAllDownloads() },
-            onDismiss = { confirmClearDownloads = false },
-        )
-    }
     if (confirmClearHistory) {
         ConfirmDialog(
             title = "Clear listening history?",
@@ -495,6 +662,102 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit) {
     }
     if (showLicenses) {
         LicensesDialog(onDismiss = { showLicenses = false })
+    }
+    if (showIconPicker) {
+        IconPickerDialog(
+            title = "App icon",
+            subtitle = "Your pick is applied straight away. Most launchers show the new icon right away; a few need a moment or a redraw.",
+            selected = settings.appIconId,
+            onSelect = { id ->
+                app.setAppIcon(id)
+                showIconPicker = false
+            },
+            onDismiss = { showIconPicker = false },
+        )
+    }
+    if (showLogoPicker) {
+        IconPickerDialog(
+            title = "Logo in the app",
+            subtitle = "Used wherever melo shows its own mark inside the app.",
+            selected = settings.logoId,
+            onSelect = { id ->
+                app.setLogo(id)
+                showLogoPicker = false
+            },
+            onDismiss = { showLogoPicker = false },
+        )
+    }
+}
+
+@Composable
+private fun IconPickerDialog(
+    title: String,
+    subtitle: String,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = RoundedCornerShape(26.dp),
+            color = LocalMeloColors.current.surfaceElevated,
+            modifier = Modifier.fillMaxWidth(0.94f),
+        ) {
+            Column(Modifier.padding(vertical = Spacing.md)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = Spacing.screenH),
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalMeloColors.current.textSecondary,
+                    modifier = Modifier.padding(horizontal = Spacing.screenH, vertical = 4.dp),
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    items(IconVariants, key = { it.id }) { variant ->
+                        IconChoice(
+                            variant = variant,
+                            selected = variant.id == selected,
+                            onClick = { onSelect(variant.id) },
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End).padding(end = Spacing.sm),
+                ) { Text("Close") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IconChoice(variant: IconVariant, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 2.dp),
+    ) {
+        MeloMark(variant.id, size = 52.dp, highlighted = selected)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            variant.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) MaterialTheme.colorScheme.primary else LocalMeloColors.current.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -567,18 +830,37 @@ private fun SettingSwitch(title: String, subtitle: String, checked: Boolean, onC
 @Composable
 private fun SettingSlider(
     title: String,
-    valueLabel: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
-    onChange: (Float) -> Unit,
+    format: (Float) -> String,
+    onDrag: ((Float) -> Unit)? = null,
+    onCommit: (Float) -> Unit,
 ) {
+    // The thumb and its label follow the finger locally; the preference is written once, when
+    // the drag ends. Writing on every frame queued dozens of DataStore edits per drag and
+    // repainted the whole screen each time, which is exactly what a drag must not do.
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val shown = dragging ?: value
+
     Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.screenH, vertical = Spacing.xs)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Text(valueLabel, style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
+            Text(format(shown), style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps)
+        Slider(
+            value = shown,
+            onValueChange = {
+                dragging = it
+                onDrag?.invoke(it)
+            },
+            valueRange = range,
+            steps = steps,
+            onValueChangeFinished = {
+                dragging?.let(onCommit)
+                dragging = null
+            },
+        )
     }
 }
 
@@ -651,4 +933,92 @@ private fun LicensesDialog(onDismiss: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
     )
+}
+
+/**
+ * Hue / saturation / brightness mixer for a custom accent.
+ *
+ * The sliders keep their own HSV state while dragging, so the hue survives low saturation
+ * instead of collapsing to grey, and the colour is written to settings when a drag ends rather
+ * than on every frame.
+ */
+@Composable
+private fun AccentMixer(argb: Int, onPick: (Int) -> Unit) {
+    val seed = remember { FloatArray(3).also { android.graphics.Color.colorToHSV(argb, it) } }
+    var hue by remember { mutableFloatStateOf(seed[0]) }
+    var saturation by remember { mutableFloatStateOf(seed[1].coerceAtLeast(0.35f)) }
+    var brightness by remember { mutableFloatStateOf(seed[2].coerceAtLeast(0.45f)) }
+
+    val preview = Color.hsv(hue, saturation, brightness)
+    // Reads the live HSV state, so the colour saved is the one on screen even when a slider
+    // commits before the next recomposition.
+    val commit = { onPick(Color.hsv(hue, saturation, brightness).toArgb()) }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(preview)
+                .border(1.dp, LocalMeloColors.current.outlineStrong, CircleShape),
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            String.format(Locale.US, "#%06X", preview.toArgb() and 0xFFFFFF),
+            style = MaterialTheme.typography.titleMedium,
+            color = LocalMeloColors.current.textPrimary,
+        )
+    }
+    Spacer(Modifier.height(Spacing.sm))
+    // onDrag keeps the preview swatch live; onCommit writes the colour once, per slider.
+    SettingSlider(
+        "Hue",
+        hue,
+        0f..360f,
+        format = { "${it.toInt()}°" },
+        onDrag = { hue = it },
+        onCommit = { hue = it; commit() },
+    )
+    SettingSlider(
+        "Saturation",
+        saturation,
+        0f..1f,
+        format = { "${(it * 100).toInt()}%" },
+        onDrag = { saturation = it },
+        onCommit = { saturation = it; commit() },
+    )
+    SettingSlider(
+        "Brightness",
+        brightness,
+        0.15f..1f,
+        format = { "${(it * 100).toInt()}%" },
+        onDrag = { brightness = it },
+        onCommit = { brightness = it; commit() },
+    )
+}
+
+/** One-line description of the update check, for its settings row. */
+private fun updateSummary(status: UpdateStatus): String = when {
+    status.checking -> "Checking the newest release…"
+    status.available != null -> "Version ${status.available.version} is available"
+    status.error != null -> status.error
+    status.latestVersion != null -> "Up to date · ${status.latestVersion}"
+    else -> "Not checked yet"
+}
+
+/** One-line description of the fallback extractor, for its settings row. */
+private fun extractorSummary(status: ExtractorStatus): String = when {
+    status.busy -> "Fetching the newest nightly build…"
+    status.version != null -> "Nightly ${status.version} · used when the fast path fails"
+    status.error != null -> "Unavailable · ${status.error}"
+    else -> "Not installed yet · tap Update to fetch the nightly extractor"
+}
+
+/** Opens a link outside the app; a device with no browser simply ignores it. */
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
 }

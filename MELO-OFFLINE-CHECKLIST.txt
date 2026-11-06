@@ -1,0 +1,207 @@
+=====================================================================
+ MELO — OFFLINE CHECK: DOWNLOAD A SONG, PLAY IT IN AIRPLANE MODE
+ A checklist you can run entirely from the phone
+=====================================================================
+
+WHAT THIS PROVES
+----------------
+
+That a downloaded song is genuinely self-contained. melo saves four
+files per song in one folder:
+
+    Music/melo/Daft Punk - Get Lucky.m4a     the audio
+               Daft Punk - Get Lucky.lrc     the lyrics, with timings
+               Daft Punk - Get Lucky.jpg     the cover picture
+               Daft Punk - Get Lucky.json    artist, album, ids, quality
+
+With the network off, all four of these must come off the disk: the
+audio plays, the cover still draws, and the lyrics still scroll in
+time with the singer.
+
+Do the steps in order. The order matters — step 5 (force stop) is what
+proves melo is reading files and not something still in memory.
+
+---------------------------------------------------------------------
+BEFORE YOU START
+---------------------------------------------------------------------
+
+* melo installed (from the GitHub Release, or a build you sideloaded).
+* Notifications allowed for melo (Settings -> Apps -> melo ->
+  Notifications). Without this the lock screen controls stay hidden.
+* A Wi-Fi or mobile connection, for the download itself.
+* A file manager to look at the folder: the built-in "Files" app is
+  enough ("Music" -> "melo"). On some phones it is called "My Files".
+
+TWO THINGS TO KNOW FIRST
+------------------------
+
+1. Not every song can be saved. A track that YouTube serves only as an
+   HLS playlist is refused on purpose ("cannot save as one file"), and
+   a track with no artwork has no .jpg. If the song you tried did one
+   of those, try a different one.
+
+2. Word-by-word highlighting needs word timings from the source. When
+   the source only had line timings, melo says so and highlights whole
+   lines. That is correct behaviour, not a bug — line sync is the
+   honest fallback.
+
+---------------------------------------------------------------------
+PART A — DOWNLOAD IT WHILE ONLINE
+---------------------------------------------------------------------
+
+A1. Open melo, search for a song you like, tap it to play it.
+    Note what the lyrics screen says at the bottom right when you open
+    it: "LRCLIB", "NetEase" or nothing. You will look for the same
+    text later, replaced by "saved in the melo folder".
+
+A2. Tap the download action for the song — the down-arrow in the now
+    playing screen, or the download item in a song's ⋮ menu. A
+    progress ring appears.
+
+A3. Wait until it finishes. The item should read as downloaded, and no
+    error should appear.
+
+A4. Open your file manager and go to Music -> melo.
+
+    PASS: the song appears as "Artist - Title" with up to four files
+    sharing that exact name: .m4a (or .mp3/.webm), .lrc, .jpg, .json.
+
+    If only the audio is there, the download may still have been in
+    progress — wait a moment and pull the list down to refresh.
+
+---------------------------------------------------------------------
+PART B — SWITCH THE NETWORK OFF
+---------------------------------------------------------------------
+
+B1. Swipe down the notification shade and turn on Airplane mode. If
+    your phone keeps Wi-Fi on in airplane mode, turn Wi-Fi off too.
+
+B2. Settings -> Apps -> melo -> Force stop. (Or swipe melo away from
+    the recent-apps screen and then, to be thorough, force stop it.)
+    This throws away everything in memory, so nothing that follows can
+    be a leftover.
+
+B3. Open melo again, with the network still off.
+
+    The app should open to its normal home screen. Songs that need the
+    network will show their empty or offline state — that is expected.
+
+---------------------------------------------------------------------
+PART C — PLAY IT OFFLINE  (this is the actual check)
+---------------------------------------------------------------------
+
+C1. Go to Library -> Downloads (the download icon). Your song is
+    listed there.
+
+C2. Tap it.
+
+    CHECK 1 — THE AUDIO: it plays. The progress bar moves.
+    CHECK 2 — THE COVER: the artwork shows in the mini player and on
+              the now playing screen. It is the song's own cover, not
+              a grey placeholder.
+
+C3. Open the lyrics screen from the player (the lyrics button).
+
+    CHECK 3 — THE LYRICS appear — not an error, not "no lyrics".
+    CHECK 4 — THE SOURCE: the small text at the bottom right reads
+              "saved in the melo folder". That label is the proof the
+              file in Music/melo was used rather than a service.
+    CHECK 5 — THE BACKDROP: the cover fills the screen behind the
+              lyrics, blurred, with the text readable over it. (Turn
+              it back on in Settings -> Appearance -> "Lyrics
+              background artwork" if you had switched it off.)
+
+C4. Watch it for twenty seconds.
+
+    CHECK 6 — LINE SYNC: the highlighted line changes as the singer
+              moves on, and the list scrolls itself.
+    CHECK 7 — WORD SYNC: tap the mode chip at the top right until it
+              reads "Word". If the file has word timings, single words
+              light up as they are sung. If not, melo says "Word
+              timings aren't published for this track" and stays on
+              line sync — honest and acceptable.
+    CHECK 8 — SEEKING: tap a lyric line. Playback jumps to that
+              moment and the highlight follows.
+
+C5. Check the system controls while still offline: pause on the lock
+    screen or in the notification, then play, then next. They should
+    work without a connection.
+
+C6. Turn Airplane mode off again. Nothing should need to be restarted.
+
+---------------------------------------------------------------------
+PART D — DELETE IT (the other half of the promise)
+---------------------------------------------------------------------
+
+D1. In Library -> Downloads, use the delete action on the song, and
+    confirm.
+
+D2. Look in Music/melo in your file manager.
+
+    PASS: all four files for that song are gone — audio, .lrc, .jpg
+    and .json. Nothing else in the folder was touched.
+
+D3. Play the song again while offline: it should now fail or ask for
+    the network, because the copy really is gone.
+
+---------------------------------------------------------------------
+IF SOMETHING FAILS
+---------------------------------------------------------------------
+
+"You're offline, and melo hasn't saved lyrics for this song."
+   -> The .lrc is missing or empty. Check Music/melo. Most likely the
+      download happened when no lyrics were found (some tracks have
+      none anywhere). Try a well-known song.
+
+Lyrics load, but no word highlighting in Word mode
+   -> The source had line timings only. Expected, and stated on
+      screen. Nothing to fix.
+
+No cover behind the lyrics (plain background)
+   -> Either the .jpg is missing (the provider served no artwork), or
+      Settings -> Appearance -> "Lyrics background artwork" is off, or
+      "Background dim" is set so high the picture is hidden. Lower the
+      dim to about 45.
+
+The song will not play at all offline
+   -> You are probably looking at a copy of the song from elsewhere in
+      the app (a history or playlist entry whose file was deleted). Open
+      it from Library -> Downloads instead, or re-download it.
+
+Download refused: "cannot save as one file"
+   -> That track is served as an HLS playlist, which is a stream of
+      segments rather than one file. melo will not write a broken file.
+      Pick another song.
+
+Every one of those being fine, but the app was installed from an APK
+built before these files existed
+   -> Re-download the song. Only songs downloaded by this version (or
+      later) have the .lrc/.jpg/.json beside them.
+
+---------------------------------------------------------------------
+THE AUTOMATED HALF
+---------------------------------------------------------------------
+
+The same behaviour is covered without a phone by
+
+    android/app/src/test/java/app/melo/player/data/repo/OfflineDownloadedSongTest.kt
+
+Run it with, from the `android` directory:
+
+    ./gradlew :app:testDebugUnitTest
+
+It also runs inside the release workflow's "Run unit tests" step, so a
+release cannot ship with this broken.
+
+A NOTE ON WHERE THIS CHECK CAN AND CANNOT RUN
+---------------------------------------------
+
+The unit test runs the real folder code, the real database and the real
+lyrics parsing, but on the JVM through Robolectric. The one thing it
+cannot do is exercise Android 10+'s MediaStore, which is how melo writes
+into the public Music/melo on a modern phone. Parts A to D above are
+that missing half — and they are the reason this checklist exists. If a
+future change breaks downloads on a real device, it will show up here
+first.
+
+=====================================================================

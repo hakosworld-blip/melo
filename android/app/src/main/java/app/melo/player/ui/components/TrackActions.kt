@@ -115,6 +115,12 @@ class TrackActionsState(
         showPlaylistPicker = true
     }
 
+    /** Opens the picker straight from a row's "+", skipping the action sheet entirely. */
+    fun addToPlaylist(track: Track) {
+        this.track = track
+        showPlaylistPicker = true
+    }
+
     /** Leave the picker and ask for a new playlist name instead. */
     fun switchToCreate() {
         showPlaylistPicker = false

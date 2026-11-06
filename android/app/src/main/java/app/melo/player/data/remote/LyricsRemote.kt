@@ -17,9 +17,14 @@ object LyricsRemote {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, LyricDocument>?) = size > 40
     }
 
+    /**
+     * [custom] is anything already in hand: lyrics the user pasted, or — the usual case on
+     * Android — the `.lrc` melo saved beside the song in its folder. It is checked before
+     * the cache so a song's own file always wins over an earlier lookup, which matters when
+     * a downloaded song is played with no connection.
+     */
     suspend fun fetch(track: Track, custom: String? = null): LyricDocument {
         val key = "${track.key}|${track.title}|${track.artist}"
-        synchronized(cache) { cache[key]?.let { return it } }
 
         if (!custom.isNullOrBlank()) {
             val doc = LyricsParser.parse(custom, LyricsSource.CUSTOM)
@@ -28,6 +33,8 @@ object LyricsRemote {
                 return doc
             }
         }
+
+        synchronized(cache) { cache[key]?.let { return it } }
 
         val lrclib = lrclib(track)
         if (lrclib != null && !lrclib.isEmpty) {

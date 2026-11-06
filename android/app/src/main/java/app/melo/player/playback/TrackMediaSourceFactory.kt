@@ -91,7 +91,7 @@ private class TrackMediaSource(
                         .setCustomCacheKey(if (stream.isHls) null else track.key)
                         .build()
                     is ResolvedStream.Local -> original.buildUpon()
-                        .setUri(Uri.fromFile(File(stream.path)))
+                        .setUri(stream.localUri())
                         .setMimeType(null)
                         .setCustomCacheKey(track.key)
                         .build()
@@ -164,8 +164,15 @@ internal fun progressiveDataSourceFactory(
             if (stream.isHls) throw IOException("This stream changed to HLS. Prepare the track again.")
             Uri.parse(stream.url)
         }
-        is ResolvedStream.Local -> Uri.fromFile(File(stream.path))
+        is ResolvedStream.Local -> stream.localUri()
         is ResolvedStream.Failure -> throw IOException(stream.message)
     }
     dataSpec.withUri(uri).buildUpon().setKey(track.key).build()
 }
+
+/**
+ * A download is a plain path below Android 10 and a `content://` URI above it, so both
+ * shapes have to become a URI ExoPlayer can open.
+ */
+internal fun ResolvedStream.Local.localUri(): Uri =
+    if (ref.startsWith("content://")) Uri.parse(ref) else Uri.fromFile(File(ref))

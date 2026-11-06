@@ -125,7 +125,16 @@ object YouTubeMusic {
             .firstOrNull { it.name.equals(name, true) }
             ?: searchArtists(name, 6).firstOrNull { it.name.contains(name, true) }
             ?: return 0L
-        val json = browse(artist.id) ?: return 0L
+        return monthlyListenersFor(artist.id)
+    }
+
+    /**
+     * The same count for an artist whose browse id is already known, e.g. from a search row.
+     * One request instead of the search plus browse that [monthlyListeners] needs.
+     */
+    suspend fun monthlyListenersFor(browseId: String): Long {
+        if (browseId.isBlank()) return 0L
+        val json = browse(browseId) ?: return 0L
         return parseListenerCount(allStrings(json))
     }
 
@@ -380,16 +389,37 @@ object YouTubeMusic {
         ),
     )
 
+    /** Top of the "normal" tier: the highest audio bitrate still counted as frugal. */
+    private const val NORMAL_MAX_BITRATE = 128_000L
+
     private val streamCache = object : LinkedHashMap<String, Pair<String, Long>>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<String, Long>>?) = size > 12
     }
 
-    /** Resolve a playable audio URL for [videoId]. Results are cached briefly. */
-    suspend fun resolveAudio(videoId: String): ResolvedStream {
+    /**
+     * Whether a cached URL was captured at the frugal tier. googlevideo URLs carry no
+     * bitrate, so the itag stands in: 249/251 opus and 139/140 mp4a straddle the cutoff,
+     * and the two lowest opus/mp4a entries are the ones "normal" selects.
+     */
+    private fun isLowBitrate(url: String): Boolean {
+        val itag = Regex("[?&]itag=(\\d+)").find(url)?.groupValues?.get(1) ?: return false
+        return itag in setOf("139", "249")
+    }
+
+    /**
+     * Resolve a playable audio URL for [videoId]. Results are cached briefly.
+     *
+     * [highQuality] decides which of the provider's audio formats is handed back: the
+     * top bitrate when true, and the best format at or under 128 kbps when false, so the
+     * user's stream-quality setting actually reaches the wire instead of being read and
+     * discarded. The cache stores the highest-quality URL for an id and is only reused
+     * when it satisfies the requested tier.
+     */
+    suspend fun resolveAudio(videoId: String, highQuality: Boolean = true): ResolvedStream {
         val id = extractVideoId(videoId) ?: return ResolvedStream.Failure("Unknown video id")
         synchronized(streamCache) {
             streamCache[id]?.let { (url, ts) ->
-                if (System.currentTimeMillis() - ts < 45 * 60 * 1000L) {
+                if (System.currentTimeMillis() - ts < 45 * 60 * 1000L && (highQuality || isLowBitrate(url))) {
                     return ResolvedStream.Remote(url, hls = url.contains(".m3u8"))
                 }
             }
@@ -430,7 +460,16 @@ object YouTubeMusic {
                 }
                 .sortedByDescending { it.num("bitrate") ?: 0L }
 
-            audio.firstOrNull()?.str("url")?.let { url ->
+            // "normal" caps at 128 kbps to spare data; anything else takes the best the
+            // provider offers, which is what "high" and "best available" promise.
+            val chosen = if (highQuality) {
+                audio.firstOrNull()
+            } else {
+                audio.lastOrNull { (it.num("bitrate") ?: 0L) <= NORMAL_MAX_BITRATE }
+                    ?: audio.lastOrNull()
+            }
+
+            chosen?.str("url")?.let { url ->
                 val fixed = if (url.contains("range=")) url else "$url&range=0-"
                 synchronized(streamCache) { streamCache[id] = fixed to System.currentTimeMillis() }
                 return ResolvedStream.Remote(fixed)

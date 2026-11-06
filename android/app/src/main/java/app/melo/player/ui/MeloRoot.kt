@@ -88,8 +88,10 @@ import app.melo.player.ui.player.NowPlayingScreen
 import app.melo.player.ui.player.QueueScreen
 import app.melo.player.ui.search.SearchScreen
 import app.melo.player.ui.settings.SettingsScreen
+import app.melo.player.ui.settings.StorageScreen
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 @Composable
@@ -132,7 +134,6 @@ fun MeloRoot(
         }
     }
 
-    // Surface playback errors once, then clear so a retry can report again.
     LaunchedEffect(playbackState.error) {
         playbackState.error?.let {
             snackbar.showSnackbar(it)
@@ -152,6 +153,7 @@ fun MeloRoot(
                     Column {
                         MiniPlayer(
                             state = playbackState,
+                            position = app.playback.position,
                             onOpen = { nav.navigateSingleTop(Routes.PLAYER) },
                             onToggle = { app.playback.toggle() },
                         )
@@ -289,7 +291,18 @@ fun MeloRoot(
                         )
                     }
                     composable(Routes.SETTINGS) {
-                        SettingsScreen(app = app, onBack = { nav.popBackStack() })
+                        SettingsScreen(
+                            app = app,
+                            onBack = { nav.popBackStack() },
+                            onOpenStorage = { nav.navigate(Routes.STORAGE) },
+                        )
+                    }
+                    composable(Routes.STORAGE) {
+                        StorageScreen(
+                            app = app,
+                            onBack = { nav.popBackStack() },
+                            notify = { message -> scope.launch { snackbar.showSnackbar(message) } },
+                        )
                     }
                 }
             }
@@ -299,44 +312,42 @@ fun MeloRoot(
 }
 
 private fun NavHostController.navigateSingleTop(route: String) {
-    navigate(route) {
-        launchSingleTop = true
-    }
+    navigate(route) { launchSingleTop = true }
 }
 
 @Composable
 private fun MiniPlayer(
     state: PlaybackState,
+    position: StateFlow<Long>,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
 ) {
     val track = state.current ?: return
     val colors = LocalMeloColors.current
-    Column(Modifier.navigationBarsPadding().padding(horizontal = 10.dp)) {
+    val positionMs = position.collectAsStateWithLifecycle()
+    Column(Modifier.navigationBarsPadding().padding(horizontal = 8.dp)) {
         Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(18.dp))
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
                 .background(colors.surfaceElevated)
-                .clickable(onClick = onOpen),
+                .clickable(onClick = onOpen)
+                .padding(8.dp),
         ) {
-            val fraction = if (state.durationMs > 0) {
-                (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
-            } else 0f
             LinearProgressIndicator(
-                progress = { fraction },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp),
+                progress = {
+                    if (state.durationMs > 0) (positionMs.value.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
+                },
+                modifier = Modifier.fillMaxWidth().height(2.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = Color.Transparent,
             )
+            Spacer(Modifier.height(4.dp))
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                MeloArt(track.artwork, Modifier.size(42.dp), corner = 11.dp)
+                MeloArt(track.artwork, Modifier.size(40.dp), corner = 8.dp)
                 Spacer(Modifier.width(Spacing.md))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -356,7 +367,7 @@ private fun MiniPlayer(
                 }
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(onClick = onToggle),
@@ -365,8 +376,8 @@ private fun MiniPlayer(
                     Icon(
                         if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (state.isPlaying) "Pause" else "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(22.dp),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -396,7 +407,7 @@ private fun MeloNavBar(current: String?, nav: NavHostController) {
                         restoreState = true
                     }
                 },
-                icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(21.dp)) },
+                icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp)) },
                 label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,

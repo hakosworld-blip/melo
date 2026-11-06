@@ -24,9 +24,7 @@ import kotlinx.coroutines.launch
 data class PlaybackState(
     val current: Track? = null,
     val isPlaying: Boolean = false,
-    val positionMs: Long = 0L,
     val durationMs: Long = 0L,
-    val bufferedMs: Long = 0L,
     val buffering: Boolean = false,
     val queue: List<Track> = emptyList(),
     val index: Int = 0,
@@ -50,10 +48,41 @@ class PlaybackController(
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
+    /**
+     * Playback position is deliberately kept out of [state]. It changes several times a
+     * second, while [state] only changes when the player actually does something. Keeping
+     * them apart means a tick repaints one progress bar instead of recomposing the screen
+     * that shows it — and because the navigation root collects [state], the whole screen
+     * graph with it.
+     */
+    private val _position = MutableStateFlow(0L)
+    val position: StateFlow<Long> = _position.asStateFlow()
+
+    private val _buffered = MutableStateFlow(0L)
+    val buffered: StateFlow<Long> = _buffered.asStateFlow()
+
+    /**
+     * Decoding every queue item back out of its URI is the expensive part of a publish,
+     * and the queue only changes on real edits, so the decoded list is cached alongside
+     * the URIs it was built from.
+     */
+    private var queuedUris: List<android.net.Uri> = emptyList()
+    private var queuedTracks: List<Track> = emptyList()
+
     private var controller: MediaController? = null
     private var ticker: Job? = null
     private var connectRequested = false
     private var restoredThisProcess = false
+
+    /**
+     * Commands issued before the service answered.
+     *
+     * The bind is asynchronous and the first tap of a session almost always lands inside
+     * that window. Dropping it is what reads as "the play button does nothing", so the
+     * intent is held here and replayed the moment the controller arrives. Kept in order:
+     * a `play` followed by an `addToQueue` has to land in that sequence.
+     */
+    private val pendingCommands = mutableListOf<(MediaController) -> Unit>()
 
     private val resumePrefs: SharedPreferences =
         context.getSharedPreferences("melo_resume", Context.MODE_PRIVATE)
@@ -97,7 +126,7 @@ class PlaybackController(
         val token = SessionToken(context, ComponentName(context, MeloPlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
         future.addListener({
-            runCatching {
+            val bound = runCatching {
                 val c = future.get()
                 controller = c
                 c.addListener(listener)
@@ -124,7 +153,35 @@ class PlaybackController(
                     }
                 }
             }
+
+            if (bound.isSuccess) {
+                flushPendingCommands()
+            } else {
+                // The bind failed, so it must be allowed again: latching connectRequested
+                // here would leave the app with no controller for the rest of the process
+                // and every subsequent play tap would be dropped in silence.
+                connectRequested = false
+            }
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    /** Runs [block] against the controller now, or holds it until the bind lands. */
+    private fun withController(block: (MediaController) -> Unit) {
+        val c = controller
+        if (c != null) {
+            block(c)
+            return
+        }
+        pendingCommands += block
+        connect()
+    }
+
+    private fun flushPendingCommands() {
+        val c = controller ?: return
+        if (pendingCommands.isEmpty()) return
+        val queued = pendingCommands.toList()
+        pendingCommands.clear()
+        queued.forEach { it(c) }
     }
 
     /** Bring back the last track, paused, at the position it was left. */
@@ -154,18 +211,20 @@ class PlaybackController(
 
     private fun publish(player: Player?) {
         val p = player ?: return
-        val items = (0 until p.mediaItemCount).mapNotNull { i ->
-            p.getMediaItemAt(i).localConfiguration?.uri?.let(TrackCodec::fromUri)
+        val uris = (0 until p.mediaItemCount).mapNotNull { i ->
+            p.getMediaItemAt(i).localConfiguration?.uri
+        }
+        if (uris != queuedUris) {
+            queuedUris = uris
+            queuedTracks = uris.mapNotNull(TrackCodec::fromUri)
         }
         val currentIndex = p.currentMediaItemIndex
-        _state.value = PlaybackState(
+        val next = PlaybackState(
             current = p.currentMediaItem?.localConfiguration?.uri?.let(TrackCodec::fromUri),
             isPlaying = p.isPlaying,
-            positionMs = p.currentPosition.coerceAtLeast(0L),
             durationMs = p.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: 0L,
-            bufferedMs = p.bufferedPosition.coerceAtLeast(0L),
             buffering = p.playbackState == Player.STATE_BUFFERING,
-            queue = items,
+            queue = queuedTracks,
             index = currentIndex.coerceAtLeast(0),
             shuffle = p.shuffleModeEnabled,
             repeatMode = when (p.repeatMode) {
@@ -177,6 +236,12 @@ class PlaybackController(
             connected = true,
             error = _state.value.error,
         )
+        _position.value = p.currentPosition.coerceAtLeast(0L)
+        _buffered.value = p.bufferedPosition.coerceAtLeast(0L)
+
+        // The controller reports an event for every position tick, so only publish when
+        // something other than the position actually moved.
+        if (next != _state.value) _state.value = next
     }
 
     private fun startTicker(playing: Boolean) {
@@ -206,139 +271,160 @@ class PlaybackController(
     /* ---------------------------- commands ---------------------------- */
 
     fun play(tracks: List<Track>, startIndex: Int = 0, shuffle: Boolean? = null) {
-        val c = controller ?: return
         if (tracks.isEmpty()) return
-        val items = tracks.map(MediaItems::from)
-        c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), 0L)
-        shuffle?.let { c.shuffleModeEnabled = it }
-        c.prepare()
-        c.play()
-        publish(c)
+        withController { c ->
+            val items = tracks.map(MediaItems::from)
+            c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), 0L)
+            shuffle?.let { c.shuffleModeEnabled = it }
+            c.prepare()
+            c.play()
+            publish(c)
+        }
     }
 
     fun playNext(track: Track) {
-        val c = controller ?: return
-        c.addMediaItem(MediaItems.from(track))
-        val insertAt = c.currentMediaItemIndex + 1
-        if (insertAt <= c.mediaItemCount - 1) {
-            c.moveMediaItem(c.mediaItemCount - 1, insertAt)
-        }
-        if (c.mediaItemCount == 1) {
-            c.prepare()
+        withController { c ->
+            c.addMediaItem(MediaItems.from(track))
+            val insertAt = c.currentMediaItemIndex + 1
+            if (insertAt <= c.mediaItemCount - 1) {
+                c.moveMediaItem(c.mediaItemCount - 1, insertAt)
+            }
+            if (c.mediaItemCount == 1) {
+                c.prepare()
+            }
         }
     }
 
     fun addToQueue(track: Track) {
-        val c = controller ?: return
-        if (c.mediaItemCount == 0) {
-            play(listOf(track))
-            return
+        withController { c ->
+            if (c.mediaItemCount == 0) {
+                play(listOf(track))
+            } else {
+                c.addMediaItem(MediaItems.from(track))
+            }
         }
-        c.addMediaItem(MediaItems.from(track))
     }
 
     fun addAllToQueue(tracks: List<Track>) {
-        val c = controller ?: return
         if (tracks.isEmpty()) return
-        if (c.mediaItemCount == 0) {
-            play(tracks)
-            return
+        withController { c ->
+            if (c.mediaItemCount == 0) {
+                play(tracks)
+            } else {
+                c.addMediaItems(tracks.map(MediaItems::from))
+            }
         }
-        c.addMediaItems(tracks.map(MediaItems::from))
     }
 
     fun toggle() {
-        val c = controller ?: return
-        if (c.isPlaying) c.pause() else {
-            if (c.playbackState == Player.STATE_IDLE) c.prepare()
-            c.play()
+        withController { c ->
+            if (c.isPlaying) c.pause() else {
+                if (c.playbackState == Player.STATE_IDLE) c.prepare()
+                c.play()
+            }
         }
     }
 
     fun playPause() = toggle()
 
     fun next() {
-        controller?.let {
-            if (it.hasNextMediaItem()) it.seekToNextMediaItem() else it.seekTo(0, 0L)
+        withController { c ->
+            if (c.hasNextMediaItem()) c.seekToNextMediaItem() else c.seekTo(0, 0L)
         }
     }
 
     fun previous() {
-        val c = controller ?: return
-        if (c.currentPosition > 4_000) c.seekTo(0) else if (c.hasPreviousMediaItem()) c.seekToPreviousMediaItem()
+        withController { c ->
+            if (c.currentPosition > 4_000) c.seekTo(0)
+            else if (c.hasPreviousMediaItem()) c.seekToPreviousMediaItem()
+        }
     }
 
     fun seekTo(ms: Long) {
-        controller?.seekTo(ms.coerceAtLeast(0L))
-        publish(controller)
+        withController { c ->
+            c.seekTo(ms.coerceAtLeast(0L))
+            publish(c)
+        }
     }
 
     fun seekToRelative(ms: Long) {
-        val c = controller ?: return
-        c.seekTo((c.currentPosition + ms).coerceAtLeast(0L))
+        withController { c ->
+            c.seekTo((c.currentPosition + ms).coerceAtLeast(0L))
+        }
     }
 
     fun setShuffle(enabled: Boolean) {
-        controller?.shuffleModeEnabled = enabled
-        publish(controller)
+        withController { c ->
+            c.shuffleModeEnabled = enabled
+            publish(c)
+        }
     }
 
     /** 0 off, 1 all, 2 one */
     fun setRepeat(mode: Int) {
-        controller?.repeatMode = when (mode) {
-            1 -> Player.REPEAT_MODE_ALL
-            2 -> Player.REPEAT_MODE_ONE
-            else -> Player.REPEAT_MODE_OFF
+        withController { c ->
+            c.repeatMode = when (mode) {
+                1 -> Player.REPEAT_MODE_ALL
+                2 -> Player.REPEAT_MODE_ONE
+                else -> Player.REPEAT_MODE_OFF
+            }
+            publish(c)
         }
-        publish(controller)
     }
 
     fun setSpeed(speed: Float) {
-        controller?.setPlaybackSpeed(speed)
-        publish(controller)
+        withController { c ->
+            c.setPlaybackSpeed(speed)
+            publish(c)
+        }
     }
 
     fun setPitch(semitones: Float) {
-        val c = controller ?: return
-        val params = c.playbackParameters
-        // ExoPlayer's Sonic processor shifts pitch independently of tempo.
-        c.playbackParameters = androidx.media3.common.PlaybackParameters(params.speed, semitonesToPitch(semitones))
-        publish(c)
+        withController { c ->
+            val params = c.playbackParameters
+            // ExoPlayer's Sonic processor shifts pitch independently of tempo.
+            c.playbackParameters = androidx.media3.common.PlaybackParameters(params.speed, semitonesToPitch(semitones))
+            publish(c)
+        }
     }
 
     private fun semitonesToPitch(semitones: Float): Float =
         Math.pow(2.0, semitones / 12.0).toFloat()
 
     fun playQueueIndex(index: Int) {
-        val c = controller ?: return
-        if (index in 0 until c.mediaItemCount) {
-            c.seekTo(index, 0L)
-            c.play()
+        withController { c ->
+            if (index in 0 until c.mediaItemCount) {
+                c.seekTo(index, 0L)
+                c.play()
+            }
         }
     }
 
     fun removeQueueItem(index: Int) {
-        val c = controller ?: return
-        if (index in 0 until c.mediaItemCount) c.removeMediaItem(index)
+        withController { c ->
+            if (index in 0 until c.mediaItemCount) c.removeMediaItem(index)
+        }
     }
 
     fun moveQueueItem(from: Int, to: Int) {
-        val c = controller ?: return
-        if (from in 0 until c.mediaItemCount && to in 0 until c.mediaItemCount) {
-            c.moveMediaItem(from, to)
+        withController { c ->
+            if (from in 0 until c.mediaItemCount && to in 0 until c.mediaItemCount) {
+                c.moveMediaItem(from, to)
+            }
         }
     }
 
     fun clearQueue() {
-        controller?.clearMediaItems()
+        withController { it.clearMediaItems() }
     }
 
     fun stop() {
-        controller?.stop()
+        withController { it.stop() }
     }
 
     suspend fun shutdown() {
         saveResumePosition()
+        pendingCommands.clear()
         controller?.release()
         controller = null
     }

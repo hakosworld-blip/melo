@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Explicit
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melo.player.data.model.Track
+import app.melo.player.data.model.VerifiedArtistLabel
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
@@ -84,7 +87,9 @@ fun MeloArt(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(url)
-                    .crossfade(220)
+                    // No crossfade: thumbnails recycle through long lists, and a fade keeps
+                    // the outgoing bitmap alive while it runs.
+                    .crossfade(false)
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
@@ -354,4 +359,41 @@ fun BottomFade(modifier: Modifier = Modifier) {
             .height(28.dp)
             .background(Brush.verticalGradient(listOf(Color.Transparent, bg))),
     )
+}
+
+/**
+ * The checkmark that marks an artist with at least [app.melo.player.data.model.VerifiedMonthlyListeners]
+ * monthly listeners. Kept small and baseline-aligned so a name beside it does not jump.
+ */
+@Composable
+fun VerifiedBadge(
+    modifier: Modifier = Modifier,
+    size: Dp = 16.dp,
+    tint: Color = MaterialTheme.colorScheme.primary,
+) {
+    Icon(
+        Icons.Rounded.Verified,
+        contentDescription = VerifiedArtistLabel,
+        tint = tint,
+        modifier = modifier.size(size),
+    )
+}
+
+/**
+ * Spotify's "+" affordance: adds one song to a playlist without leaving the screen. It raises
+ * the same picker as the action sheet, so "New playlist" lives in one place for both paths.
+ */
+@Composable
+fun AddToPlaylistButton(track: Track, modifier: Modifier = Modifier) {
+    val actions = LocalTrackActions.current
+    IconButton(
+        onClick = { actions.addToPlaylist(track) },
+        modifier = modifier.size(40.dp),
+    ) {
+        Icon(
+            Icons.Rounded.AddCircleOutline,
+            contentDescription = "Add ${track.title} to a playlist",
+            tint = LocalMeloColors.current.textSecondary,
+        )
+    }
 }

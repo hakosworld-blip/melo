@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed-icon silhouette: the "m" alone in white. Android tints the alpha mask for
+  Material You icons, so only the shape matters here, not the colour. The circle is
+  dropped because a solid disc would hide the letter under a single flat tint.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M27,43 H35 V67 H27 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M55,43 H63 V67 H55 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M83,43 H91 V67 H83 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,43 C40,40 50,40 55,43 L55,51 C50,57 40,57 35,51 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M63,43 C68,40 78,40 83,43 L83,51 C78,57 68,57 63,51 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,63 H38 V67 H24 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,63 H66 V67 H52 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M80,63 H94 V67 H80 Z" />
+</vector>

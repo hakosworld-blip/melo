@@ -187,6 +187,10 @@ interface DownloadDao {
     @Query("DELETE FROM downloads")
     suspend fun clear()
 
+    /** Clears only what melo downloaded itself, leaving songs found in the folder listed. */
+    @Query("DELETE FROM downloads WHERE quality != :quality")
+    suspend fun clearManaged(quality: String)
+
     @Query("SELECT SUM(bytes) FROM downloads WHERE status = 'DONE'")
     fun totalBytes(): Flow<Long?>
 }

@@ -109,6 +109,7 @@ data class SearchPlaylist(
     val source: Source = Source.YOUTUBE,
 )
 
+@Serializable
 data class HomeSection(
     val id: String,
     val title: String,
@@ -131,7 +132,9 @@ sealed interface ResolvedStream {
                 java.net.URI(url).path.orEmpty().endsWith(".m3u8", ignoreCase = true)
             }.getOrDefault(false)
     }
-    data class Local(val path: String) : ResolvedStream
+
+    /** A file in the melo folder: a plain path, or a `content://` URI on Android 10+. */
+    data class Local(val ref: String) : ResolvedStream
     data class Failure(val message: String) : ResolvedStream
 }
 

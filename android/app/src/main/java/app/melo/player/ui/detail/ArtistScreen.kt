@@ -1,5 +1,6 @@
 package app.melo.player.ui.detail
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -52,7 +53,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.melo.player.data.model.Album
 import app.melo.player.data.model.ArtistPage
 import app.melo.player.data.model.Track
+import app.melo.player.data.model.VerifiedArtistLabel
+import app.melo.player.data.model.isVerifiedArtist
 import app.melo.player.di.ServiceLocator
+import app.melo.player.ui.components.AddToPlaylistButton
 import app.melo.player.ui.components.EmptyState
 import app.melo.player.ui.components.LoadingRow
 import app.melo.player.ui.components.LocalCurrentTrack
@@ -61,6 +65,7 @@ import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.OverflowButton
 import app.melo.player.ui.components.SectionHeader
 import app.melo.player.ui.components.TrackRow
+import app.melo.player.ui.components.VerifiedBadge
 import app.melo.player.ui.components.formatCount
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.MeloTheme
@@ -134,8 +139,16 @@ fun ArtistScreen(
     val following by vm.following.collectAsStateWithLifecycle()
     val actions = LocalTrackActions.current
     val current = LocalCurrentTrack.current
-    val settings by ServiceLocator.settings.settings.collectAsStateWithLifecycle(initialValue = app.melo.player.data.prefs.Settings())
+    // One default instance instead of allocating a Settings object on every recomposition.
+    val settingsDefault = remember { app.melo.player.data.prefs.Settings() }
+    val settings by ServiceLocator.settings.settings.collectAsStateWithLifecycle(initialValue = settingsDefault)
     var bioExpanded by remember { mutableStateOf(false) }
+    // Built once per page rather than on every composition; the Popular list is capped at ten.
+    val popular = remember(page?.topTracks) { page?.topTracks.orEmpty().take(10) }
+
+    // A 48dp blur is a software shader below API 31 and costs real frame time while the list
+    // scrolls, so older devices get the same soft header from a stronger fade instead.
+    val canBlur = Build.VERSION.SDK_INT >= 31
 
     Box(Modifier.fillMaxSize()) {
         page?.artist?.artwork?.takeIf { it.isNotBlank() }?.let { art ->
@@ -143,11 +156,11 @@ fun ArtistScreen(
                 model = art,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                alpha = 0.35f,
+                alpha = if (canBlur) 0.35f else 0.22f,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
-                    .blur(48.dp),
+                    .then(if (canBlur) Modifier.blur(48.dp) else Modifier),
             )
         }
 
@@ -185,11 +198,17 @@ fun ArtistScreen(
                                 contentDescription = "${p.artist.name} photo",
                             )
                             Spacer(Modifier.height(Spacing.md))
-                            Text(
-                                p.artist.name,
-                                style = MaterialTheme.typography.headlineLarge,
-                                textAlign = TextAlign.Center,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    p.artist.name,
+                                    style = MaterialTheme.typography.headlineLarge,
+                                    textAlign = TextAlign.Center,
+                                )
+                                if (p.artist.isVerifiedArtist) {
+                                    Spacer(Modifier.width(6.dp))
+                                    VerifiedBadge(size = 22.dp)
+                                }
+                            }
                             if (p.artist.monthlyListeners > 0 && settings.showStatsSource) {
                                 Text(
                                     "${formatCount(p.artist.monthlyListeners)} monthly listeners · YouTube Music",
@@ -197,9 +216,9 @@ fun ArtistScreen(
                                     color = LocalMeloColors.current.textSecondary,
                                     textAlign = TextAlign.Center,
                                 )
-                            } else if (p.artist.verified) {
+                            } else if (p.artist.isVerifiedArtist) {
                                 Text(
-                                    "Verified artist",
+                                    VerifiedArtistLabel,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = LocalMeloColors.current.textSecondary,
                                 )
@@ -244,6 +263,7 @@ fun ArtistScreen(
                     }
 
                     if (p.artist.bio.isNotBlank()) {
+                        item { SectionHeader("About") }
                         item {
                             Column(Modifier.padding(horizontal = Spacing.screenH, vertical = Spacing.md)) {
                                 Text(
@@ -265,13 +285,13 @@ fun ArtistScreen(
                         }
                     }
 
-                    if (p.topTracks.isNotEmpty()) {
+                    if (popular.isNotEmpty()) {
                         item { SectionHeader("Popular", "On YouTube Music") }
-                        itemsIndexed(p.topTracks.take(10), key = { _, t -> t.key }) { index, track ->
+                        itemsIndexed(popular, key = { _, t -> t.key }) { index, track ->
                             TrackRow(
                                 track = track,
                                 isActive = current?.key == track.key,
-                                onClick = { onPlay(p.topTracks, p.topTracks.indexOf(track)) },
+                                onClick = { onPlay(popular, index) },
                                 leading = {
                                     Text(
                                         "${index + 1}",
@@ -279,7 +299,12 @@ fun ArtistScreen(
                                         color = LocalMeloColors.current.textSecondary,
                                     )
                                 },
-                                trailing = { OverflowButton { actions.show(track) } },
+                                trailing = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        AddToPlaylistButton(track)
+                                        OverflowButton { actions.show(track) }
+                                    }
+                                },
                             )
                         }
                     }

@@ -46,6 +46,8 @@ import app.melo.player.ui.components.ScreenHeader
 import app.melo.player.ui.theme.LocalMeloColors
 import app.melo.player.ui.theme.Spacing
 import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
 
 @Composable
 fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
@@ -64,10 +66,29 @@ fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
             ScreenHeader(
                 "queue",
                 onBack = onClose,
-                subtitle = "${state.queue.size} tracks · ${if (state.shuffle) "shuffled" else "in order"}",
+                subtitle = "${state.queue.size} tracks · ${if (state.shuffle) "shuffled" else "in order"}" +
+                    when (state.repeatMode) {
+                        1 -> " · repeat playlist"
+                        2 -> " · repeat song"
+                        else -> ""
+                    },
                 trailing = {
-                    if (state.queue.isNotEmpty()) {
-                        MeloTextButton("Clear", { confirmClear = true })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Same three states as the player's repeat control, spelled out in the
+                        // subtitle so the queue says what will happen when it ends.
+                        CircleIconButton(
+                            icon = if (state.repeatMode == 2) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                            description = when (state.repeatMode) {
+                                1 -> "Repeat playlist"
+                                2 -> "Repeat song"
+                                else -> "Repeat off"
+                            },
+                            tint = if (state.repeatMode == 0) LocalMeloColors.current.textSecondary
+                            else MaterialTheme.colorScheme.primary,
+                        ) { app.setRepeat((state.repeatMode + 1) % 3) }
+                        if (state.queue.isNotEmpty()) {
+                            MeloTextButton("Clear", { confirmClear = true })
+                        }
                     }
                 },
             )

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- melo brand mark: three rounded waveform bars forming a relaxed lowercase "m". -->
+<!--
+  melo's logo, used by the base launcher icon (app info, splash). Same artwork as
+  ic_mark_01 so the icon on the home screen and the one in system settings match.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,17 +10,33 @@
     android:viewportHeight="108">
 
     <path
-        android:fillColor="#F4E9D8"
-        android:pathData="M32,46 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
-    <path
-        android:fillColor="#F4E9D8"
-        android:pathData="M30.5,38 h3 a2.5,2.5 0 0 1 2.5,2.5 v21 a2.5,2.5 0 0 1 -2.5,2.5 h-3 a2.5,2.5 0 0 1 -2.5,-2.5 v-21 a2.5,2.5 0 0 1 2.5,-2.5 z" />
+        android:fillColor="#DCDCDC"
+        android:pathData="M21,54 A33,33 0 1,0 87,54 A33,33 0 1,0 21,54 Z" />
 
     <path
-        android:fillColor="#E6B980"
-        android:pathData="M54,34 h3 a2.5,2.5 0 0 1 2.5,2.5 v35 a2.5,2.5 0 0 1 -2.5,2.5 h-3 a2.5,2.5 0 0 1 -2.5,-2.5 v-35 a2.5,2.5 0 0 1 2.5,-2.5 z" />
+        android:fillColor="#000000"
+        android:pathData="M27,43 H35 V67 H27 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M55,43 H63 V67 H55 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M83,43 H91 V67 H83 Z" />
 
     <path
-        android:fillColor="#F4E9D8"
-        android:pathData="M75.5,43 h3 a2.5,2.5 0 0 1 2.5,2.5 v17 a2.5,2.5 0 0 1 -2.5,2.5 h-3 a2.5,2.5 0 0 1 -2.5,-2.5 v-17 a2.5,2.5 0 0 1 2.5,-2.5 z" />
+        android:fillColor="#000000"
+        android:pathData="M35,43 C40,40 50,40 55,43 L55,51 C50,57 40,57 35,51 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M63,43 C68,40 78,40 83,43 L83,51 C78,57 68,57 63,51 Z" />
+
+    <path
+        android:fillColor="#000000"
+        android:pathData="M24,63 H38 V67 H24 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M52,63 H66 V67 H52 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M80,63 H94 V67 H80 Z" />
 </vector>
