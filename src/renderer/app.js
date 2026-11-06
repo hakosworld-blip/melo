@@ -1,4 +1,4 @@
-(function initRiffDiskStorageDaemon() {
+(function initmeloDiskStorageDaemon() {
 if (!window.electronAPI || typeof window.electronAPI.storageInitSync !== 'function') return;
 const origGet = Storage.prototype.getItem;
 const origSet = Storage.prototype.setItem;
@@ -33,7 +33,7 @@ migrated = true;
 }
 
 try { origClear.call(window.localStorage); } catch (_) {}
-window.__RIFF_STORAGE_MAP__ = diskMap;
+window.__MELO_STORAGE_MAP__ = diskMap;
 
 if (migrated) {
 window.electronAPI.storageSaveSync(diskMap);
@@ -78,7 +78,7 @@ origRemove.call(this, key);
 Storage.prototype.clear = function() {
 if (this === window.localStorage) {
 diskMap = {};
-window.__RIFF_STORAGE_MAP__ = diskMap;
+window.__MELO_STORAGE_MAP__ = diskMap;
 flushAsync();
 return;
 }
@@ -110,20 +110,20 @@ try { window.electronAPI.storageSaveSync(diskMap); } catch (_) {}
 
 (() => {
   try {
-    if (typeof window === 'undefined' || window.__riffFetchPatched) return;
+    if (typeof window === 'undefined' || window.__meloFetchPatched) return;
     const api = window.electronAPI;
     const token = api && api.serverToken;
     if (!token) return;
     const origFetch = window.fetch ? window.fetch.bind(window) : null;
     if (!origFetch) return;
-    window.__riffFetchPatched = true;
+    window.__meloFetchPatched = true;
     window.fetch = function (input, init) {
       try {
         const raw = typeof input === 'string' ? input : (input && input.url) || '';
         if (raw.indexOf('/api/') !== -1) {
           const opts = Object.assign({}, init || {});
           const headers = new Headers(opts.headers || (input && input.headers) || undefined);
-          headers.set('X-Riff-Token', token);
+          headers.set('X-melo-Token', token);
           opts.headers = headers;
           return origFetch(input, opts);
         }
@@ -148,7 +148,7 @@ try { window.electronAPI.storageSaveSync(diskMap); } catch (_) {}
       window.electronAPI.logError(level, message, stack);
     }
   }
-  window.__riffLogError = reportError;
+  window.__meloLogError = reportError;
   window.addEventListener('error', (e) => {
     reportError('ERROR', e.message || String(e), e.error ? e.error.stack : null);
   });
@@ -160,7 +160,7 @@ try { window.electronAPI.storageSaveSync(diskMap); } catch (_) {}
   });
 })();
 
-(async function runRiffSplash() {
+(async function runmeloSplash() {
   const splash = document.getElementById('splash');
   const host = document.getElementById('splash-logo');
   if (!splash || !host) return;
@@ -171,7 +171,7 @@ try { window.electronAPI.storageSaveSync(diskMap); } catch (_) {}
   };
   const safety = setTimeout(finish, 1850);
   try {
-    const res = await fetch('../../assets/riff.svg');
+    const res = await fetch('../../assets/melo-mark-mono.svg');
     const svgText = await res.text();
     host.innerHTML = svgText;
     const svg = host.querySelector('svg');
@@ -213,7 +213,7 @@ try { window.electronAPI.storageSaveSync(diskMap); } catch (_) {}
 })();
 
 document.addEventListener('DOMContentLoaded', async () => {
-  try { localStorage.removeItem('riff_stats'); } catch (e) {}
+  try { localStorage.removeItem('melo_stats'); } catch (e) {}
   var lyricsScrollRaf = 0;
   var gradientRaf = 0;
   var cacheRafId = 0;
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function t(str) {
     if (!str || typeof str !== 'string') return str;
-    const lang = localStorage.getItem('riff_ui_lang') || 'en';
+    const lang = localStorage.getItem('melo_ui_lang') || 'en';
     if (lang === 'en') return str;
     const dict = i18nSessionMap.get(lang);
     if (dict && dict.has(str)) return dict.get(str);
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function tSet(el, str) {
     if (!el) return;
     el.textContent = t(str);
-    const lang = localStorage.getItem('riff_ui_lang') || 'en';
+    const lang = localStorage.getItem('melo_ui_lang') || 'en';
     if (lang === 'en') return;
     const dict = i18nSessionMap.get(lang);
     if (dict && dict.has(str)) return;
@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { message, type, duration } = toastQueue.shift();
 
     const toast = document.createElement('div');
-    toast.className = `riff-toast ${type}${duration ? ' wide' : ''}`;
+    toast.className = `melo-toast ${type}${duration ? ' wide' : ''}`;
 
     let iconSvg = '';
     if (type === 'error') {
@@ -450,13 +450,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     startTimer(remaining);
   }
 
-  if (localStorage.getItem('riff_scale_rebased_v2') !== '1') {
-    localStorage.setItem('riff_scale_rebased_v2', '1');
+  if (localStorage.getItem('melo_scale_rebased_v2') !== '1') {
+    localStorage.setItem('melo_scale_rebased_v2', '1');
     if (localStorage.getItem('devsize_ui_scale') === '90') {
       localStorage.removeItem('devsize_ui_scale');
     }
-    if (localStorage.getItem('riff_font_scale') === '95') {
-      localStorage.removeItem('riff_font_scale');
+    if (localStorage.getItem('melo_font_scale') === '95') {
+      localStorage.removeItem('melo_font_scale');
     }
   }
 
@@ -575,12 +575,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const rawCustomPresets = safeArray('devsize_custom_presets');
   const normalizedCustomPresets = rawCustomPresets.map(normalizePreset).filter(Boolean);
 
-  const savedVolumeRaw = parseFloat(localStorage.getItem('riff_volume'));
+  const savedVolumeRaw = parseFloat(localStorage.getItem('melo_volume'));
   const savedVolume = Number.isFinite(savedVolumeRaw) ? Math.max(0, Math.min(1, savedVolumeRaw)) : 0.85;
 
   const DEFAULT_AUDIO_SETTINGS = { speed: 1.0, speedPitch: 1.0, pitch: 0, reverb: 0, distortion: 0, volume: 1.0, echo: 0, eq: { low: 0, mid: 0, high: 0 }, eqBands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] };
   const DEFAULT_HQ_SETTINGS = { engine: 'hqmusic-3', preset: 'studio', vocal: 0, air: 0, bass: 0 };
-  let soundPersistenceEnabled = localStorage.getItem('riff_persist_sound_settings') === '1';
+  let soundPersistenceEnabled = localStorage.getItem('melo_persist_sound_settings') === '1';
 
   function loadSoundSettings() {
     if (!soundPersistenceEnabled) {
@@ -590,8 +590,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         hqSettings: { ...DEFAULT_HQ_SETTINGS }
       };
     }
-    const savedAudio = safeJson('riff_audio_settings', null);
-    const savedHq = safeJson('riff_hq_settings', null);
+    const savedAudio = safeJson('melo_audio_settings', null);
+    const savedHq = safeJson('melo_hq_settings', null);
     const audioObj = savedAudio && typeof savedAudio === 'object' ? savedAudio : {};
     const hqObj = savedHq && typeof savedHq === 'object' ? savedHq : {};
     return {
@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         eq: { ...DEFAULT_AUDIO_SETTINGS.eq, ...(audioObj.eq && typeof audioObj.eq === 'object' ? audioObj.eq : {}) },
         eqBands: Array.isArray(audioObj.eqBands) && audioObj.eqBands.length === 10 ? audioObj.eqBands.map(v => typeof v === 'number' ? v : 0) : [...DEFAULT_AUDIO_SETTINGS.eqBands]
       },
-      hqEnabled: localStorage.getItem('riff_hq_enabled') === '1',
+      hqEnabled: localStorage.getItem('melo_hq_enabled') === '1',
       hqSettings: { ...DEFAULT_HQ_SETTINGS, ...hqObj }
     };
   }
@@ -621,9 +621,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function applyFont(font) {
-    const f = (typeof font === 'string' && font) ? font : (localStorage.getItem('riff_font') || 'google');
+    const f = (typeof font === 'string' && font) ? font : (localStorage.getItem('melo_font') || 'google');
     if (typeof state !== 'undefined' && state) {
-      state.riffFont = f;
+      state.meloFont = f;
     }
     if (f === 'sf') {
       ensureSfFontLoaded();
@@ -642,7 +642,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const state = {
-    platform: localStorage.getItem('riff_platform') || 'ytmusic',
+    platform: localStorage.getItem('melo_platform') || 'ytmusic',
     currentView: 'discover',
     previousView: 'discover',
     currentPlaylistId: null,
@@ -656,10 +656,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentTrackContext: null,
     currentTrackIndexInContext: -1,
     isPlaying: false,
-    isMuted: localStorage.getItem('riff_muted') === '1',
+    isMuted: localStorage.getItem('melo_muted') === '1',
     volume: savedVolume,
-    isRepeat: localStorage.getItem('riff_repeat') === '1',
-    isShuffle: localStorage.getItem('riff_shuffle') === '1',
+    isRepeat: localStorage.getItem('melo_repeat') === '1',
+    isShuffle: localStorage.getItem('melo_shuffle') === '1',
     isAutoRemix: false,
     myWaveActive: false,
     isRadioQueue: false,
@@ -670,16 +670,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     isRightPanelOpen: true,
     lyricsMode: 'word',
     uiScale: savedScale,
-    activePresetId: soundPersistenceEnabled ? (localStorage.getItem('riff_active_preset') || 'p_default') : 'p_default',
-    themeMode: localStorage.getItem('riff_theme_mode') || 'dark',
-    paletteStyle: localStorage.getItem('riff_palette_style') || 'classic',
-    meshBrightness: parseInt(localStorage.getItem('riff_mesh_brightness') || '100', 10),
-    themeAccent: localStorage.getItem('riff_theme_accent') || '#6750A4',
-    themeIntensity: parseInt(localStorage.getItem('riff_theme_intensity') || '0'),
-    themeBrightness: parseInt(localStorage.getItem('riff_theme_brightness') || '0'),
-    trEnabled: localStorage.getItem('riff_tr_enabled') === 'true',
-    trLang: localStorage.getItem('riff_tr_lang') || 'en',
-    trAuto: localStorage.getItem('riff_tr_auto') === 'true',
+    activePresetId: soundPersistenceEnabled ? (localStorage.getItem('melo_active_preset') || 'p_default') : 'p_default',
+    themeMode: localStorage.getItem('melo_theme_mode') || 'dark',
+    paletteStyle: localStorage.getItem('melo_palette_style') || 'classic',
+    meshBrightness: parseInt(localStorage.getItem('melo_mesh_brightness') || '100', 10),
+    themeAccent: localStorage.getItem('melo_theme_accent') || '#6750A4',
+    themeIntensity: parseInt(localStorage.getItem('melo_theme_intensity') || '0'),
+    themeBrightness: parseInt(localStorage.getItem('melo_theme_brightness') || '0'),
+    trEnabled: localStorage.getItem('melo_tr_enabled') === 'true',
+    trLang: localStorage.getItem('melo_tr_lang') || 'en',
+    trAuto: localStorage.getItem('melo_tr_auto') === 'true',
     trActive: false,
     currentTranslations: null,
     isTvKaraokeOpen: false,
@@ -706,7 +706,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                           lastBroadcastStateKey: null,
                           syncTimeout: null,
                           scrubberDragTargetTime: undefined,
-                          riffFont: localStorage.getItem('riff_font') || 'google'
+                          meloFont: localStorage.getItem('melo_font') || 'google'
   };
 
   function migrateAddedAt() {
@@ -729,7 +729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   migrateAddedAt();
 
-  applyFont(state.riffFont);
+  applyFont(state.meloFont);
 
   if (window.electronAPI && window.electronAPI.getServerPort) {
     try {
@@ -758,12 +758,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (customArt && isHttpUrl(customArt.cover)) rpcThumb = customArt.cover;
     else if (isHttpUrl(track.thumbnail)) rpcThumb = track.thumbnail;
     else if (isHttpUrl(track.cover)) rpcThumb = track.cover;
-    const shareUrl = buildRiffShareUrl(track, '', '', 500);
+    const shareUrl = buildmeloShareUrl(track, '', '', 500);
     const posSec = (el.nativeAudio && Number.isFinite(el.nativeAudio.currentTime) && el.nativeAudio.currentTime > 0) ? Math.floor(el.nativeAudio.currentTime) : 0;
     window.electronAPI.discordRpcUpdate({
       title: track.title || 'Unknown Track',
       artist: track.artist || 'Unknown Artist',
-      artistInStatus: localStorage.getItem('riff_discord_artist_status') !== '0',
+      artistInStatus: localStorage.getItem('melo_discord_artist_status') !== '0',
       duration: track.duration || 0,
       thumbnail: rpcThumb,
       url: shareUrl,
@@ -922,13 +922,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function getAdv(name, defaultVal = true) {
-    const val = localStorage.getItem(`riff_adv_${name}`);
+    const val = localStorage.getItem(`melo_adv_${name}`);
     if (val === null) return defaultVal;
     return val === 'true';
   }
 
   function setAdv(name, boolVal) {
-    localStorage.setItem(`riff_adv_${name}`, boolVal ? 'true' : 'false');
+    localStorage.setItem(`melo_adv_${name}`, boolVal ? 'true' : 'false');
   }
 
   function applyReducedMotionSetting() {
@@ -1546,15 +1546,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (mode === 'light') {
         const now = currentUiAlpha();
         if (now < 100) {
-          localStorage.setItem('riff_ui_alpha_light_prev', String(now));
-          localStorage.setItem('riff_ui_alpha_light_auto', '100');
+          localStorage.setItem('melo_ui_alpha_light_prev', String(now));
+          localStorage.setItem('melo_ui_alpha_light_auto', '100');
           setUiAlphaViaSlider(100);
         }
       } else if (lastEffectiveMode === 'light') {
-        const auto = localStorage.getItem('riff_ui_alpha_light_auto'), prev = localStorage.getItem('riff_ui_alpha_light_prev');
+        const auto = localStorage.getItem('melo_ui_alpha_light_auto'), prev = localStorage.getItem('melo_ui_alpha_light_prev');
         if (auto !== null && prev !== null && currentUiAlpha() === Number(auto)) setUiAlphaViaSlider(Number(prev));
-        localStorage.removeItem('riff_ui_alpha_light_auto');
-        localStorage.removeItem('riff_ui_alpha_light_prev');
+        localStorage.removeItem('melo_ui_alpha_light_auto');
+        localStorage.removeItem('melo_ui_alpha_light_prev');
       }
       lastEffectiveMode = mode;
     }
@@ -1965,13 +1965,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (el.sliderScale) el.sliderScale.value = state.uiScale;
   if (el.valScale) el.valScale.textContent = `${state.uiScale}%`;
 
-  const savedFontScale = localStorage.getItem('riff_font_scale') || '100';
+  const savedFontScale = localStorage.getItem('melo_font_scale') || '100';
   const fontVal = parseInt(savedFontScale, 10) || 100;
   if (el.sliderFontScale) el.sliderFontScale.value = fontVal.toString();
   if (el.valFontScale) el.valFontScale.textContent = `${fontVal}%`;
   document.documentElement.style.setProperty('--font-scale', ((fontVal / 100) * 0.95 * 1.25).toString());
 
-  const savedRadius = localStorage.getItem('riff_corner_radius') || '16';
+  const savedRadius = localStorage.getItem('melo_corner_radius') || '16';
   if (el.sliderCornerRadius) el.sliderCornerRadius.value = savedRadius;
   if (el.valCornerRadius) el.valCornerRadius.textContent = savedRadius === '16' ? 'Default' : `${savedRadius}px`;
   document.documentElement.style.setProperty('--md-shape-corner-l', `${savedRadius}px`);
@@ -2003,10 +2003,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (titlebarRevealHideTimer) { clearTimeout(titlebarRevealHideTimer); titlebarRevealHideTimer = null; }
   });
 
-  const savedBannerBlur = parseInt(localStorage.getItem('riff_banner_blur') || '3', 10);
-  const savedBannerOpacity = parseInt(localStorage.getItem('riff_banner_opacity') || '100', 10);
-  const savedBannerFade = parseInt(localStorage.getItem('riff_banner_fade') || '100', 10);
-  const savedBannerFit = localStorage.getItem('riff_banner_fit') || 'zoom';
+  const savedBannerBlur = parseInt(localStorage.getItem('melo_banner_blur') || '3', 10);
+  const savedBannerOpacity = parseInt(localStorage.getItem('melo_banner_opacity') || '100', 10);
+  const savedBannerFade = parseInt(localStorage.getItem('melo_banner_fade') || '100', 10);
+  const savedBannerFit = localStorage.getItem('melo_banner_fit') || 'zoom';
 
   document.documentElement.style.setProperty('--banner-blur', `${savedBannerBlur}px`);
   document.documentElement.style.setProperty('--banner-opacity', `${savedBannerOpacity / 100}`);
@@ -2015,8 +2015,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyBannerFit(savedBannerFit);
 
   function applyUiOpacity() {
-    const rawUi = parseInt(localStorage.getItem('riff_ui_alpha') || '20', 10);
-    const rawText = parseInt(localStorage.getItem('riff_text_alpha') || '100', 10);
+    const rawUi = parseInt(localStorage.getItem('melo_ui_alpha') || '20', 10);
+    const rawText = parseInt(localStorage.getItem('melo_text_alpha') || '100', 10);
     const uiAlpha = Math.max(20, Math.min(100, isNaN(rawUi) ? 100 : rawUi));
     const textAlpha = Math.max(1, Math.min(100, isNaN(rawText) ? 100 : rawText));
 
@@ -2278,13 +2278,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const audioEngine = new window.RiffAudioEngine();
+  const audioEngine = new window.meloAudioEngine();
   window.audioEngine = audioEngine;
   let hlsInstance = null;
   animationFrameId = null;
 
   let levelAvgDb = -120;
-  function normalizeEnabled() { return localStorage.getItem('riff_audio_normalize') === '1'; }
+  function normalizeEnabled() { return localStorage.getItem('melo_audio_normalize') === '1'; }
   function resetLevelWatcher() { levelAvgDb = -120; if (audioEngine && audioEngine.setNormalizeGainDb) audioEngine.setNormalizeGainDb(0); }
   setInterval(() => {
     const audio = el.nativeAudio;
@@ -2334,10 +2334,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     soundSettingsSaveTimer = setTimeout(() => {
       soundSettingsSaveTimer = null;
       try {
-        localStorage.setItem('riff_hq_enabled', state.hqEnabled ? '1' : '0');
-        localStorage.setItem('riff_hq_settings', JSON.stringify(state.hqSettings));
-        localStorage.setItem('riff_audio_settings', JSON.stringify(state.audioSettings));
-        localStorage.setItem('riff_active_preset', state.activePresetId || '');
+        localStorage.setItem('melo_hq_enabled', state.hqEnabled ? '1' : '0');
+        localStorage.setItem('melo_hq_settings', JSON.stringify(state.hqSettings));
+        localStorage.setItem('melo_audio_settings', JSON.stringify(state.audioSettings));
+        localStorage.setItem('melo_active_preset', state.activePresetId || '');
       } catch (e) {
         console.warn('Failed to save sound settings', e);
       }
@@ -2374,8 +2374,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   let barBgSmoothedHeights = null;
   let vizPrev = null;
   function vizSettings() {
-    const smooth = Math.min(0.95, Math.max(0, (parseInt(localStorage.getItem('riff_viz_smooth') || '55', 10)) / 100));
-    const sens = Math.min(3, Math.max(0, (parseInt(localStorage.getItem('riff_viz_sens') || '100', 10)) / 100));
+    const smooth = Math.min(0.95, Math.max(0, (parseInt(localStorage.getItem('melo_viz_smooth') || '55', 10)) / 100));
+    const sens = Math.min(3, Math.max(0, (parseInt(localStorage.getItem('melo_viz_sens') || '100', 10)) / 100));
     return { smooth, sens };
   }
 
@@ -2473,7 +2473,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function isVizConnectedMode() {
-    return localStorage.getItem('riff_viz_connected') === '1';
+    return localStorage.getItem('melo_viz_connected') === '1';
   }
   function drawConnectedLiquidWave(ctx, w, h, heights, color = '#ffffff') {
     const rawN = heights.length;
@@ -2597,7 +2597,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const isVisualizerVisible = miniCanvas && miniCanvas.offsetParent !== null && !document.hidden;
       const isTvkVisualizerVisible = state.isTvKaraokeOpen && tvkCanvas && tvkCanvas.offsetParent !== null && !document.hidden;
-      const isBehindVizVisible = document.body.classList.contains('bar-viz-behind') && localStorage.getItem('riff_bar_wave') !== '0' && !document.body.classList.contains('mini') && !document.hidden;
+      const isBehindVizVisible = document.body.classList.contains('bar-viz-behind') && localStorage.getItem('melo_bar_wave') !== '0' && !document.body.classList.contains('mini') && !document.hidden;
       const needBassPulse = !!(state.vfx && state.vfx.bassPulse);
       const activeGap = document.querySelector('.lyric-line.lyric-gap.active');
 
@@ -2983,7 +2983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           const centerY = sh / 2;
 
-          const showProgressBg = localStorage.getItem('riff_progress_bg') === 'true';
+          const showProgressBg = localStorage.getItem('melo_progress_bg') === 'true';
           if (showProgressBg && bgStartX < bgEndX - 1) {
             sCtx.save();
             sCtx.globalAlpha = 0.3;
@@ -3297,7 +3297,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const bannerImg = banner.querySelector('.banner-image') || banner;
     const trackArt = state.currentTrack ? getTrackArt(state.currentTrack) : {};
     const trackBanner = trackArt.banner || null;
-    const globalMedia = localStorage.getItem('riff_banner_media');
+    const globalMedia = localStorage.getItem('melo_banner_media');
     const mediaToUse = trackBanner || globalMedia || thumbUrl;
 
     const hasCustomFx = !!(trackArt.bannerCustomFx || (trackArt.bannerFx && trackArt.bannerFx.enabled));
@@ -3397,7 +3397,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     banner.style.display = '';
     const bannerImg = banner.querySelector('.banner-image') || banner;
-    const globalMedia = localStorage.getItem('riff_banner_media');
+    const globalMedia = localStorage.getItem('melo_banner_media');
     const mediaToUse = globalMedia || thumbUrl;
 
     if (!mediaToUse) {
@@ -3459,7 +3459,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return getTrackCanonicalId(a) === getTrackCanonicalId(b);
   }
 
-  function getTrackTrims() { return safeJson('riff_track_trims', {}); }
+  function getTrackTrims() { return safeJson('melo_track_trims', {}); }
   function getTrackTrim(track) {
     if (!track) return null;
     const cid = getTrackCanonicalId(track);
@@ -3475,12 +3475,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       all[cid] = { start: Math.round(startSec * 10) / 10, end: Math.round(endSec * 10) / 10, updatedAt: Date.now() };
     }
-    try { localStorage.setItem('riff_track_trims', JSON.stringify(all)); } catch (_) {}
+    try { localStorage.setItem('melo_track_trims', JSON.stringify(all)); } catch (_) {}
   }
 
   function getTrackArt(t) {
     try {
-      return JSON.parse(localStorage.getItem('riff_track_art') || '{}')[getTrackCanonicalId(t)] || {};
+      return JSON.parse(localStorage.getItem('melo_track_art') || '{}')[getTrackCanonicalId(t)] || {};
     } catch (e) {
       return {};
     }
@@ -3489,22 +3489,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setTrackArt(t, patch) {
     let all = {};
     try {
-      all = JSON.parse(localStorage.getItem('riff_track_art') || '{}');
+      all = JSON.parse(localStorage.getItem('melo_track_art') || '{}');
     } catch (e) {}
     const id = getTrackCanonicalId(t);
     if (!id) return;
     const cur = { ...(all[id] || {}), ...patch };
     for (const k in cur) if (cur[k] === undefined || cur[k] === null || cur[k] === '') delete cur[k];
     if (Object.keys(cur).length) all[id] = cur; else delete all[id];
-    localStorage.setItem('riff_track_art', JSON.stringify(all));
+    localStorage.setItem('melo_track_art', JSON.stringify(all));
   }
 
-  function getTrackRenames() { return safeJson('riff_track_renames', {}); }
+  function getTrackRenames() { return safeJson('melo_track_renames', {}); }
   function saveTrackRename(canonicalId, title, artist) {
     if (!canonicalId) return;
     const all = getTrackRenames();
     all[canonicalId] = { title, artist, updatedAt: Date.now() };
-    try { localStorage.setItem('riff_track_renames', JSON.stringify(all)); } catch (_) {}
+    try { localStorage.setItem('melo_track_renames', JSON.stringify(all)); } catch (_) {}
   }
   function applyTrackRenames(t) {
     if (!t) return t;
@@ -3513,8 +3513,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (r) { if (r.title) t.title = r.title; if (r.artist) t.artist = r.artist; }
     return t;
   }
-  function buildRiffShareUrl(track, directStream = '', resolvedUrl = '', maxLen = 0) {
-    if (!track) return 'https://riff.hs.vc/share/';
+  function buildmeloShareUrl(track, directStream = '', resolvedUrl = '', maxLen = 0) {
+    if (!track) return 'https://melo.hs.vc/share/';
     applyTrackRenames(track);
     const isHttpUrl = (u) => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://')) && !u.includes('127.0.0.1');
     const title = track.title || 'Untitled';
@@ -3533,14 +3533,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (directStream && isHttpUrl(directStream) && !directStream.includes('.m3u8')) params.set('stream', directStream);
     if (isHttpUrl(rawThumb)) params.set('img', rawThumb);
     if (track.duration) params.set('dur', String(Math.round(Number(track.duration))));
-    let full = 'https://riff.hs.vc/share/?' + params.toString();
+    let full = 'https://melo.hs.vc/share/?' + params.toString();
     if (maxLen > 0 && full.length > maxLen) {
       params.delete('stream');
-      full = 'https://riff.hs.vc/share/?' + params.toString();
+      full = 'https://melo.hs.vc/share/?' + params.toString();
     }
     if (maxLen > 0 && full.length > maxLen) {
       params.delete('img');
-      full = 'https://riff.hs.vc/share/?' + params.toString();
+      full = 'https://melo.hs.vc/share/?' + params.toString();
     }
     return maxLen > 0 ? full.slice(0, maxLen) : full;
   }
@@ -3559,11 +3559,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   let navigatingBack = false;
 
   const lastfmState = {
-    enabled: localStorage.getItem('riff_lastfm_enabled') !== 'false',
-    sessionKey: localStorage.getItem('riff_lastfm_sk') || '',
-    username: localStorage.getItem('riff_lastfm_user') || '',
-    apiKey: localStorage.getItem('riff_lastfm_apikey') || '',
-    apiSecret: localStorage.getItem('riff_lastfm_apisecret') || '',
+    enabled: localStorage.getItem('melo_lastfm_enabled') !== 'false',
+    sessionKey: localStorage.getItem('melo_lastfm_sk') || '',
+    username: localStorage.getItem('melo_lastfm_user') || '',
+    apiKey: localStorage.getItem('melo_lastfm_apikey') || '',
+    apiSecret: localStorage.getItem('melo_lastfm_apisecret') || '',
     currentTrackKey: '',
     startedAtUnix: 0,
     playedSeconds: 0,
@@ -4136,7 +4136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function fetchAndUpgradeWords(title, artist, trackId, token) {
-    const wordSource = localStorage.getItem('riff_word_source') || 'auto';
+    const wordSource = localStorage.getItem('melo_word_source') || 'auto';
     if (wordSource === 'estimate') return;
 
     const cachedWords = wordsSessionCache.get(trackId);
@@ -4334,7 +4334,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof renderMiniLyrics === 'function') renderMiniLyrics();
 
     try {
-      const source = localStorage.getItem('riff_lyrics_source') === 'genius' ? 'genius' : 'lrclib';
+      const source = localStorage.getItem('melo_lyrics_source') === 'genius' ? 'genius' : 'lrclib';
       const trackId = (state.currentTrack && state.currentTrack.id) || `${artist}:${title}`;
       const lyricsCacheKey = `${trackId}:${source}`;
 
@@ -4497,7 +4497,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function getLyricsWordStyle() { return localStorage.getItem('riff_lyrics_word_style') === 'words' ? 'words' : 'gradient'; }
+  function getLyricsWordStyle() { return localStorage.getItem('melo_lyrics_word_style') === 'words' ? 'words' : 'gradient'; }
   function isGradientMode() { return state.lyricsMode === 'word' && getAdv('karaoke_words', true) && getLyricsWordStyle() === 'gradient'; }
 
   function renderLyricsView() {
@@ -4977,7 +4977,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     '.dialog-card span:not([class])'
   ].join(', ');
 
-  const savedUiLang = localStorage.getItem('riff_ui_lang') || 'en';
+  const savedUiLang = localStorage.getItem('melo_ui_lang') || 'en';
   if (savedUiLang !== 'en') {
     applyI18n(savedUiLang);
   }
@@ -5008,8 +5008,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function applyI18n(lang) {
-    lang = lang || localStorage.getItem('riff_ui_lang') || 'en';
-    localStorage.setItem('riff_ui_lang', lang);
+    lang = lang || localStorage.getItem('melo_ui_lang') || 'en';
+    localStorage.setItem('melo_ui_lang', lang);
 
     const found = TRANSLATION_LANGUAGES.find(l => l.code === lang);
     const uiLangLabel = document.getElementById('ui-lang-label');
@@ -5224,11 +5224,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     linear: { css: 'linear', fn: (t) => t }
   };
   function getLyricsEase() {
-    const v = localStorage.getItem('riff_lyrics_ease');
+    const v = localStorage.getItem('melo_lyrics_ease');
     return LYRIC_EASINGS[v] ? v : 'inout';
   }
   function getLyricsSpeed() {
-    const v = parseFloat(localStorage.getItem('riff_lyrics_speed'));
+    const v = parseFloat(localStorage.getItem('melo_lyrics_speed'));
     return (v >= 0.5 && v <= 2.5) ? v : 1.0;
   }
   function applyLyricsEase() {
@@ -5239,7 +5239,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.documentElement.style.setProperty('--lyric-duration', `${(baseDuration / speed).toFixed(2)}s`);
   }
   function getLyricsGradientTightness() {
-    const v = parseInt(localStorage.getItem('riff_lyrics_gradient_tightness') || localStorage.getItem('riff_gradient_tight'), 10);
+    const v = parseInt(localStorage.getItem('melo_lyrics_gradient_tightness') || localStorage.getItem('melo_gradient_tight'), 10);
     return (v >= 0 && v <= 40) ? v : 2;
   }
   function applyLyricsGradientTightness() {
@@ -6267,7 +6267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function getTvk() {
     try {
-      const raw = localStorage.getItem('riff_tvk');
+      const raw = localStorage.getItem('melo_tvk');
       if (raw) {
         const parsed = JSON.parse(raw);
         return {
@@ -6286,13 +6286,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function saveTvk(settings) {
     try {
-      localStorage.setItem('riff_tvk', JSON.stringify(settings));
+      localStorage.setItem('melo_tvk', JSON.stringify(settings));
     } catch (_) {}
   }
 
   function updateTvkVisualizerSetting(enabled) {
     const on = enabled !== false && enabled !== 'false';
-    localStorage.setItem('riff_tvk_visualizer', on ? 'true' : 'false');
+    localStorage.setItem('melo_tvk_visualizer', on ? 'true' : 'false');
     const tv = document.getElementById('tv-karaoke');
     if (tv) {
       tv.classList.toggle('no-tvk-visualizer', !on);
@@ -6309,7 +6309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function updateTvkVisualizerLyricsSetting(enabled) {
     const on = enabled !== false && enabled !== 'false';
-    localStorage.setItem('riff_tvk_visualizer_lyrics', on ? 'true' : 'false');
+    localStorage.setItem('melo_tvk_visualizer_lyrics', on ? 'true' : 'false');
     const tv = document.getElementById('tv-karaoke');
     if (tv) {
       tv.classList.toggle('tvk-show-lyrics-visualizer', on);
@@ -6328,7 +6328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let val = parseInt(opacityVal, 10);
     if (isNaN(val)) val = 85;
     val = Math.max(10, Math.min(100, val));
-    localStorage.setItem('riff_tvk_visualizer_opacity', val.toString());
+    localStorage.setItem('melo_tvk_visualizer_opacity', val.toString());
 
     const norm = (val / 100).toFixed(2);
     const tv = document.getElementById('tv-karaoke');
@@ -6370,11 +6370,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     tv.setAttribute('data-tvk-anim', anim);
     tv.setAttribute('data-tvk-align', align);
 
-    const tvkVisOn = localStorage.getItem('riff_tvk_visualizer') !== 'false';
+    const tvkVisOn = localStorage.getItem('melo_tvk_visualizer') !== 'false';
     tv.classList.toggle('no-tvk-visualizer', !tvkVisOn);
-    const tvkVisLyricsOn = localStorage.getItem('riff_tvk_visualizer_lyrics') !== 'false';
+    const tvkVisLyricsOn = localStorage.getItem('melo_tvk_visualizer_lyrics') !== 'false';
     tv.classList.toggle('tvk-show-lyrics-visualizer', tvkVisLyricsOn);
-    const visOpacity = parseInt(localStorage.getItem('riff_tvk_visualizer_opacity') || '85', 10);
+    const visOpacity = parseInt(localStorage.getItem('melo_tvk_visualizer_opacity') || '85', 10);
     tv.style.setProperty('--tvk-vis-opacity', (Math.max(10, Math.min(100, visOpacity)) / 100).toFixed(2));
   }
 
@@ -6438,22 +6438,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (valGap) valGap.textContent = `${s.gap}px`;
     if (valSpeed) valSpeed.textContent = `${s.speed}ms`;
 
-    const tvkVisOn = localStorage.getItem('riff_tvk_visualizer') !== 'false';
+    const tvkVisOn = localStorage.getItem('melo_tvk_visualizer') !== 'false';
     const btnTvkVis = document.getElementById('btn-tvk-visualizer');
     if (btnTvkVis) btnTvkVis.classList.toggle('active', tvkVisOn);
     const btnTvkVisSetting = document.getElementById('btn-tvk-visualizer-setting');
     if (btnTvkVisSetting) btnTvkVisSetting.classList.toggle('active', tvkVisOn);
 
-    const tvkVisLyricsOn = localStorage.getItem('riff_tvk_visualizer_lyrics') !== 'false';
+    const tvkVisLyricsOn = localStorage.getItem('melo_tvk_visualizer_lyrics') !== 'false';
     const btnTvkVisLyrics = document.getElementById('btn-tvk-visualizer-lyrics');
     if (btnTvkVisLyrics) btnTvkVisLyrics.classList.toggle('active', tvkVisLyricsOn);
     const btnTvkVisLyricsSetting = document.getElementById('btn-tvk-visualizer-lyrics-setting');
     if (btnTvkVisLyricsSetting) btnTvkVisLyricsSetting.classList.toggle('active', tvkVisLyricsOn);
 
     const btnTvkVizConnectedEl = document.getElementById('btn-tvk-viz-connected');
-    if (btnTvkVizConnectedEl) btnTvkVizConnectedEl.classList.toggle('active', localStorage.getItem('riff_viz_connected') === '1');
+    if (btnTvkVizConnectedEl) btnTvkVizConnectedEl.classList.toggle('active', localStorage.getItem('melo_viz_connected') === '1');
 
-    const visOpacity = parseInt(localStorage.getItem('riff_tvk_visualizer_opacity') || '85', 10);
+    const visOpacity = parseInt(localStorage.getItem('melo_tvk_visualizer_opacity') || '85', 10);
     const sliderTvkVisOpacity = document.getElementById('tvk-vis-opacity');
     if (sliderTvkVisOpacity) sliderTvkVisOpacity.value = visOpacity;
     const valTvkVisOpacity = document.getElementById('val-tvk-vis-opacity');
@@ -6626,14 +6626,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnTvkVis = document.getElementById('btn-tvk-visualizer');
     if (btnTvkVis) {
       btnTvkVis.addEventListener('click', () => {
-        const cur = localStorage.getItem('riff_tvk_visualizer') !== 'false';
+        const cur = localStorage.getItem('melo_tvk_visualizer') !== 'false';
         updateTvkVisualizerSetting(!cur);
       });
     }
     const btnTvkVisSetting = document.getElementById('btn-tvk-visualizer-setting');
     if (btnTvkVisSetting) {
       btnTvkVisSetting.addEventListener('click', () => {
-        const cur = localStorage.getItem('riff_tvk_visualizer') !== 'false';
+        const cur = localStorage.getItem('melo_tvk_visualizer') !== 'false';
         updateTvkVisualizerSetting(!cur);
       });
     }
@@ -6641,14 +6641,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnTvkVisLyrics = document.getElementById('btn-tvk-visualizer-lyrics');
     if (btnTvkVisLyrics) {
       btnTvkVisLyrics.addEventListener('click', () => {
-        const cur = localStorage.getItem('riff_tvk_visualizer_lyrics') !== 'false';
+        const cur = localStorage.getItem('melo_tvk_visualizer_lyrics') !== 'false';
         updateTvkVisualizerLyricsSetting(!cur);
       });
     }
     const btnTvkVisLyricsSetting = document.getElementById('btn-tvk-visualizer-lyrics-setting');
     if (btnTvkVisLyricsSetting) {
       btnTvkVisLyricsSetting.addEventListener('click', () => {
-        const cur = localStorage.getItem('riff_tvk_visualizer_lyrics') !== 'false';
+        const cur = localStorage.getItem('melo_tvk_visualizer_lyrics') !== 'false';
         updateTvkVisualizerLyricsSetting(!cur);
       });
     }
@@ -6674,7 +6674,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const valVizSmooth = document.getElementById('val-viz-smooth');
     const sliderBarVizSmooth = document.getElementById('slider-bar-viz-smooth');
     const valBarVizSmooth = document.getElementById('val-bar-viz-smooth');
-    const initialVizSmooth = localStorage.getItem('riff_viz_smooth') || '55';
+    const initialVizSmooth = localStorage.getItem('melo_viz_smooth') || '55';
     function syncSmooth(v) {
       if (sliderVizSmooth) sliderVizSmooth.value = v;
       if (valVizSmooth) valVizSmooth.textContent = `${v}%`;
@@ -6684,7 +6684,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncSmooth(initialVizSmooth);
     const onSmoothInput = (e) => {
       const v = e.target.value;
-      localStorage.setItem('riff_viz_smooth', v);
+      localStorage.setItem('melo_viz_smooth', v);
       syncSmooth(v);
     };
     if (sliderVizSmooth) {
@@ -6700,7 +6700,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const valVizSens = document.getElementById('val-viz-sens');
     const sliderBarVizSens = document.getElementById('slider-bar-viz-sens');
     const valBarVizSens = document.getElementById('val-bar-viz-sens');
-    const initialVizSens = localStorage.getItem('riff_viz_sens') || '100';
+    const initialVizSens = localStorage.getItem('melo_viz_sens') || '100';
     function syncSens(v) {
       if (sliderVizSens) sliderVizSens.value = v;
       if (valVizSens) valVizSens.textContent = `${v}%`;
@@ -6710,7 +6710,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncSens(initialVizSens);
     const onSensInput = (e) => {
       const v = e.target.value;
-      localStorage.setItem('riff_viz_sens', v);
+      localStorage.setItem('melo_viz_sens', v);
       syncSens(v);
     };
     if (sliderVizSens) {
@@ -7351,7 +7351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       if (crossfadeFadeInPending) {
         crossfadeFadeInPending = false;
-        const X = parseInt(localStorage.getItem('riff_crossfade') || '0', 10);
+        const X = parseInt(localStorage.getItem('melo_crossfade') || '0', 10);
         if (X > 0 && audioEngine) audioEngine.fadeIn(X / 2);
       }
       if (typeof m3cStart === 'function') m3cStart();
@@ -7483,7 +7483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const cur = (el.nativeAudio && Number.isFinite(el.nativeAudio.currentTime)) ? el.nativeAudio.currentTime : 0;
       const dur = getReliableTrackDuration();
 
-      const X = parseInt(localStorage.getItem('riff_crossfade') || '0', 10);
+      const X = parseInt(localStorage.getItem('melo_crossfade') || '0', 10);
       if (X > 0 && !crossfadeTriggered && !state.isRepeat && dur > Math.max(X * 3, 30) && (!hlsInstance || dur >= (state.currentTrack?.duration || 0) * 0.9) && cur >= dur - X && (!audioEngine || !audioEngine.isLiveStream(el.nativeAudio))) {
         crossfadeTriggered = true;
         crossfadeFadeInPending = true;
@@ -7703,7 +7703,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initAudioContext();
     renderPresets();
     if (activeTweenRaf) { cancelAnimationFrame(activeTweenRaf); activeTweenRaf = null; }
-    if (localStorage.getItem('riff_smooth_presets') === 'false') {
+    if (localStorage.getItem('melo_smooth_presets') === 'false') {
       state.audioSettings = { ...normalized.settings };
       syncSettingsSlidersToState();
       applyAudioSettings();
@@ -7938,7 +7938,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function getMixFeedback() {
     const defaultVal = { likedArtists: [], dislikedArtists: [], likedTracks: [], dislikedTracks: [], ratingsByMix: {} };
-    const val = safeJson('riff_mix_feedback', defaultVal);
+    const val = safeJson('melo_mix_feedback', defaultVal);
     if (!val || typeof val !== 'object') return defaultVal;
     if (!Array.isArray(val.likedArtists)) val.likedArtists = [];
     if (!Array.isArray(val.dislikedArtists)) val.dislikedArtists = [];
@@ -7949,7 +7949,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function saveMixFeedback(data) {
-    localStorage.setItem('riff_mix_feedback', JSON.stringify(data));
+    localStorage.setItem('melo_mix_feedback', JSON.stringify(data));
   }
 
   function handleDailyMixRating(isLike) {
@@ -8037,7 +8037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function getSavedAlbums() {
     try {
-      const raw = localStorage.getItem('riff_saved_albums');
+      const raw = localStorage.getItem('melo_saved_albums');
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch (_) {
@@ -8047,7 +8047,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function setSavedAlbums(list) {
     try {
-      localStorage.setItem('riff_saved_albums', JSON.stringify(list));
+      localStorage.setItem('melo_saved_albums', JSON.stringify(list));
     } catch (_) {}
     updateAlbumsCount();
   }
@@ -8464,7 +8464,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const svg = container.querySelector('.m3-search-loader');
     const path = svg ? svg.querySelector('path') : null;
     if (!svg || !path) return;
-    const S = window.RiffShapes;
+    const S = window.meloShapes;
     if (!S || !S.ready()) {
       container.innerHTML = `<div class="m3-loader-container" style="display:flex;justify-content:center;align-items:center;padding:64px 0;width:100%;"><svg class="g-spinner" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20"/></svg></div>`;
       return;
@@ -8539,7 +8539,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (el.searchTracksList) renderTracks(el.searchTracksList, data.tracks, 'search');
       });
 
-      const showArtists = localStorage.getItem('riff_search_artists') !== '0';
+      const showArtists = localStorage.getItem('melo_search_artists') !== '0';
       const trimmedQuery = query.trim();
       if (showArtists && trimmedQuery.length >= 3) {
         fetchArtistCardForSearch(trimmedQuery, searchToken, data.tracks);
@@ -8585,11 +8585,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let isShareInProgress = false;
   function showShareSpinnerToast() {
-    document.querySelectorAll('.riff-share-spinner-toast').forEach(t => t.remove());
+    document.querySelectorAll('.melo-share-spinner-toast').forEach(t => t.remove());
     const container = document.getElementById('toast-container');
     if (!container) return () => {};
     const toast = document.createElement('div');
-    toast.className = 'riff-toast info riff-share-spinner-toast';
+    toast.className = 'melo-toast info melo-share-spinner-toast';
     toast.innerHTML = '<svg class="g-spinner" style="width:20px;height:20px;" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20"/></svg>';
     container.appendChild(toast);
     return () => {
@@ -8626,7 +8626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if ((track.url || track.id) && track.platform !== 'local') {
         directStream = await resolveFullTrackStreamForShare(track);
       }
-      const shareUrl = buildRiffShareUrl(track, directStream, '', 0);
+      const shareUrl = buildmeloShareUrl(track, directStream, '', 0);
       await navigator.clipboard.writeText(shareUrl);
       showToast('Share link copied to clipboard!', 'success');
     } catch (e) {
@@ -8685,7 +8685,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <span class="track-row-duration">${formatDuration(track.duration)}</span>
       <div class="track-row-actions">
-      <button class="btn-icon-pill riff-share-action-btn btn-row-share" title="Copy share link" aria-label="Copy share link">
+      <button class="btn-icon-pill melo-share-action-btn btn-row-share" title="Copy share link" aria-label="Copy share link">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"></polyline><path d="M4 20v-7a4 4 0 0 1 4-4h12"></path></svg>
       </button>
       <button class="btn-icon-pill btn-row-fav" title="favorite">
@@ -9047,17 +9047,17 @@ function renderClickableArtists(container, rawArtist) {
   function isArtistFollowed(artistName) {
     if (!artistName) return false;
     const lower = artistName.trim().toLowerCase();
-    const favs = safeArray('riff_favorite_artists');
+    const favs = safeArray('melo_favorite_artists');
     return favs.some(x => (typeof x === 'string' ? x : x.name || '').toLowerCase().trim() === lower);
   }
 
   function getFavoriteArtistsList() {
-    const favsRaw = safeArray('riff_favorite_artists');
+    const favsRaw = safeArray('melo_favorite_artists');
     if (!favsRaw || favsRaw.length === 0) return [];
 
-    const unfollowedList = safeArray('riff_unfollowed_artists');
+    const unfollowedList = safeArray('melo_unfollowed_artists');
     const unfollowed = new Set(unfollowedList.map(a => (typeof a === 'string' ? a : a.name || '').toLowerCase().trim()));
-    const metaCache = safeJson('riff_artist_meta_cache', {});
+    const metaCache = safeJson('melo_artist_meta_cache', {});
 
     const result = [];
     const seen = new Set();
@@ -9087,9 +9087,9 @@ function renderClickableArtists(container, rawArtist) {
     const cleanName = artistName.trim();
     const lower = cleanName.toLowerCase();
 
-    let favs = safeArray('riff_favorite_artists');
-    let unfollowed = safeArray('riff_unfollowed_artists');
-    const metaCache = safeJson('riff_artist_meta_cache', {});
+    let favs = safeArray('melo_favorite_artists');
+    let unfollowed = safeArray('melo_unfollowed_artists');
+    const metaCache = safeJson('melo_artist_meta_cache', {});
 
     const isFav = favs.some(x => (typeof x === 'string' ? x : x.name || '').toLowerCase().trim() === lower);
 
@@ -9113,11 +9113,11 @@ function renderClickableArtists(container, rawArtist) {
 
     if (meta && (meta.avatar || meta.fans)) {
       metaCache[lower] = { ...(metaCache[lower] || {}), ...meta };
-      localStorage.setItem('riff_artist_meta_cache', JSON.stringify(metaCache));
+      localStorage.setItem('melo_artist_meta_cache', JSON.stringify(metaCache));
     }
 
-    localStorage.setItem('riff_favorite_artists', JSON.stringify(favs));
-    localStorage.setItem('riff_unfollowed_artists', JSON.stringify(unfollowed));
+    localStorage.setItem('melo_favorite_artists', JSON.stringify(favs));
+    localStorage.setItem('melo_unfollowed_artists', JSON.stringify(unfollowed));
 
     const followed = !isFav;
     const btnFollow = document.getElementById('btn-artist-follow');
@@ -9158,13 +9158,13 @@ function renderClickableArtists(container, rawArtist) {
               }
             }
           }
-          const cache = safeJson('riff_artist_meta_cache', {});
+          const cache = safeJson('melo_artist_meta_cache', {});
           cache[lower] = {
             avatar: artistObj.avatar || '',
             fans: artistObj.fans || 0,
             plays: artistObj.plays || 0
           };
-          localStorage.setItem('riff_artist_meta_cache', JSON.stringify(cache));
+          localStorage.setItem('melo_artist_meta_cache', JSON.stringify(cache));
         }
       })
       .catch(() => {});
@@ -9179,7 +9179,7 @@ function renderClickableArtists(container, rawArtist) {
       card.className = 'fav-artist-card';
     }
 
-    const metaCache = safeJson('riff_artist_meta_cache', {});
+    const metaCache = safeJson('melo_artist_meta_cache', {});
     const lower = (artistObj.name || '').toLowerCase();
     const cached = metaCache[lower];
 
@@ -9281,7 +9281,7 @@ function renderClickableArtists(container, rawArtist) {
     const svg = container.querySelector('.m3-search-loader');
     const path = svg ? svg.querySelector('path') : null;
     if (!svg || !path) return;
-    const S = window.RiffShapes;
+    const S = window.meloShapes;
     if (!S || !S.ready()) {
       container.innerHTML = `<div class="m3-loader-container" style="display:flex;justify-content:center;align-items:center;padding:48px 0;width:100%;"><svg class="g-spinner" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20"/></svg></div>`;
       return;
@@ -9446,13 +9446,13 @@ function renderClickableArtists(container, rawArtist) {
       }
       if (data.artist) {
         const lower = cleanName.toLowerCase();
-        const cache = safeJson('riff_artist_meta_cache', {});
+        const cache = safeJson('melo_artist_meta_cache', {});
         cache[lower] = {
           avatar: data.artist.avatar || data.artist.banner || (cache[lower] && cache[lower].avatar) || '',
           fans: data.artist.fans || data.artist.nb_fan || (cache[lower] && cache[lower].fans) || 0,
           plays: (cache[lower] && cache[lower].plays) || 0
         };
-        localStorage.setItem('riff_artist_meta_cache', JSON.stringify(cache));
+        localStorage.setItem('melo_artist_meta_cache', JSON.stringify(cache));
       }
 
       if (!bioFromCache) {
@@ -9715,7 +9715,7 @@ function renderClickableArtists(container, rawArtist) {
     setNavCount(el.favoritesCount, state.favorites.length);
   }
 
-  const TRACK_SORT_KEYS = { favorites: 'riff_favorites_sort', playlist: 'riff_playlist_sort' };
+  const TRACK_SORT_KEYS = { favorites: 'melo_favorites_sort', playlist: 'melo_playlist_sort' };
 
   function getTrackSortMode(kind) {
     const stored = localStorage.getItem(TRACK_SORT_KEYS[kind]);
@@ -10658,7 +10658,7 @@ function renderClickableArtists(container, rawArtist) {
           if (viewName === 'discover') {
             if (el.viewDiscover) el.viewDiscover.classList.add('active');
             if (el.navDiscover) el.navDiscover.classList.add('active');
-            const sp = (localStorage.getItem('riff_home_layout') || 'spotify') === 'spotify';
+            const sp = (localStorage.getItem('melo_home_layout') || 'spotify') === 'spotify';
             if (sp) renderSpotifyHome();
           } else if (viewName === 'favorites') {
             if (el.viewFavorites) el.viewFavorites.classList.add('active');
@@ -10689,7 +10689,7 @@ function renderClickableArtists(container, rawArtist) {
           } else if (viewName === 'settings') {
             if (el.viewSettings) el.viewSettings.classList.add('active');
             if (el.navSettings) el.navSettings.classList.add('active');
-            const savedCat = localStorage.getItem('riff_settings_cat');
+            const savedCat = localStorage.getItem('melo_settings_cat');
             showSettingsCategory((savedCat === 'overview' || !savedCat) ? 'home' : savedCat);
             updateOfflineStorageUI();
             updateMusicFolderUI();
@@ -11228,7 +11228,7 @@ function bindCoverHoldZoom(wrapEl) {
     const panel = el.rightPanel || document.getElementById('right-panel');
     if (!edge || !panel) return;
 
-    const savedWidth = localStorage.getItem('riff_right_panel_width');
+    const savedWidth = localStorage.getItem('melo_right_panel_width');
     if (savedWidth) {
       const w = parseInt(savedWidth, 10);
       if (w >= 260 && w <= 720) {
@@ -11278,7 +11278,7 @@ function bindCoverHoldZoom(wrapEl) {
         raf = 0;
       }
       if (pendingW >= 260 && pendingW <= 720) {
-        localStorage.setItem('riff_right_panel_width', pendingW.toString());
+        localStorage.setItem('melo_right_panel_width', pendingW.toString());
       }
       if (typeof resizeCanvases === 'function') resizeCanvases();
     };
@@ -11289,7 +11289,7 @@ function bindCoverHoldZoom(wrapEl) {
     edge.addEventListener('dblclick', () => {
       panel.style.width = '340px';
       panel.style.setProperty('--right-panel-width', '340px');
-      localStorage.setItem('riff_right_panel_width', '340px');
+      localStorage.setItem('melo_right_panel_width', '340px');
       if (typeof resizeCanvases === 'function') resizeCanvases();
     });
   })();
@@ -11350,7 +11350,7 @@ function bindCoverHoldZoom(wrapEl) {
   function setPlatform(platform, triggerSearch = true) {
     if (!['youtube', 'ytmusic', 'soundcloud'].includes(platform)) platform = 'ytmusic';
     state.platform = platform;
-    localStorage.setItem('riff_platform', platform);
+    localStorage.setItem('melo_platform', platform);
 
     if (el.platformYt) el.platformYt.classList.toggle('active', platform === 'youtube');
     if (el.platformYtm) el.platformYtm.classList.toggle('active', platform === 'ytmusic');
@@ -11373,7 +11373,7 @@ function bindCoverHoldZoom(wrapEl) {
     }
   }
 
-  const savedPlatform = localStorage.getItem('riff_platform') || 'ytmusic';
+  const savedPlatform = localStorage.getItem('melo_platform') || 'ytmusic';
   setPlatform(savedPlatform, false);
 
   if (el.platformYt) el.platformYt.addEventListener('click', () => setPlatform('youtube'));
@@ -11421,7 +11421,7 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   const btnCompactEngineBtns = document.getElementById('btn-compact-engine-btns');
-  const isCompactEngine = localStorage.getItem('riff_compact_engine_btns') === '1';
+  const isCompactEngine = localStorage.getItem('melo_compact_engine_btns') === '1';
   document.body.classList.toggle('compact-engine-btns', isCompactEngine);
   if (btnCompactEngineBtns) {
     btnCompactEngineBtns.classList.toggle('active', isCompactEngine);
@@ -11429,14 +11429,14 @@ function bindCoverHoldZoom(wrapEl) {
       const next = !btnCompactEngineBtns.classList.contains('active');
       btnCompactEngineBtns.classList.toggle('active', next);
       document.body.classList.toggle('compact-engine-btns', next);
-      localStorage.setItem('riff_compact_engine_btns', next ? '1' : '0');
+      localStorage.setItem('melo_compact_engine_btns', next ? '1' : '0');
       updateEngineWidthVar();
       setTimeout(updateEngineWidthVar, 350);
     });
   }
 
   const btnHideEngineBtns = document.getElementById('btn-hide-engine-btns');
-  const isHideEngine = localStorage.getItem('riff_hide_engine_btns') === '1';
+  const isHideEngine = localStorage.getItem('melo_hide_engine_btns') === '1';
   document.body.classList.toggle('hide-engine-btns', isHideEngine);
   if (btnHideEngineBtns) {
     btnHideEngineBtns.classList.toggle('active', isHideEngine);
@@ -11444,7 +11444,7 @@ function bindCoverHoldZoom(wrapEl) {
       const next = !btnHideEngineBtns.classList.contains('active');
       btnHideEngineBtns.classList.toggle('active', next);
       document.body.classList.toggle('hide-engine-btns', next);
-      localStorage.setItem('riff_hide_engine_btns', next ? '1' : '0');
+      localStorage.setItem('melo_hide_engine_btns', next ? '1' : '0');
       updateEngineWidthVar();
       setTimeout(updateEngineWidthVar, 350);
     });
@@ -11457,7 +11457,7 @@ function bindCoverHoldZoom(wrapEl) {
       const next = !btnPersistSound.classList.contains('active');
       btnPersistSound.classList.toggle('active', next);
       soundPersistenceEnabled = next;
-      localStorage.setItem('riff_persist_sound_settings', next ? '1' : '0');
+      localStorage.setItem('melo_persist_sound_settings', next ? '1' : '0');
       if (next) persistSoundSettings();
     });
   }
@@ -11470,7 +11470,7 @@ function bindCoverHoldZoom(wrapEl) {
     el.btnShuffle.classList.toggle('active', state.isShuffle);
     el.btnShuffle.addEventListener('click', () => {
       state.isShuffle = !state.isShuffle;
-      localStorage.setItem('riff_shuffle', state.isShuffle ? '1' : '0');
+      localStorage.setItem('melo_shuffle', state.isShuffle ? '1' : '0');
       el.btnShuffle.classList.toggle('active', state.isShuffle);
     });
   }
@@ -11479,7 +11479,7 @@ function bindCoverHoldZoom(wrapEl) {
     el.btnRepeat.classList.toggle('active', state.isRepeat);
     el.btnRepeat.addEventListener('click', () => {
       state.isRepeat = !state.isRepeat;
-      localStorage.setItem('riff_repeat', state.isRepeat ? '1' : '0');
+      localStorage.setItem('melo_repeat', state.isRepeat ? '1' : '0');
       el.btnRepeat.classList.toggle('active', state.isRepeat);
     });
   }
@@ -11489,8 +11489,8 @@ function bindCoverHoldZoom(wrapEl) {
 
   function persistVolumeState() {
     try {
-      localStorage.setItem('riff_volume', String(state.volume));
-      localStorage.setItem('riff_muted', state.isMuted ? '1' : '0');
+      localStorage.setItem('melo_volume', String(state.volume));
+      localStorage.setItem('melo_muted', state.isMuted ? '1' : '0');
     } catch (e) {}
   }
 
@@ -12290,7 +12290,7 @@ function bindCoverHoldZoom(wrapEl) {
     el.themeModeBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         state.themeMode = btn.dataset.themeMode;
-        localStorage.setItem('riff_theme_mode', state.themeMode);
+        localStorage.setItem('melo_theme_mode', state.themeMode);
         updateThemeFromState();
       });
     });
@@ -12300,11 +12300,11 @@ function bindCoverHoldZoom(wrapEl) {
     el.themeSwatches.forEach(sw => {
       sw.addEventListener('click', () => {
         state.themeAccent = sw.dataset.color;
-        localStorage.setItem('riff_theme_accent', state.themeAccent);
+        localStorage.setItem('melo_theme_accent', state.themeAccent);
         if (state.themeMode === 'auto') {
           const targetMode = currentEffectiveMode || 'dark';
           state.themeMode = targetMode;
-          localStorage.setItem('riff_theme_mode', targetMode);
+          localStorage.setItem('melo_theme_mode', targetMode);
         }
         updateThemeFromState();
       });
@@ -12314,11 +12314,11 @@ function bindCoverHoldZoom(wrapEl) {
   if (el.customColorInput) {
     el.customColorInput.addEventListener('input', (e) => {
       state.themeAccent = e.target.value;
-      localStorage.setItem('riff_theme_accent', state.themeAccent);
+      localStorage.setItem('melo_theme_accent', state.themeAccent);
       if (state.themeMode === 'auto') {
         const targetMode = currentEffectiveMode || 'dark';
         state.themeMode = targetMode;
-        localStorage.setItem('riff_theme_mode', targetMode);
+        localStorage.setItem('melo_theme_mode', targetMode);
       }
       updateThemeFromState();
       if (el.themeSwatches) el.themeSwatches.forEach(sw => sw.classList.remove('active'));
@@ -12335,11 +12335,11 @@ function bindCoverHoldZoom(wrapEl) {
       const h = parseInt(e.target.value, 10);
       if (el.valHue) el.valHue.textContent = h + '°';
       state.themeAccent = hslToHex(h, 55, 50);
-      localStorage.setItem('riff_theme_accent', state.themeAccent);
+      localStorage.setItem('melo_theme_accent', state.themeAccent);
       if (state.themeMode === 'auto') {
         const targetMode = currentEffectiveMode || 'dark';
         state.themeMode = targetMode;
-        localStorage.setItem('riff_theme_mode', targetMode);
+        localStorage.setItem('melo_theme_mode', targetMode);
       }
       updateThemeFromState();
       if (el.themeSwatches) el.themeSwatches.forEach(sw => sw.classList.remove('active'));
@@ -12357,7 +12357,7 @@ function bindCoverHoldZoom(wrapEl) {
       state.themeIntensity = val;
       document.body.classList.toggle('intensity-zero', state.themeIntensity < 8);
       if (el.valIntensity) el.valIntensity.textContent = val + '%';
-      localStorage.setItem('riff_theme_intensity', val.toString());
+      localStorage.setItem('melo_theme_intensity', val.toString());
       updateThemeFromState();
     });
   }
@@ -12371,7 +12371,7 @@ function bindCoverHoldZoom(wrapEl) {
       const val = parseInt(e.target.value, 10);
       state.themeBrightness = val;
       if (el.valBrightness) el.valBrightness.textContent = val + '%';
-      localStorage.setItem('riff_theme_brightness', val.toString());
+      localStorage.setItem('melo_theme_brightness', val.toString());
       updateThemeFromState();
     });
   }
@@ -12399,7 +12399,7 @@ function bindCoverHoldZoom(wrapEl) {
       const val = parseInt(e.target.value, 10);
       if (el.valFontScale) el.valFontScale.textContent = `${val}%`;
       document.documentElement.style.setProperty('--font-scale', ((val / 100) * 0.95 * 1.25).toString());
-      localStorage.setItem('riff_font_scale', val.toString());
+      localStorage.setItem('melo_font_scale', val.toString());
       requestAnimationFrame(updateEngineWidthVar);
     });
   }
@@ -12415,12 +12415,12 @@ function bindCoverHoldZoom(wrapEl) {
   ].forEach(({ btn, key }) => {
     if (btn) {
       btn.addEventListener('click', () => {
-        localStorage.setItem('riff_font', key);
+        localStorage.setItem('melo_font', key);
         applyFont(key);
       });
     }
   });
-  applyFont(state.riffFont);
+  applyFont(state.meloFont);
 
   const ICON_PACKS = {
     sf: {
@@ -12516,7 +12516,7 @@ function bindCoverHoldZoom(wrapEl) {
     }
   }
 
-  const savedIconPack = localStorage.getItem('riff_icon_pack') || 'material';
+  const savedIconPack = localStorage.getItem('melo_icon_pack') || 'material';
   applyIconPack(savedIconPack);
 
   const iconPackDropdown = document.getElementById('icon-pack-dropdown');
@@ -12532,7 +12532,7 @@ function bindCoverHoldZoom(wrapEl) {
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         const val = opt.dataset.value;
-        localStorage.setItem('riff_icon_pack', val);
+        localStorage.setItem('melo_icon_pack', val);
         applyIconPack(val);
         iconPackDropdown.classList.remove('open');
       });
@@ -12562,7 +12562,7 @@ function bindCoverHoldZoom(wrapEl) {
     }
   }
 
-  const savedSearchPos = localStorage.getItem('riff_search_pos') || 'middle';
+  const savedSearchPos = localStorage.getItem('melo_search_pos') || 'middle';
   applySearchPos(savedSearchPos);
 
   const searchPosDropdown = document.getElementById('search-pos-dropdown');
@@ -12578,7 +12578,7 @@ function bindCoverHoldZoom(wrapEl) {
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         const val = opt.dataset.value;
-        localStorage.setItem('riff_search_pos', val);
+        localStorage.setItem('melo_search_pos', val);
         applySearchPos(val);
         searchPosDropdown.classList.remove('open');
       });
@@ -12610,7 +12610,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (el.valCornerRadius) el.valCornerRadius.textContent = val === 16 ? 'Default' : `${val}px`;
       document.documentElement.style.setProperty('--md-shape-corner-l', `${val}px`);
       document.documentElement.style.setProperty('--md-shape-corner-m', `${Math.max(0, val - 4)}px`);
-      localStorage.setItem('riff_corner_radius', val.toString());
+      localStorage.setItem('melo_corner_radius', val.toString());
     });
   }
 
@@ -12619,7 +12619,7 @@ function bindCoverHoldZoom(wrapEl) {
       const val = Math.max(20, Math.min(100, parseInt(e.target.value, 10) || 100));
       if (el.valUiAlpha) el.valUiAlpha.textContent = `${val}%`;
       document.documentElement.style.setProperty('--ui-alpha', `${val}%`);
-      localStorage.setItem('riff_ui_alpha', val.toString());
+      localStorage.setItem('melo_ui_alpha', val.toString());
       refreshCachedThemeColors();
     });
   }
@@ -12630,7 +12630,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (el.sliderUiAlpha) el.sliderUiAlpha.value = val;
       if (el.valUiAlpha) el.valUiAlpha.textContent = `${val}%`;
       document.documentElement.style.setProperty('--ui-alpha', `${val}%`);
-      localStorage.setItem('riff_ui_alpha', val.toString());
+      localStorage.setItem('melo_ui_alpha', val.toString());
       refreshCachedThemeColors();
     });
   }
@@ -12640,7 +12640,7 @@ function bindCoverHoldZoom(wrapEl) {
       const val = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 100));
       if (el.valTextAlpha) el.valTextAlpha.textContent = `${val}%`;
       document.documentElement.style.setProperty('--text-alpha', `${val}%`);
-      localStorage.setItem('riff_text_alpha', val.toString());
+      localStorage.setItem('melo_text_alpha', val.toString());
       refreshCachedThemeColors();
     });
   }
@@ -12651,7 +12651,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (el.sliderTextAlpha) el.sliderTextAlpha.value = val;
       if (el.valTextAlpha) el.valTextAlpha.textContent = `${val}%`;
       document.documentElement.style.setProperty('--text-alpha', `${val}%`);
-      localStorage.setItem('riff_text_alpha', val.toString());
+      localStorage.setItem('melo_text_alpha', val.toString());
       refreshCachedThemeColors();
     });
   }
@@ -12664,7 +12664,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (window.electronAPI && window.electronAPI.pickMedia) {
         const url = await window.electronAPI.pickMedia();
         if (url) {
-          localStorage.setItem('riff_banner_media', url);
+          localStorage.setItem('melo_banner_media', url);
           const thumb = getTrackThumbUrl(state.currentTrack);
           updateRightPanelBanner(thumb);
           updatePlaylistDetailBanner(thumb);
@@ -12675,7 +12675,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   if (btnResetBannerMedia) {
     btnResetBannerMedia.addEventListener('click', () => {
-      localStorage.removeItem('riff_banner_media');
+      localStorage.removeItem('melo_banner_media');
       const thumb = getTrackThumbUrl(state.currentTrack);
       updateRightPanelBanner(thumb);
       updatePlaylistDetailBanner(thumb);
@@ -12691,7 +12691,7 @@ function bindCoverHoldZoom(wrapEl) {
       const v = parseInt(e.target.value, 10);
       document.documentElement.style.setProperty('--banner-blur', `${v}px`);
       if (valBannerBlur) valBannerBlur.textContent = `${v}px`;
-      localStorage.setItem('riff_banner_blur', v.toString());
+      localStorage.setItem('melo_banner_blur', v.toString());
     });
   }
 
@@ -12704,7 +12704,7 @@ function bindCoverHoldZoom(wrapEl) {
       const v = parseInt(e.target.value, 10);
       document.documentElement.style.setProperty('--banner-opacity', `${v / 100}`);
       if (valBannerOpacity) valBannerOpacity.textContent = `${v}%`;
-      localStorage.setItem('riff_banner_opacity', v.toString());
+      localStorage.setItem('melo_banner_opacity', v.toString());
     });
   }
 
@@ -12723,7 +12723,7 @@ function bindCoverHoldZoom(wrapEl) {
         rightBanner.style.setProperty('--banner-fade-end', `${v}%`);
       }
       if (valBannerFade) valBannerFade.textContent = `${v}%`;
-      localStorage.setItem('riff_banner_fade', v.toString());
+      localStorage.setItem('melo_banner_fade', v.toString());
     });
   }
 
@@ -12773,7 +12773,7 @@ function bindCoverHoldZoom(wrapEl) {
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         const val = opt.dataset.value;
-        localStorage.setItem('riff_banner_fit', val);
+        localStorage.setItem('melo_banner_fit', val);
         applyBannerFit(val);
         if (bannerFitLabel) bannerFitLabel.textContent = opt.textContent;
         bannerFitMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.remove('selected'));
@@ -12805,9 +12805,9 @@ function bindCoverHoldZoom(wrapEl) {
   if (window.electronAPI && window.electronAPI.onWindowVisibility) window.electronAPI.onWindowVisibility(() => syncBgVideoPlayback());
 
   function updateCustomBg() {
-    const bgUrl = localStorage.getItem('riff_bg_url') || '';
-    const opacityVal = parseInt(localStorage.getItem('riff_bg_opacity') ?? '100', 10);
-    const blurVal = parseInt(localStorage.getItem('riff_bg_blur') ?? '0', 10);
+    const bgUrl = localStorage.getItem('melo_bg_url') || '';
+    const opacityVal = parseInt(localStorage.getItem('melo_bg_opacity') ?? '100', 10);
+    const blurVal = parseInt(localStorage.getItem('melo_bg_blur') ?? '0', 10);
     const isVideo = /\.(mp4|webm)($|\?)/i.test(bgUrl);
     document.body.classList.toggle('has-video-bg', isVideo && !!bgUrl);
 
@@ -12875,17 +12875,17 @@ function bindCoverHoldZoom(wrapEl) {
 
   function currentUiAlpha() { return Number(document.getElementById('slider-ui-alpha').value); }
   function setUiAlphaViaSlider(v) { const s = document.getElementById('slider-ui-alpha'); if (!s) return; s.value = v; s.dispatchEvent(new Event('input', { bubbles: true })); }
-  function backgroundActive() { return !!localStorage.getItem('riff_bg_url') || getAdv('cover_bg', true); }
+  function backgroundActive() { return !!localStorage.getItem('melo_bg_url') || getAdv('cover_bg', true); }
   function onBackgroundChanged(kind, enabled) {
     if (document.body.classList.contains('light') || document.body.getAttribute('data-theme') === 'light') return;
     if (!getAdv('ui_alpha_auto', true)) return;
     if (enabled) {
       const now = currentUiAlpha();
-      if (now > 50) { localStorage.setItem('riff_ui_alpha_prev', String(now)); setUiAlphaViaSlider(50); localStorage.setItem('riff_ui_alpha_auto', '50'); }
+      if (now > 50) { localStorage.setItem('melo_ui_alpha_prev', String(now)); setUiAlphaViaSlider(50); localStorage.setItem('melo_ui_alpha_auto', '50'); }
     } else if (!backgroundActive()) {
-      const auto = localStorage.getItem('riff_ui_alpha_auto'), prev = localStorage.getItem('riff_ui_alpha_prev');
+      const auto = localStorage.getItem('melo_ui_alpha_auto'), prev = localStorage.getItem('melo_ui_alpha_prev');
       if (auto !== null && prev !== null && currentUiAlpha() === Number(auto)) setUiAlphaViaSlider(Number(prev));
-      localStorage.removeItem('riff_ui_alpha_auto'); localStorage.removeItem('riff_ui_alpha_prev');
+      localStorage.removeItem('melo_ui_alpha_auto'); localStorage.removeItem('melo_ui_alpha_prev');
     }
   }
 
@@ -12894,7 +12894,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (window.electronAPI && window.electronAPI.pickMedia) {
         const url = await window.electronAPI.pickMedia();
         if (url) {
-          localStorage.setItem('riff_bg_url', url);
+          localStorage.setItem('melo_bg_url', url);
           updateCustomBg();
           onBackgroundChanged('custom', true);
         }
@@ -12904,7 +12904,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   if (btnRemoveCustomBg) {
     btnRemoveCustomBg.addEventListener('click', () => {
-      localStorage.removeItem('riff_bg_url');
+      localStorage.removeItem('melo_bg_url');
       updateCustomBg();
       onBackgroundChanged('custom', false);
     });
@@ -12914,7 +12914,7 @@ function bindCoverHoldZoom(wrapEl) {
     sliderBgOpacity.addEventListener('input', (e) => {
       const v = parseInt(e.target.value, 10);
       if (valBgOpacity) valBgOpacity.textContent = `${v}%`;
-      localStorage.setItem('riff_bg_opacity', String(v));
+      localStorage.setItem('melo_bg_opacity', String(v));
       const customBg = document.getElementById('custom-bg');
       if (customBg) customBg.style.opacity = (v / 100).toString();
     });
@@ -12924,7 +12924,7 @@ function bindCoverHoldZoom(wrapEl) {
     sliderBgBlur.addEventListener('input', (e) => {
       const v = parseInt(e.target.value, 10);
       if (valBgBlur) valBgBlur.textContent = `${v}px`;
-      localStorage.setItem('riff_bg_blur', String(v));
+      localStorage.setItem('melo_bg_blur', String(v));
       const customBg = document.getElementById('custom-bg');
       if (customBg) {
         customBg.style.filter = 'none';
@@ -12946,7 +12946,7 @@ function bindCoverHoldZoom(wrapEl) {
   const sliderCoverBgBrightness = document.getElementById('slider-cover-bg-brightness');
   const valCoverBgBrightness = document.getElementById('val-cover-bg-brightness');
   if (sliderCoverBgBrightness) {
-    const savedBrightness = parseInt(localStorage.getItem('riff_cover_bg_brightness') ?? '45', 10);
+    const savedBrightness = parseInt(localStorage.getItem('melo_cover_bg_brightness') ?? '45', 10);
     sliderCoverBgBrightness.value = savedBrightness;
     if (valCoverBgBrightness) valCoverBgBrightness.textContent = `${savedBrightness}%`;
     document.documentElement.style.setProperty('--cover-bg-brightness', (savedBrightness / 100).toString());
@@ -12954,7 +12954,7 @@ function bindCoverHoldZoom(wrapEl) {
     sliderCoverBgBrightness.addEventListener('input', (e) => {
       const v = parseInt(e.target.value, 10);
       if (valCoverBgBrightness) valCoverBgBrightness.textContent = `${v}%`;
-      localStorage.setItem('riff_cover_bg_brightness', String(v));
+      localStorage.setItem('melo_cover_bg_brightness', String(v));
       document.documentElement.style.setProperty('--cover-bg-brightness', (v / 100).toString());
     });
   }
@@ -12981,7 +12981,7 @@ function bindCoverHoldZoom(wrapEl) {
       const v = parseInt(e.target.value, 10);
       state.meshBrightness = v;
       if (valMeshBrightness) valMeshBrightness.textContent = `${v}%`;
-      localStorage.setItem('riff_mesh_brightness', v.toString());
+      localStorage.setItem('melo_mesh_brightness', v.toString());
       updateThemeFromState();
     });
   }
@@ -12995,7 +12995,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   let meshCfg = { ...DEFAULT_MESH_CFG };
   try {
-    const raw = localStorage.getItem('riff_mesh_cfg');
+    const raw = localStorage.getItem('melo_mesh_cfg');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.p1 && parsed.p2) {
@@ -13042,7 +13042,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (vlBlur) vlBlur.textContent = `${cfg.blur}px`;
 
     if (save) {
-      localStorage.setItem('riff_mesh_cfg', JSON.stringify(cfg));
+      localStorage.setItem('melo_mesh_cfg', JSON.stringify(cfg));
     }
   }
 
@@ -13189,7 +13189,7 @@ function bindCoverHoldZoom(wrapEl) {
         e.stopPropagation();
         const val = opt.dataset.value;
         state.paletteStyle = val;
-        localStorage.setItem('riff_palette_style', state.paletteStyle);
+        localStorage.setItem('melo_palette_style', state.paletteStyle);
         if (paletteLabel) paletteLabel.textContent = opt.textContent;
         paletteMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.remove('selected'));
         opt.classList.add('selected');
@@ -13206,7 +13206,7 @@ function bindCoverHoldZoom(wrapEl) {
   const btnToggleAdv = document.getElementById('btn-toggle-adv-section');
   const advWrapper = document.getElementById('adv-collapsible-wrapper');
   if (btnToggleAdv && advWrapper) {
-    const isAdvOpen = localStorage.getItem('riff_adv_open') === 'true';
+    const isAdvOpen = localStorage.getItem('melo_adv_open') === 'true';
     if (isAdvOpen) {
       btnToggleAdv.classList.add('is-open');
       advWrapper.classList.add('is-open');
@@ -13214,7 +13214,7 @@ function bindCoverHoldZoom(wrapEl) {
     btnToggleAdv.addEventListener('click', () => {
       const nowOpen = advWrapper.classList.toggle('is-open');
       btnToggleAdv.classList.toggle('is-open', nowOpen);
-      localStorage.setItem('riff_adv_open', nowOpen ? 'true' : 'false');
+      localStorage.setItem('melo_adv_open', nowOpen ? 'true' : 'false');
     });
   }
 
@@ -13301,21 +13301,21 @@ function bindCoverHoldZoom(wrapEl) {
 
   const btnSearchArtists = document.getElementById('btn-search-artists');
   if (btnSearchArtists) {
-    btnSearchArtists.classList.toggle('active', localStorage.getItem('riff_search_artists') !== '0');
+    btnSearchArtists.classList.toggle('active', localStorage.getItem('melo_search_artists') !== '0');
     btnSearchArtists.addEventListener('click', () => {
       const v = !btnSearchArtists.classList.contains('active');
       btnSearchArtists.classList.toggle('active', v);
-      localStorage.setItem('riff_search_artists', v ? '1' : '0');
+      localStorage.setItem('melo_search_artists', v ? '1' : '0');
     });
   }
 
   const btnSmooth = document.getElementById('btn-smooth-presets');
   if (btnSmooth) {
-    btnSmooth.classList.toggle('active', localStorage.getItem('riff_smooth_presets') !== 'false');
+    btnSmooth.classList.toggle('active', localStorage.getItem('melo_smooth_presets') !== 'false');
     btnSmooth.addEventListener('click', () => {
       const v = !btnSmooth.classList.contains('active');
       btnSmooth.classList.toggle('active', v);
-      localStorage.setItem('riff_smooth_presets', String(v));
+      localStorage.setItem('melo_smooth_presets', String(v));
     });
   }
   if (sidebarEl) {
@@ -13329,7 +13329,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   const btnShowLocal = document.getElementById('btn-show-local');
   function updateShowLocalUI(animate = false) {
-    const show = localStorage.getItem('riff_show_local') !== 'false';
+    const show = localStorage.getItem('melo_show_local') !== 'false';
     if (el.navLocal) el.navLocal.classList.toggle('nav-collapsed', !show);
     if (btnShowLocal) btnShowLocal.classList.toggle('active', show);
     if (!show && state.currentView === 'local') {
@@ -13349,15 +13349,15 @@ function bindCoverHoldZoom(wrapEl) {
   }
   if (btnShowLocal) {
     btnShowLocal.addEventListener('click', () => {
-      const show = localStorage.getItem('riff_show_local') !== 'false';
-      localStorage.setItem('riff_show_local', (!show) ? 'true' : 'false');
+      const show = localStorage.getItem('melo_show_local') !== 'false';
+      localStorage.setItem('melo_show_local', (!show) ? 'true' : 'false');
       updateShowLocalUI(true);
       refreshStacks();
     });
   }
   updateShowLocalUI(false);
 
-  const showAlbumsSaved = localStorage.getItem('riff_show_albums') === '1';
+  const showAlbumsSaved = localStorage.getItem('melo_show_albums') === '1';
   document.body.classList.toggle('hide-albums-tab', !showAlbumsSaved);
   const btnShowAlbums = document.getElementById('btn-show-albums');
   if (btnShowAlbums) {
@@ -13365,7 +13365,7 @@ function bindCoverHoldZoom(wrapEl) {
     btnShowAlbums.addEventListener('click', () => {
       const next = !btnShowAlbums.classList.contains('active');
       btnShowAlbums.classList.toggle('active', next);
-      localStorage.setItem('riff_show_albums', next ? '1' : '0');
+      localStorage.setItem('melo_show_albums', next ? '1' : '0');
       document.body.classList.toggle('hide-albums-tab', !next);
       if (!next && state.currentView === 'albums') {
         switchView('discover');
@@ -13379,14 +13379,14 @@ function bindCoverHoldZoom(wrapEl) {
     document.body.classList.toggle('no-hand-cursor', !!on);
   }
   const btnNoHandCursor = document.getElementById('btn-no-hand-cursor');
-  const noHand = localStorage.getItem('riff_no_hand_cursor') !== '0';
+  const noHand = localStorage.getItem('melo_no_hand_cursor') !== '0';
   applyNoHandCursor(noHand);
   if (btnNoHandCursor) {
     btnNoHandCursor.classList.toggle('active', noHand);
     btnNoHandCursor.addEventListener('click', () => {
       const next = !btnNoHandCursor.classList.contains('active');
       btnNoHandCursor.classList.toggle('active', next);
-      localStorage.setItem('riff_no_hand_cursor', next ? '1' : '0');
+      localStorage.setItem('melo_no_hand_cursor', next ? '1' : '0');
       applyNoHandCursor(next);
     });
   }
@@ -13395,19 +13395,19 @@ function bindCoverHoldZoom(wrapEl) {
     document.body.classList.toggle('highlight-buttons', !!on);
   }
   const btnHighlightButtons = document.getElementById('btn-highlight-buttons');
-  const initialHighlightButtons = localStorage.getItem('riff_highlight_buttons') !== '0';
+  const initialHighlightButtons = localStorage.getItem('melo_highlight_buttons') !== '0';
   applyHighlightButtons(initialHighlightButtons);
   if (btnHighlightButtons) {
     btnHighlightButtons.classList.toggle('active', initialHighlightButtons);
     btnHighlightButtons.addEventListener('click', () => {
       const next = !btnHighlightButtons.classList.contains('active');
       btnHighlightButtons.classList.toggle('active', next);
-      localStorage.setItem('riff_highlight_buttons', next ? '1' : '0');
+      localStorage.setItem('melo_highlight_buttons', next ? '1' : '0');
       applyHighlightButtons(next);
     });
   }
 
-  const RIFF_APP_ICONS = [
+  const MELO_APP_ICONS = [
     { id: '01-default.svg', label: 'Default' },
     { id: '02-editor.svg', label: 'Editor' },
     { id: '03-orbit.svg', label: 'Orbit' },
@@ -13426,8 +13426,8 @@ function bindCoverHoldZoom(wrapEl) {
     return '../../assets/' + val.replace(/^.*assets\//, '');
   }
   function applyHomeAppIcon(val) {
-    const chosen = val || localStorage.getItem('riff_app_icon') || '02-editor.svg';
-    localStorage.setItem('riff_app_icon', chosen);
+    const chosen = val || localStorage.getItem('melo_app_icon') || '02-editor.svg';
+    localStorage.setItem('melo_app_icon', chosen);
     const homeImg = document.getElementById('nav-home-app-icon');
     if (homeImg) homeImg.src = resolveAppIconSrc(chosen);
     const grid = document.getElementById('app-icon-picker-grid');
@@ -13439,10 +13439,10 @@ function bindCoverHoldZoom(wrapEl) {
   }
   function initAppIconPicker() {
     const grid = document.getElementById('app-icon-picker-grid');
-    const saved = localStorage.getItem('riff_app_icon') || '02-editor.svg';
+    const saved = localStorage.getItem('melo_app_icon') || '02-editor.svg';
     if (grid) {
       grid.innerHTML = '';
-      RIFF_APP_ICONS.forEach(item => {
+      MELO_APP_ICONS.forEach(item => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'app-icon-option' + (saved === item.id ? ' active' : '');
@@ -13517,8 +13517,8 @@ function bindCoverHoldZoom(wrapEl) {
 
   const btnWavyProgress = document.getElementById('btn-wavy-progress');
   function updateWavyProgressUI() {
-    const isWavy = localStorage.getItem('riff_wavy_progress') !== 'false';
-    const isPerf = localStorage.getItem('riff_perf_mode') === '1' || localStorage.getItem('riff_perf_mode') === 'true';
+    const isWavy = localStorage.getItem('melo_wavy_progress') !== 'false';
+    const isPerf = localStorage.getItem('melo_perf_mode') === '1' || localStorage.getItem('melo_perf_mode') === 'true';
     document.body.classList.toggle('no-wavy', isPerf ? true : !isWavy);
     if (btnWavyProgress) {
       btnWavyProgress.classList.toggle('active', isWavy);
@@ -13527,7 +13527,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   const btnProgressKnob = document.getElementById('btn-progress-knob');
   function updateProgressKnobUI() {
-    const isEnabled = localStorage.getItem('riff_progress_knob') === 'true';
+    const isEnabled = localStorage.getItem('melo_progress_knob') === 'true';
     document.body.classList.toggle('no-knob', !isEnabled);
     if (btnProgressKnob) {
       btnProgressKnob.classList.toggle('active', isEnabled);
@@ -13536,7 +13536,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   const btnProgressBg = document.getElementById('btn-progress-bg');
   function updateProgressBgUI() {
-    const isEnabled = localStorage.getItem('riff_progress_bg') === 'true';
+    const isEnabled = localStorage.getItem('melo_progress_bg') === 'true';
     document.body.classList.toggle('no-progress-bg', !isEnabled);
     if (btnProgressBg) {
       btnProgressBg.classList.toggle('active', isEnabled);
@@ -13585,8 +13585,8 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   function m3cEnabled() {
-    const barOn = localStorage.getItem('riff_m3_cover') !== '0';
-    const heroOn = localStorage.getItem('riff_m3_hero_covers') === '1';
+    const barOn = localStorage.getItem('melo_m3_cover') !== '0';
+    const heroOn = localStorage.getItem('melo_m3_hero_covers') === '1';
     return (barOn || heroOn) && !document.body.classList.contains('perf');
   }
   function m3cInit() {
@@ -13624,7 +13624,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (url) m3c.img.src = url;
   }
   function m3cShapeRadii(now) {
-    const S = window.RiffShapes;
+    const S = window.meloShapes;
     if (!S || !S.ready()) return null;
     if (!m3c.start) { m3c.start = now; m3c.from = 0; m3c.to = 0; }
     if (now - m3c.start >= S.HOLD_MS) { m3c.from = m3c.to; m3c.to = S.next(m3c.from); m3c.start = now; }
@@ -13633,7 +13633,7 @@ function bindCoverHoldZoom(wrapEl) {
   }
   function m3cDraw(now) {
     const ctx = m3c.ctx;
-    const S = window.RiffShapes;
+    const S = window.meloShapes;
     if (!ctx || !S) return;
     const sh = m3cShapeRadii(now);
     if (!sh) return;
@@ -13782,13 +13782,13 @@ function bindCoverHoldZoom(wrapEl) {
 
   function applyPerfMode(on) {
     document.body.classList.toggle('perf', !!on);
-    const isWavy = localStorage.getItem('riff_wavy_progress') !== 'false';
+    const isWavy = localStorage.getItem('melo_wavy_progress') !== 'false';
     document.body.classList.toggle('no-wavy', on ? true : !isWavy);
     syncBgVideoPlayback();
     applyM3Cover();
   }
   const btnBarWave = document.getElementById('btn-bar-wave');
-  const barWaveOn = localStorage.getItem('riff_bar_wave') !== '0';
+  const barWaveOn = localStorage.getItem('melo_bar_wave') !== '0';
   function applyBarWave(on) {
     const vc = document.getElementById('visualizer-container');
     if (vc) {
@@ -13823,13 +13823,13 @@ function bindCoverHoldZoom(wrapEl) {
     btnBarWave.addEventListener('click', () => {
       const next = !btnBarWave.classList.contains('active');
       btnBarWave.classList.toggle('active', next);
-      localStorage.setItem('riff_bar_wave', next ? '1' : '0');
+      localStorage.setItem('melo_bar_wave', next ? '1' : '0');
       applyBarWave(next);
     });
   }
 
   const barVizPosGroup = document.getElementById('bar-viz-pos-group');
-  const initialBarVizPos = localStorage.getItem('riff_bar_viz_pos') || 'behind';
+  const initialBarVizPos = localStorage.getItem('melo_bar_viz_pos') || 'behind';
   function applyBarVizPos(pos) {
     document.body.classList.toggle('bar-viz-behind', pos === 'behind');
     if (barVizPosGroup) {
@@ -13844,7 +13844,7 @@ function bindCoverHoldZoom(wrapEl) {
     barVizPosGroup.querySelectorAll('.theme-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const pos = btn.getAttribute('data-bar-viz-pos') || 'behind';
-        localStorage.setItem('riff_bar_viz_pos', pos);
+        localStorage.setItem('melo_bar_viz_pos', pos);
         applyBarVizPos(pos);
       });
     });
@@ -13852,7 +13852,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   const sliderBarVizOpacity = document.getElementById('slider-bar-viz-opacity');
   const valBarVizOpacity = document.getElementById('val-bar-viz-opacity');
-  const initialBarVizOpacity = localStorage.getItem('riff_bar_viz_opacity') || '22';
+  const initialBarVizOpacity = localStorage.getItem('melo_bar_viz_opacity') || '22';
   function applyBarVizOpacity(v) {
     const num = parseInt(v, 10);
     document.documentElement.style.setProperty('--bar-viz-opacity', (num / 100).toString());
@@ -13863,7 +13863,7 @@ function bindCoverHoldZoom(wrapEl) {
   if (sliderBarVizOpacity) {
     const onOpInput = (e) => {
       const v = e.target.value;
-      localStorage.setItem('riff_bar_viz_opacity', v);
+      localStorage.setItem('melo_bar_viz_opacity', v);
       applyBarVizOpacity(v);
     };
     sliderBarVizOpacity.addEventListener('input', onOpInput);
@@ -13873,14 +13873,14 @@ function bindCoverHoldZoom(wrapEl) {
   const btnVizConnected = document.getElementById('btn-viz-connected');
   const btnTvkVizConnected = document.getElementById('btn-tvk-viz-connected');
   function syncVizConnectedUI() {
-    const isConn = localStorage.getItem('riff_viz_connected') === '1';
+    const isConn = localStorage.getItem('melo_viz_connected') === '1';
     if (btnVizConnected) btnVizConnected.classList.toggle('active', isConn);
     if (btnTvkVizConnected) btnTvkVizConnected.classList.toggle('active', isConn);
   }
   function toggleVizConnected() {
-    const isConn = localStorage.getItem('riff_viz_connected') === '1';
+    const isConn = localStorage.getItem('melo_viz_connected') === '1';
     const next = !isConn;
-    localStorage.setItem('riff_viz_connected', next ? '1' : '0');
+    localStorage.setItem('melo_viz_connected', next ? '1' : '0');
     syncVizConnectedUI();
   }
   if (btnVizConnected) btnVizConnected.addEventListener('click', toggleVizConnected);
@@ -13889,20 +13889,20 @@ function bindCoverHoldZoom(wrapEl) {
 
   const toggleM3Cover = document.getElementById('toggle-m3-cover');
   if (toggleM3Cover) {
-    const saved = localStorage.getItem('riff_m3_cover');
+    const saved = localStorage.getItem('melo_m3_cover');
     const isM3On = saved !== '0';
     toggleM3Cover.classList.toggle('active', isM3On);
     toggleM3Cover.addEventListener('click', () => {
       const next = !toggleM3Cover.classList.contains('active');
       toggleM3Cover.classList.toggle('active', next);
-      localStorage.setItem('riff_m3_cover', next ? '1' : '0');
+      localStorage.setItem('melo_m3_cover', next ? '1' : '0');
       applyM3Cover();
     });
   }
 
   const toggleM3Hero = document.getElementById('toggle-m3-hero-covers');
   if (toggleM3Hero) {
-    const isHeroOn = localStorage.getItem('riff_m3_hero_covers') === '1';
+    const isHeroOn = localStorage.getItem('melo_m3_hero_covers') === '1';
     toggleM3Hero.classList.toggle('active', isHeroOn);
     document.body.classList.toggle('m3-hero-covers-on', isHeroOn);
     toggleM3Hero.onclick = (e) => {
@@ -13911,34 +13911,34 @@ function bindCoverHoldZoom(wrapEl) {
       const next = !toggleM3Hero.classList.contains('active');
       toggleM3Hero.classList.toggle('active', next);
       document.body.classList.toggle('m3-hero-covers-on', next);
-      localStorage.setItem('riff_m3_hero_covers', next ? '1' : '0');
+      localStorage.setItem('melo_m3_hero_covers', next ? '1' : '0');
       if (typeof m3cStart === 'function') m3cStart();
     };
   }
 
   const toggleExplicitTag = document.getElementById('toggle-explicit-tag');
-  const isExplicitOn = localStorage.getItem('riff_show_explicit') !== '0';
+  const isExplicitOn = localStorage.getItem('melo_show_explicit') !== '0';
   document.body.classList.toggle('hide-explicit-badges', !isExplicitOn);
   if (toggleExplicitTag) {
     toggleExplicitTag.classList.toggle('active', isExplicitOn);
     toggleExplicitTag.addEventListener('click', () => {
       const next = !toggleExplicitTag.classList.contains('active');
       toggleExplicitTag.classList.toggle('active', next);
-      localStorage.setItem('riff_show_explicit', next ? '1' : '0');
+      localStorage.setItem('melo_show_explicit', next ? '1' : '0');
       document.body.classList.toggle('hide-explicit-badges', !next);
     });
   }
 
-  updateTvkVisualizerSetting(localStorage.getItem('riff_tvk_visualizer') !== 'false');
-  updateTvkVisualizerLyricsSetting(localStorage.getItem('riff_tvk_visualizer_lyrics') !== 'false');
-  updateTvkVisualizerOpacity(parseInt(localStorage.getItem('riff_tvk_visualizer_opacity') || '85', 10));
+  updateTvkVisualizerSetting(localStorage.getItem('melo_tvk_visualizer') !== 'false');
+  updateTvkVisualizerLyricsSetting(localStorage.getItem('melo_tvk_visualizer_lyrics') !== 'false');
+  updateTvkVisualizerOpacity(parseInt(localStorage.getItem('melo_tvk_visualizer_opacity') || '85', 10));
 
   const btnPerfMode = document.getElementById('btn-perf-mode');
-  const initialPerfMode = localStorage.getItem('riff_perf_mode') === '1';
+  const initialPerfMode = localStorage.getItem('melo_perf_mode') === '1';
   applyPerfMode(initialPerfMode);
   document.body.classList.toggle('perf', initialPerfMode);
   document.documentElement.classList.remove('force-reduced-motion');
-  localStorage.setItem('riff_perf_mode', initialPerfMode ? '1' : '0');
+  localStorage.setItem('melo_perf_mode', initialPerfMode ? '1' : '0');
   if (btnPerfMode) btnPerfMode.classList.toggle('active', initialPerfMode);
   applyLyricsEase();
   updateNavIndicator(true);
@@ -13946,16 +13946,16 @@ function bindCoverHoldZoom(wrapEl) {
     btnPerfMode.addEventListener('click', () => {
       const next = !btnPerfMode.classList.contains('active');
       btnPerfMode.classList.toggle('active', next);
-      localStorage.setItem('riff_perf_mode', next ? '1' : '0');
+      localStorage.setItem('melo_perf_mode', next ? '1' : '0');
       applyPerfMode(next);
     });
   }
 
   if (btnWavyProgress) {
     btnWavyProgress.addEventListener('click', () => {
-      const isWavy = localStorage.getItem('riff_wavy_progress') !== 'false';
+      const isWavy = localStorage.getItem('melo_wavy_progress') !== 'false';
       const next = !isWavy;
-      localStorage.setItem('riff_wavy_progress', next ? 'true' : 'false');
+      localStorage.setItem('melo_wavy_progress', next ? 'true' : 'false');
       updateWavyProgressUI();
       hasDrawnPausedFrame = false;
     });
@@ -13963,9 +13963,9 @@ function bindCoverHoldZoom(wrapEl) {
 
   if (btnProgressKnob) {
     btnProgressKnob.addEventListener('click', () => {
-      const isKnob = localStorage.getItem('riff_progress_knob') === 'true';
+      const isKnob = localStorage.getItem('melo_progress_knob') === 'true';
       const next = !isKnob;
-      localStorage.setItem('riff_progress_knob', next ? 'true' : 'false');
+      localStorage.setItem('melo_progress_knob', next ? 'true' : 'false');
       updateProgressKnobUI();
       hasDrawnPausedFrame = false;
       if (!animationFrameId && typeof startVisualizers === 'function') startVisualizers();
@@ -13974,9 +13974,9 @@ function bindCoverHoldZoom(wrapEl) {
 
   if (btnProgressBg) {
     btnProgressBg.addEventListener('click', () => {
-      const isBg = localStorage.getItem('riff_progress_bg') === 'true';
+      const isBg = localStorage.getItem('melo_progress_bg') === 'true';
       const next = !isBg;
-      localStorage.setItem('riff_progress_bg', next ? 'true' : 'false');
+      localStorage.setItem('melo_progress_bg', next ? 'true' : 'false');
       updateProgressBgUI();
       hasDrawnPausedFrame = false;
       if (!animationFrameId && typeof startVisualizers === 'function') startVisualizers();
@@ -13988,7 +13988,7 @@ function bindCoverHoldZoom(wrapEl) {
   updateProgressBgUI();
 
   const btnTrayOnClose = document.getElementById('btn-tray-on-close');
-  const storedTrayOnClose = localStorage.getItem('riff_tray_on_close');
+  const storedTrayOnClose = localStorage.getItem('melo_tray_on_close');
   const savedTrayOnClose = storedTrayOnClose !== null
     ? storedTrayOnClose === 'true'
     : /Windows|Mac/.test(navigator.userAgent);
@@ -13997,7 +13997,7 @@ function bindCoverHoldZoom(wrapEl) {
     btnTrayOnClose.addEventListener('click', () => {
       const next = !btnTrayOnClose.classList.contains('active');
       btnTrayOnClose.classList.toggle('active', next);
-      localStorage.setItem('riff_tray_on_close', next ? 'true' : 'false');
+      localStorage.setItem('melo_tray_on_close', next ? 'true' : 'false');
       if (window.electronAPI && window.electronAPI.setTrayOnClose) {
         window.electronAPI.setTrayOnClose(next);
       }
@@ -14023,7 +14023,7 @@ function bindCoverHoldZoom(wrapEl) {
     document.querySelectorAll('#view-settings .settings-section').forEach(s => s.classList.toggle('cat-hidden', s.dataset.cat !== cat));
     document.querySelectorAll('#settings-nav .settings-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
     const pane = document.querySelector('#view-settings .settings-pane'); if (pane) pane.scrollTop = 0;
-    try { localStorage.setItem('riff_settings_cat', cat); } catch (e) {}
+    try { localStorage.setItem('melo_settings_cat', cat); } catch (e) {}
     if (cat === 'custom-themes' && typeof renderThemeCards === 'function') renderThemeCards();
     if (cat === 'plugins' && typeof reloadPluginsList === 'function') reloadPluginsList();
     refreshStacks();
@@ -14077,18 +14077,18 @@ function bindCoverHoldZoom(wrapEl) {
   let appCssCache = null;
 
   function applyCustomStyles() {
-    document.querySelectorAll('style[data-riff-custom]').forEach((n) => n.remove());
+    document.querySelectorAll('style[data-melo-custom]').forEach((n) => n.remove());
     customThemes.filter((t) => t.enabled).forEach((t) => {
       const s = document.createElement('style');
-      s.dataset.riffCustom = 'theme';
+      s.dataset.meloCustom = 'theme';
       s.dataset.themeId = t.id;
       s.textContent = t.css;
       document.head.appendChild(s);
     });
-    const userCss = localStorage.getItem('riff_custom_css') || '';
+    const userCss = localStorage.getItem('melo_custom_css') || '';
     if (userCss.trim()) {
       const s = document.createElement('style');
-      s.dataset.riffCustom = 'user';
+      s.dataset.meloCustom = 'user';
       s.textContent = userCss;
       document.head.appendChild(s);
     }
@@ -14096,9 +14096,9 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   function resetCustomStyling() {
-    const userCss = localStorage.getItem('riff_custom_css') || '';
-    if (userCss.trim()) localStorage.setItem('riff_custom_css_backup', userCss);
-    localStorage.removeItem('riff_custom_css');
+    const userCss = localStorage.getItem('melo_custom_css') || '';
+    if (userCss.trim()) localStorage.setItem('melo_custom_css_backup', userCss);
+    localStorage.removeItem('melo_custom_css');
     customThemes.forEach((t) => { t.enabled = false; });
     if (window.electronAPI && window.electronAPI.disableAllThemes) window.electronAPI.disableAllThemes();
     if (typeof cssEditorInstance !== 'undefined' && cssEditorInstance) cssEditorInstance.setValue('');
@@ -14220,7 +14220,7 @@ function bindCoverHoldZoom(wrapEl) {
     showToast(`Plugin ${file} failed: ${e && e.message ? e.message : e}`, 'error');
   }
   function createPluginApi(p) {
-    const prefix = `riff_plugin_${p.file}_`;
+    const prefix = `melo_plugin_${p.file}_`;
     return {
       plugin: { file: p.file, name: p.name, author: p.author, version: p.version },
       on(event, cb) {
@@ -14231,7 +14231,7 @@ function bindCoverHoldZoom(wrapEl) {
       toast: (message, type) => showToast(String(message), type || 'info'),
       addStyle(css) {
         const s = document.createElement('style');
-        s.dataset.riffCustom = 'plugin';
+        s.dataset.meloCustom = 'plugin';
         s.dataset.plugin = p.file;
         s.textContent = css;
         document.head.appendChild(s);
@@ -14251,7 +14251,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (loadedPlugins.has(p.file)) return;
     try {
       const api = createPluginApi(p);
-      const fn = new Function('Riff', 'plugin', `${p.code}\n//# sourceURL=riff-plugin-${p.file}`);
+      const fn = new Function('melo', 'plugin', `${p.code}\n//# sourceURL=melo-plugin-${p.file}`);
       const result = fn(api, api.plugin);
       loadedPlugins.set(p.file, { stop: result && typeof result.stop === 'function' ? result.stop : null });
     } catch (e) { reportPluginError(p.file, e); }
@@ -14263,7 +14263,7 @@ function bindCoverHoldZoom(wrapEl) {
     document.querySelectorAll(`style[data-plugin="${p.file}"]`).forEach((n) => n.remove());
     const hadStop = !!(entry && entry.stop);
     loadedPlugins.delete(p.file);
-    if (!silent && !hadStop) showToast(`Restart Riff to fully unload "${p.name}"`, 'info');
+    if (!silent && !hadStop) showToast(`Restart melo to fully unload "${p.name}"`, 'info');
   }
   let pluginsCache = [];
   function renderPluginCards() {
@@ -14351,15 +14351,15 @@ function bindCoverHoldZoom(wrapEl) {
     return cssEditorLoading;
   }
 
-  function defineRiffMonacoTheme(monaco) {
+  function definemeloMonacoTheme(monaco) {
     const cs = getComputedStyle(document.documentElement);
     const hex = (name, fallback) => { const v = cs.getPropertyValue(name).trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : fallback; };
     const bg = hex('--md-sys-color-surface-container-lowest-solid', '#141218');
     const high = hex('--md-sys-color-surface-container-high-solid', '#2b2930');
     const primary = hex('--md-sys-color-primary', '#d0bcff');
     const lum = (h) => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
-    monaco.editor.defineTheme('riff', { base: lum(bg) < 0.5 ? 'vs-dark' : 'vs', inherit: true, rules: [], colors: { 'editor.background': bg, 'editorGutter.background': bg, 'minimap.background': bg, 'editor.lineHighlightBackground': high, 'editorCursor.foreground': primary, 'editor.selectionBackground': primary + '55' } });
-    monaco.editor.setTheme('riff');
+    monaco.editor.defineTheme('melo', { base: lum(bg) < 0.5 ? 'vs-dark' : 'vs', inherit: true, rules: [], colors: { 'editor.background': bg, 'editorGutter.background': bg, 'minimap.background': bg, 'editor.lineHighlightBackground': high, 'editorCursor.foreground': primary, 'editor.selectionBackground': primary + '55' } });
+    monaco.editor.setTheme('melo');
   }
 
   async function openCssEditor() {
@@ -14367,12 +14367,12 @@ function bindCoverHoldZoom(wrapEl) {
     overlay.classList.remove('hidden');
     let monaco;
     try { monaco = await loadMonaco(); } catch (e) { overlay.classList.add('hidden'); showToast('Could not load the CSS editor', 'error'); return; }
-    defineRiffMonacoTheme(monaco);
+    definemeloMonacoTheme(monaco);
     if (cssEditorInstance) { cssEditorInstance.focus(); return; }
     cssEditorInstance = monaco.editor.create(document.getElementById('css-editor-host'), {
-      value: localStorage.getItem('riff_custom_css') || '/* Your CSS goes here. Example:\n.btn-pill-primary { border-radius: 8px; }\n*/\n',
+      value: localStorage.getItem('melo_custom_css') || '/* Your CSS goes here. Example:\n.btn-pill-primary { border-radius: 8px; }\n*/\n',
       language: 'css',
-      theme: 'riff',
+      theme: 'melo',
       automaticLayout: true,
       minimap: { enabled: true },
       fontSize: 14,
@@ -14392,7 +14392,7 @@ function bindCoverHoldZoom(wrapEl) {
     cssEditorInstance.onDidChangeModelContent(() => {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        localStorage.setItem('riff_custom_css', cssEditorInstance.getValue());
+        localStorage.setItem('melo_custom_css', cssEditorInstance.getValue());
         applyCustomStyles();
       }, 350);
     });
@@ -14405,17 +14405,17 @@ function bindCoverHoldZoom(wrapEl) {
   if (btnCssClose) btnCssClose.addEventListener('click', () => document.getElementById('css-editor').classList.add('hidden'));
   const btnCssClear = document.getElementById('btn-css-clear');
   if (btnCssClear) btnCssClear.addEventListener('click', () => {
-    const current = localStorage.getItem('riff_custom_css') || '';
-    if (current.trim()) localStorage.setItem('riff_custom_css_backup', current);
+    const current = localStorage.getItem('melo_custom_css') || '';
+    if (current.trim()) localStorage.setItem('melo_custom_css_backup', current);
     if (cssEditorInstance) cssEditorInstance.setValue('');
-    else { localStorage.removeItem('riff_custom_css'); applyCustomStyles(); }
+    else { localStorage.removeItem('melo_custom_css'); applyCustomStyles(); }
   });
   const btnCssRestore = document.getElementById('btn-css-restore');
   if (btnCssRestore) btnCssRestore.addEventListener('click', () => {
-    const backup = localStorage.getItem('riff_custom_css_backup');
+    const backup = localStorage.getItem('melo_custom_css_backup');
     if (!backup) { showToast('Nothing to restore', 'info'); return; }
     if (cssEditorInstance) cssEditorInstance.setValue(backup);
-    else { localStorage.setItem('riff_custom_css', backup); applyCustomStyles(); }
+    else { localStorage.setItem('melo_custom_css', backup); applyCustomStyles(); }
   });
 
   function addSliderTicks(input) {
@@ -14471,13 +14471,13 @@ function bindCoverHoldZoom(wrapEl) {
     settingWinMediaKeys.style.display = isWindows ? '' : 'none';
   }
 
-  const savedWinMediaKeys = localStorage.getItem('riff_global_media_keys') !== 'false';
+  const savedWinMediaKeys = localStorage.getItem('melo_global_media_keys') !== 'false';
   if (btnWinMediaKeys) {
     btnWinMediaKeys.classList.toggle('active', savedWinMediaKeys);
     btnWinMediaKeys.addEventListener('click', () => {
       const next = !btnWinMediaKeys.classList.contains('active');
       btnWinMediaKeys.classList.toggle('active', next);
-      localStorage.setItem('riff_global_media_keys', next ? 'true' : 'false');
+      localStorage.setItem('melo_global_media_keys', next ? 'true' : 'false');
       if (window.electronAPI && window.electronAPI.setMediaKeys) {
         window.electronAPI.setMediaKeys(next);
       }
@@ -14505,12 +14505,12 @@ function bindCoverHoldZoom(wrapEl) {
       }
     }
     if (d.toggles) {
-      setSwitch(document.getElementById('btn-show-local'), d.toggles.riff_show_local);
-      setSwitch(document.getElementById('btn-search-artists'), d.toggles.riff_search_artists);
-      setSwitch(document.getElementById('btn-no-hand-cursor'), d.toggles.riff_no_hand_cursor);
-      setSwitch(document.getElementById('btn-perf-mode'), d.toggles.riff_perf_mode);
-      if (d.toggles.riff_custom_bg_enabled && d.background) {
-        localStorage.setItem('riff_bg_url', d.background);
+      setSwitch(document.getElementById('btn-show-local'), d.toggles.melo_show_local);
+      setSwitch(document.getElementById('btn-search-artists'), d.toggles.melo_search_artists);
+      setSwitch(document.getElementById('btn-no-hand-cursor'), d.toggles.melo_no_hand_cursor);
+      setSwitch(document.getElementById('btn-perf-mode'), d.toggles.melo_perf_mode);
+      if (d.toggles.melo_custom_bg_enabled && d.background) {
+        localStorage.setItem('melo_bg_url', d.background);
         if (typeof updateCustomBg === 'function') updateCustomBg();
         if (typeof onBackgroundChanged === 'function') onBackgroundChanged('custom', true);
       }
@@ -14526,14 +14526,14 @@ function bindCoverHoldZoom(wrapEl) {
       const btnConfirm = document.getElementById('btn-confirm-spotify-import');
       if (btnConfirm) btnConfirm.click();
     }
-    showToast('Welcome to Riff!', 'info');
+    showToast('Welcome to melo!', 'info');
   }
   if (window.electronAPI && window.electronAPI.onWelcomeResult) window.electronAPI.onWelcomeResult((d) => applyWelcomeResult(d));
 
   function checkCompactLayout() {
     const isMini = window.innerWidth <= 520;
     document.body.classList.toggle('mini', isMini);
-    const savedLyricsOn = localStorage.getItem('riff_mini_lyrics') === '1';
+    const savedLyricsOn = localStorage.getItem('melo_mini_lyrics') === '1';
     document.body.classList.toggle('mini-lyrics-on', isMini && savedLyricsOn);
     const btn = document.getElementById('btn-mini-lyrics');
     if (btn) btn.classList.toggle('active', isMini && savedLyricsOn);
@@ -14549,7 +14549,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (window.electronAPI && window.electronAPI.toggleMiniWindow) {
       const isNowMini = await window.electronAPI.toggleMiniWindow();
       if (isNowMini) {
-        const savedLyricsOn = localStorage.getItem('riff_mini_lyrics') === '1';
+        const savedLyricsOn = localStorage.getItem('melo_mini_lyrics') === '1';
         if (savedLyricsOn && window.electronAPI.setMiniLyrics) {
           await window.electronAPI.setMiniLyrics(true);
         }
@@ -14572,7 +14572,7 @@ function bindCoverHoldZoom(wrapEl) {
   if (btnMiniLyrics) {
     btnMiniLyrics.addEventListener('click', async () => {
       const nextOn = !document.body.classList.contains('mini-lyrics-on');
-      localStorage.setItem('riff_mini_lyrics', nextOn ? '1' : '0');
+      localStorage.setItem('melo_mini_lyrics', nextOn ? '1' : '0');
       document.body.classList.toggle('mini-lyrics-on', nextOn);
       btnMiniLyrics.classList.toggle('active', nextOn);
       if (window.electronAPI && window.electronAPI.setMiniLyrics) {
@@ -14588,20 +14588,20 @@ function bindCoverHoldZoom(wrapEl) {
   const sliderCrossfade = document.getElementById('slider-crossfade');
   const valCrossfade = document.getElementById('val-crossfade');
   if (sliderCrossfade) {
-    const cf = parseInt(localStorage.getItem('riff_crossfade') || '0', 10);
+    const cf = parseInt(localStorage.getItem('melo_crossfade') || '0', 10);
     sliderCrossfade.value = cf;
     if (valCrossfade) valCrossfade.textContent = cf > 0 ? `${cf}s` : 'Off';
     sliderCrossfade.addEventListener('input', (e) => {
       const v = parseInt(e.target.value, 10);
       if (valCrossfade) valCrossfade.textContent = v > 0 ? `${v}s` : 'Off';
-      localStorage.setItem('riff_crossfade', String(v));
+      localStorage.setItem('melo_crossfade', String(v));
     });
   }
 
   if (el.btnTrEnabled) {
     el.btnTrEnabled.addEventListener('click', () => {
       state.trEnabled = !state.trEnabled;
-      localStorage.setItem('riff_tr_enabled', String(state.trEnabled));
+      localStorage.setItem('melo_tr_enabled', String(state.trEnabled));
       updateLyricsTranslationUI();
       if (!state.trEnabled) {
         state.trActive = false;
@@ -14642,7 +14642,7 @@ function bindCoverHoldZoom(wrapEl) {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           state.trLang = item.code;
-          localStorage.setItem('riff_tr_lang', state.trLang);
+          localStorage.setItem('melo_tr_lang', state.trLang);
           if (trLangLabel) trLangLabel.textContent = text;
           trLangMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.remove('selected'));
           btn.classList.add('selected');
@@ -14716,7 +14716,7 @@ function bindCoverHoldZoom(wrapEl) {
   const uiLangSearch = document.getElementById('ui-lang-search');
 
   if (uiLangDropdown && uiLangTrigger && uiLangMenu) {
-    const curLang = localStorage.getItem('riff_ui_lang') || 'en';
+    const curLang = localStorage.getItem('melo_ui_lang') || 'en';
     const foundCur = TRANSLATION_LANGUAGES.find(l => l.code === curLang);
     if (foundCur && uiLangLabel) {
       uiLangLabel.textContent = `${foundCur.flag} ${foundCur.name} (${foundCur.code})`;
@@ -14737,8 +14737,8 @@ function bindCoverHoldZoom(wrapEl) {
         }
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const prevLang = localStorage.getItem('riff_ui_lang') || 'en';
-          localStorage.setItem('riff_ui_lang', item.code);
+          const prevLang = localStorage.getItem('melo_ui_lang') || 'en';
+          localStorage.setItem('melo_ui_lang', item.code);
           if (uiLangLabel) uiLangLabel.textContent = text;
           uiLangMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.remove('selected'));
           btn.classList.add('selected');
@@ -14845,7 +14845,7 @@ function bindCoverHoldZoom(wrapEl) {
   if (el.btnTrAuto) {
     el.btnTrAuto.addEventListener('click', () => {
       state.trAuto = !state.trAuto;
-      localStorage.setItem('riff_tr_auto', String(state.trAuto));
+      localStorage.setItem('melo_tr_auto', String(state.trAuto));
       updateLyricsTranslationUI();
       if (state.trEnabled && state.trAuto && !state.trActive) {
         state.trActive = true;
@@ -14877,7 +14877,7 @@ function bindCoverHoldZoom(wrapEl) {
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         const val = opt.dataset.value;
-        localStorage.setItem('riff_lyrics_ease', val);
+        localStorage.setItem('melo_lyrics_ease', val);
         if (lyricsEaseLabel) lyricsEaseLabel.textContent = opt.textContent;
         lyricsEaseMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.toggle('selected', o === opt));
         applyLyricsEase();
@@ -14900,7 +14900,7 @@ function bindCoverHoldZoom(wrapEl) {
     sliderLyricsSpeed.addEventListener('input', () => {
       const val = parseInt(sliderLyricsSpeed.value, 10) / 10;
       valLyricsSpeed.textContent = `${val.toFixed(1)}x`;
-      localStorage.setItem('riff_lyrics_speed', val.toString());
+      localStorage.setItem('melo_lyrics_speed', val.toString());
       applyLyricsEase();
     });
   }
@@ -14911,7 +14911,7 @@ function bindCoverHoldZoom(wrapEl) {
   const lyricsSourceMenu = document.getElementById('lyrics-source-menu');
 
   if (lyricsSourceDropdown && lyricsSourceTrigger && lyricsSourceMenu) {
-    const curSource = localStorage.getItem('riff_lyrics_source') === 'genius' ? 'genius' : 'lrclib';
+    const curSource = localStorage.getItem('melo_lyrics_source') === 'genius' ? 'genius' : 'lrclib';
     lyricsSourceMenu.querySelectorAll('.m3-dropdown-option').forEach(opt => {
       const isSel = opt.dataset.value === curSource;
       opt.classList.toggle('selected', isSel);
@@ -14927,7 +14927,7 @@ function bindCoverHoldZoom(wrapEl) {
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         const val = opt.dataset.value;
-        localStorage.setItem('riff_lyrics_source', val);
+        localStorage.setItem('melo_lyrics_source', val);
         if (lyricsSourceLabel) lyricsSourceLabel.textContent = opt.textContent;
         lyricsSourceMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.toggle('selected', o === opt));
         lyricsSourceDropdown.classList.remove('open');
@@ -14949,7 +14949,7 @@ function bindCoverHoldZoom(wrapEl) {
   const wordSourceMenu = document.getElementById('word-source-menu');
 
   if (wordSourceDropdown && wordSourceTrigger && wordSourceMenu) {
-    const curWordSource = localStorage.getItem('riff_word_source') || 'auto';
+    const curWordSource = localStorage.getItem('melo_word_source') || 'auto';
     wordSourceMenu.querySelectorAll('.m3-dropdown-option').forEach(opt => {
       const isSel = opt.dataset.value === curWordSource;
       opt.classList.toggle('selected', isSel);
@@ -14965,7 +14965,7 @@ function bindCoverHoldZoom(wrapEl) {
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         const val = opt.dataset.value;
-        localStorage.setItem('riff_word_source', val);
+        localStorage.setItem('melo_word_source', val);
         if (wordSourceLabel) wordSourceLabel.textContent = opt.textContent;
         wordSourceMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.toggle('selected', o === opt));
         wordSourceDropdown.classList.remove('open');
@@ -15003,7 +15003,7 @@ function bindCoverHoldZoom(wrapEl) {
       opt.addEventListener('click', (e) => {
         e.stopPropagation();
         const val = opt.dataset.value;
-        localStorage.setItem('riff_lyrics_word_style', val);
+        localStorage.setItem('melo_lyrics_word_style', val);
         if (lyricsWordStyleLabel) lyricsWordStyleLabel.textContent = opt.textContent;
         lyricsWordStyleMenu.querySelectorAll('.m3-dropdown-option').forEach(o => o.classList.toggle('selected', o === opt));
         lyricsWordStyleDropdown.classList.remove('open');
@@ -15027,8 +15027,8 @@ function bindCoverHoldZoom(wrapEl) {
     sliderLyricsTightness.addEventListener('input', () => {
       const val = parseInt(sliderLyricsTightness.value, 10);
       valLyricsTightness.textContent = `${val}%`;
-      localStorage.setItem('riff_lyrics_gradient_tightness', val.toString());
-      localStorage.setItem('riff_gradient_tight', val.toString());
+      localStorage.setItem('melo_lyrics_gradient_tightness', val.toString());
+      localStorage.setItem('melo_gradient_tight', val.toString());
       applyLyricsGradientTightness();
       updateActiveGradient();
     });
@@ -15049,12 +15049,12 @@ function bindCoverHoldZoom(wrapEl) {
 
   const toggleNormalize = document.getElementById('toggle-normalize');
   if (toggleNormalize) {
-    const isNorm = localStorage.getItem('riff_audio_normalize') === '1';
+    const isNorm = localStorage.getItem('melo_audio_normalize') === '1';
     toggleNormalize.classList.toggle('active', isNorm);
     toggleNormalize.addEventListener('click', () => {
       const active = !toggleNormalize.classList.contains('active');
       toggleNormalize.classList.toggle('active', active);
-      localStorage.setItem('riff_audio_normalize', active ? '1' : '0');
+      localStorage.setItem('melo_audio_normalize', active ? '1' : '0');
       if (!active) resetLevelWatcher();
     });
   }
@@ -15085,7 +15085,7 @@ function bindCoverHoldZoom(wrapEl) {
     const originalBtnHtml = btn ? btn.innerHTML : 'Check for updates';
     let manualUpdateCheck = false;
     let checkTimeoutId = null;
-    let fallbackReleaseUrl = 'https://github.com/rootscripts/riff/releases/latest';
+    let fallbackReleaseUrl = 'https://github.com/rootscripts/melo/releases/latest';
     let canNativeInstall = false;
 
     function restoreButton() {
@@ -15115,8 +15115,8 @@ function bindCoverHoldZoom(wrapEl) {
     function showUpdateModal(d) {
       if (!modal) return;
       canNativeInstall = !!d.canInstall;
-      fallbackReleaseUrl = d.htmlUrl || d.url || 'https://github.com/rootscripts/riff/releases/latest';
-      if (title) title.textContent = 'Riff ' + d.version + ' is available';
+      fallbackReleaseUrl = d.htmlUrl || d.url || 'https://github.com/rootscripts/melo/releases/latest';
+      if (title) title.textContent = 'melo ' + d.version + ' is available';
       if (bar) { bar.classList.add('hidden'); if (bar.firstElementChild) bar.firstElementChild.style.width = '0'; }
       if (nowB) {
         nowB.disabled = false;
@@ -15145,13 +15145,13 @@ function bindCoverHoldZoom(wrapEl) {
           showToast('Could not check for updates', 'error');
           return;
         }
-        const res = await fetch('https://api.github.com/repos/rootscripts/riff/releases/latest', {
-          headers: { 'User-Agent': 'Riff-Player' }
+        const res = await fetch('https://api.github.com/repos/rootscripts/melo/releases/latest', {
+          headers: { 'User-Agent': 'melo-Player' }
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const json = await res.json();
         const latestVersion = (json.tag_name || '').replace(/^v/i, '');
-        fallbackReleaseUrl = json.html_url || 'https://github.com/rootscripts/riff/releases/latest';
+        fallbackReleaseUrl = json.html_url || 'https://github.com/rootscripts/melo/releases/latest';
         if (isNewerVersion(latestVersion, currentAppVersion)) {
           showUpdateModal({
             version: latestVersion,
@@ -15162,7 +15162,7 @@ function bindCoverHoldZoom(wrapEl) {
           restoreButton();
         } else {
           restoreButton();
-          showToast('You are using the latest version of Riff!', 'success');
+          showToast('You are using the latest version of melo!', 'success');
         }
       } catch (err) {
         restoreButton();
@@ -15212,7 +15212,7 @@ function bindCoverHoldZoom(wrapEl) {
         const wasManual = manualUpdateCheck;
         restoreButton();
         if (wasManual) {
-          showToast('You are using the latest version of Riff!', 'success');
+          showToast('You are using the latest version of melo!', 'success');
         }
       });
     }
@@ -15233,7 +15233,7 @@ function bindCoverHoldZoom(wrapEl) {
     }
     if (api && api.onUpdateReady) {
       api.onUpdateReady(() => {
-        if (text) text.textContent = 'Update downloaded. It will be installed when you close Riff.';
+        if (text) text.textContent = 'Update downloaded. It will be installed when you close melo.';
         if (nowB) nowB.classList.add('hidden');
         if (laterB) laterB.classList.add('hidden');
       });
@@ -15247,7 +15247,7 @@ function bindCoverHoldZoom(wrapEl) {
           if (laterB) laterB.disabled = true;
           if (text) text.textContent = 'Downloading...';
         } else {
-          window.open(fallbackReleaseUrl || 'https://github.com/rootscripts/riff/releases/latest', '_blank');
+          window.open(fallbackReleaseUrl || 'https://github.com/rootscripts/melo/releases/latest', '_blank');
           if (modal) closeModal(modal);
         }
       });
@@ -15256,7 +15256,7 @@ function bindCoverHoldZoom(wrapEl) {
       laterB.addEventListener('click', () => {
         if (api && api.updateAction) api.updateAction('later');
         if (modal) closeModal(modal);
-        showToast('The update will be installed when you close Riff', 'info');
+        showToast('The update will be installed when you close melo', 'info');
       });
     }
     if (ignoreB) {
@@ -15486,12 +15486,12 @@ function bindCoverHoldZoom(wrapEl) {
 
   const btnDiscordArtistStatus = document.getElementById('btn-discord-artist-status');
   if (btnDiscordArtistStatus) {
-    const on = localStorage.getItem('riff_discord_artist_status') !== '0';
+    const on = localStorage.getItem('melo_discord_artist_status') !== '0';
     btnDiscordArtistStatus.classList.toggle('active', on);
     btnDiscordArtistStatus.addEventListener('click', () => {
       const next = !btnDiscordArtistStatus.classList.contains('active');
       btnDiscordArtistStatus.classList.toggle('active', next);
-      localStorage.setItem('riff_discord_artist_status', next ? '1' : '0');
+      localStorage.setItem('melo_discord_artist_status', next ? '1' : '0');
       if (state.discordRpcEnabled && state.isPlaying && state.currentTrack) {
         sendDiscordRpcUpdate(state.currentTrack, true);
       }
@@ -15558,7 +15558,7 @@ function bindCoverHoldZoom(wrapEl) {
   if (btnLastFmToggle) {
     btnLastFmToggle.addEventListener('click', () => {
       lastfmState.enabled = !lastfmState.enabled;
-      localStorage.setItem('riff_lastfm_enabled', String(lastfmState.enabled));
+      localStorage.setItem('melo_lastfm_enabled', String(lastfmState.enabled));
       syncLastFmUI();
     });
   }
@@ -15573,13 +15573,13 @@ function bindCoverHoldZoom(wrapEl) {
       if (customKey && customSecret) {
         lastfmState.apiKey = customKey;
         lastfmState.apiSecret = customSecret;
-        localStorage.setItem('riff_lastfm_apikey', customKey);
-        localStorage.setItem('riff_lastfm_apisecret', customSecret);
+        localStorage.setItem('melo_lastfm_apikey', customKey);
+        localStorage.setItem('melo_lastfm_apisecret', customSecret);
       } else {
         lastfmState.apiKey = '';
         lastfmState.apiSecret = '';
-        localStorage.removeItem('riff_lastfm_apikey');
-        localStorage.removeItem('riff_lastfm_apisecret');
+        localStorage.removeItem('melo_lastfm_apikey');
+        localStorage.removeItem('melo_lastfm_apisecret');
       }
       if (statusEl) {
         statusEl.textContent = 'Requesting Last.fm authorization...';
@@ -15627,8 +15627,8 @@ function bindCoverHoldZoom(wrapEl) {
               lastfmState.pollTimer = null;
               lastfmState.sessionKey = sData.sessionKey;
               lastfmState.username = sData.username;
-              localStorage.setItem('riff_lastfm_sk', sData.sessionKey);
-              localStorage.setItem('riff_lastfm_user', sData.username);
+              localStorage.setItem('melo_lastfm_sk', sData.sessionKey);
+              localStorage.setItem('melo_lastfm_user', sData.username);
               syncLastFmUI();
               if (typeof showToast === 'function') showToast('Connected to Last.fm as @' + sData.username, 'info');
               closeLastFmModal();
@@ -15666,11 +15666,11 @@ function bindCoverHoldZoom(wrapEl) {
 
       if (customKey) {
         lastfmState.apiKey = customKey;
-        localStorage.setItem('riff_lastfm_apikey', customKey);
+        localStorage.setItem('melo_lastfm_apikey', customKey);
       }
       if (customSecret) {
         lastfmState.apiSecret = customSecret;
-        localStorage.setItem('riff_lastfm_apisecret', customSecret);
+        localStorage.setItem('melo_lastfm_apisecret', customSecret);
       }
 
       if (statusEl) {
@@ -15694,8 +15694,8 @@ function bindCoverHoldZoom(wrapEl) {
         if (data.success && data.sessionKey) {
           lastfmState.sessionKey = data.sessionKey;
           lastfmState.username = data.username || username;
-          localStorage.setItem('riff_lastfm_sk', data.sessionKey);
-          localStorage.setItem('riff_lastfm_user', lastfmState.username);
+          localStorage.setItem('melo_lastfm_sk', data.sessionKey);
+          localStorage.setItem('melo_lastfm_user', lastfmState.username);
           if (passInp) passInp.value = '';
           if (statusEl) {
             statusEl.textContent = `Connected as @${lastfmState.username}!`;
@@ -15722,8 +15722,8 @@ function bindCoverHoldZoom(wrapEl) {
     btnLastFmDisconnect.addEventListener('click', () => {
       lastfmState.sessionKey = '';
       lastfmState.username = '';
-      localStorage.removeItem('riff_lastfm_sk');
-      localStorage.removeItem('riff_lastfm_user');
+      localStorage.removeItem('melo_lastfm_sk');
+      localStorage.removeItem('melo_lastfm_user');
       if (lastfmState.pollTimer) {
         clearInterval(lastfmState.pollTimer);
         lastfmState.pollTimer = null;
@@ -15982,7 +15982,7 @@ function bindCoverHoldZoom(wrapEl) {
   let parsedSpotifyExport = { likes: [], playlists: [] };
   let spLoginPollTimer = null;
   let spotifyConnected = false;
-  const spotifyHeaders = { 'X-Riff-Token': window.electronAPI?.serverToken || '' };
+  const spotifyHeaders = { 'X-melo-Token': window.electronAPI?.serverToken || '' };
 
   async function checkSpotifyAuthStatus() {
     try {
@@ -16115,14 +16115,14 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   if (spClientIdInput) {
-    const savedId = localStorage.getItem('riff_spotify_client_id') || '';
+    const savedId = localStorage.getItem('melo_spotify_client_id') || '';
     spClientIdInput.value = savedId;
     if (btnSpLogin) {
       btnSpLogin.disabled = !/^[a-f0-9]{32}$/i.test(savedId.trim());
     }
     spClientIdInput.addEventListener('input', () => {
       const val = spClientIdInput.value.trim();
-      localStorage.setItem('riff_spotify_client_id', val);
+      localStorage.setItem('melo_spotify_client_id', val);
       if (btnSpLogin) {
         btnSpLogin.disabled = !/^[a-f0-9]{32}$/i.test(val);
       }
@@ -16294,7 +16294,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (spChkLikes2) { spChkLikes2.checked = true; spChkLikes2.disabled = false; }
     if (spChkPlaylists2) { spChkPlaylists2.checked = true; spChkPlaylists2.disabled = false; }
     if (btnSpPickFiles) btnSpPickFiles.disabled = false;
-    const savedId = localStorage.getItem('riff_spotify_client_id') || '';
+    const savedId = localStorage.getItem('melo_spotify_client_id') || '';
     if (spClientIdInput) spClientIdInput.value = savedId;
     if (btnSpLogin) btnSpLogin.disabled = !/^[a-f0-9]{32}$/i.test(savedId.trim());
     if (spRedirectUri) spRedirectUri.textContent = `http://127.0.0.1:${state.serverPort || 38472}/api/spotify-callback`;
@@ -16681,7 +16681,7 @@ function bindCoverHoldZoom(wrapEl) {
           finishMsg += ` Search errors: ${fs.commonError}`;
         }
       }
-      if (window.__riffLogError) window.__riffLogError('INFO', 'Import summary: ' + finishMsg);
+      if (window.__meloLogError) window.__meloLogError('INFO', 'Import summary: ' + finishMsg);
       if (spotifyStatus) {
         spotifyStatus.textContent = finishMsg;
         spotifyStatus.style.color = 'var(--md-sys-color-primary, #6750A4)';
@@ -17873,7 +17873,7 @@ function bindCoverHoldZoom(wrapEl) {
     } catch (e) {}
 
     const payload = {
-      app: 'Riff',
+      app: 'melo',
       appVersion: appVer,
       exportedAt: new Date().toISOString(),
       playlists: valid.map(pl => ({
@@ -17905,7 +17905,7 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   async function exportAllPlaylists() {
-    await exportPlaylistsAsJson(state.playlists, 'riff-playlists.json');
+    await exportPlaylistsAsJson(state.playlists, 'melo-playlists.json');
   }
 
   const btnExportPl = document.getElementById('btn-export-playlist');
@@ -18039,7 +18039,7 @@ function bindCoverHoldZoom(wrapEl) {
     btnImportJsonPlaylists.addEventListener('click', triggerJsonPlaylistImport);
   }
 
-  function confirmChain({ title = 'Import Riff account', message = 'Importing an account will replace your existing playlists, favorites, custom styles, and settings. Riff will restart immediately.', confirmLabel = 'Import & Restart', seconds = 3 } = {}) {
+  function confirmChain({ title = 'Import melo account', message = 'Importing an account will replace your existing playlists, favorites, custom styles, and settings. melo will restart immediately.', confirmLabel = 'Import & Restart', seconds = 3 } = {}) {
     return new Promise((resolve) => {
       let modal = document.getElementById('confirm-chain-modal');
       if (!modal) {
@@ -18109,7 +18109,7 @@ function bindCoverHoldZoom(wrapEl) {
         }
       } catch (_) {}
       const payload = {
-        app: 'Riff',
+        app: 'melo',
         version: '1.0',
         exportedAt: Date.now(),
         localStorage: dump
@@ -18129,8 +18129,8 @@ function bindCoverHoldZoom(wrapEl) {
   if (btnImportAccount) {
     btnImportAccount.onclick = async () => {
       const confirmed = await confirmChain({
-        title: 'Import Riff account',
-        message: 'Importing an account will replace your existing playlists, favorites, custom styles, and settings. Riff will restart immediately.',
+        title: 'Import melo account',
+        message: 'Importing an account will replace your existing playlists, favorites, custom styles, and settings. melo will restart immediately.',
         confirmLabel: 'Import & Restart',
         seconds: 3
       });
@@ -18154,8 +18154,8 @@ function bindCoverHoldZoom(wrapEl) {
             } catch (_) {}
           }
         }
-        if (window.electronAPI.storageSaveSync && window.__RIFF_STORAGE_MAP__) {
-          try { window.electronAPI.storageSaveSync(window.__RIFF_STORAGE_MAP__); } catch (_) {}
+        if (window.electronAPI.storageSaveSync && window.__MELO_STORAGE_MAP__) {
+          try { window.electronAPI.storageSaveSync(window.__MELO_STORAGE_MAP__); } catch (_) {}
         }
       }
       showToast('Account imported! Restarting...', 'success');
@@ -18191,7 +18191,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   let trackToDownload = null;
   let downloadBatch = null;
-  let selectedFormat = localStorage.getItem('riff_download_format') || 'mp3';
+  let selectedFormat = localStorage.getItem('melo_download_format') || 'mp3';
   let selectedQuality = '0';
 
   function updateDownloadBtnLabel() {
@@ -18631,7 +18631,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (cid) {
         const all = getTrackTrims();
         delete all[cid];
-        try { localStorage.setItem('riff_track_trims', JSON.stringify(all)); } catch (_) {}
+        try { localStorage.setItem('melo_track_trims', JSON.stringify(all)); } catch (_) {}
       }
       trimDraft.start = 0;
       trimDraft.end = trimDraft.dur;
@@ -18643,7 +18643,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   function setDownloadFormat(fmt) {
     selectedFormat = fmt || 'mp3';
-    localStorage.setItem('riff_download_format', selectedFormat);
+    localStorage.setItem('melo_download_format', selectedFormat);
     document.querySelectorAll('.format-chip').forEach(c => {
       c.classList.toggle('active', c.dataset.format === selectedFormat);
     });
@@ -18791,7 +18791,7 @@ function bindCoverHoldZoom(wrapEl) {
       for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
     };
 
-    writeStr(0, 'RIFF');
+    writeStr(0, 'MELO');
     view.setUint32(4, 36 + dataSize, true);
     writeStr(8, 'WAVE');
     writeStr(12, 'fmt ');
@@ -19016,7 +19016,7 @@ function bindCoverHoldZoom(wrapEl) {
   const analysisCache = new Map();
   let myWaveCurrentTracks = [];
   let jumpBackCurrentTracks = [];
-  let homeMode = localStorage.getItem('riff_home_pane') === 'recent' ? 'recent' : 'wave';
+  let homeMode = localStorage.getItem('melo_home_pane') === 'recent' ? 'recent' : 'wave';
   let isExtendingMyWave = false;
 
   function getCachedTrackAnalysis(trackId) {
@@ -19024,7 +19024,7 @@ function bindCoverHoldZoom(wrapEl) {
     const cleanId = String(trackId).replace(/[^a-zA-Z0-9_-]/g, '_');
     if (analysisCache.has(cleanId)) return analysisCache.get(cleanId);
     try {
-      const stored = localStorage.getItem(`riff_audio_analysis_${cleanId}`);
+      const stored = localStorage.getItem(`melo_audio_analysis_${cleanId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         analysisCache.set(cleanId, parsed);
@@ -19039,7 +19039,7 @@ function bindCoverHoldZoom(wrapEl) {
     const cleanId = String(trackId).replace(/[^a-zA-Z0-9_-]/g, '_');
     analysisCache.set(cleanId, analysis);
     try {
-      localStorage.setItem(`riff_audio_analysis_${cleanId}`, JSON.stringify(analysis));
+      localStorage.setItem(`melo_audio_analysis_${cleanId}`, JSON.stringify(analysis));
       fetch(`http://127.0.0.1:${state.serverPort}/api/track-analysis`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -19062,7 +19062,7 @@ function bindCoverHoldZoom(wrapEl) {
     return `${a}::${t}`;
   }
 
-  const WAVE_SKIPS_KEY = 'riff_wave_skips';
+  const WAVE_SKIPS_KEY = 'melo_wave_skips';
 
   function normalizeArtistName(name) {
     return String(name || '')
@@ -19956,7 +19956,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (newMode === homeMode) return;
 
     homeMode = newMode;
-    localStorage.setItem('riff_home_pane', newMode);
+    localStorage.setItem('melo_home_pane', newMode);
     updateHomeDots();
 
     const isPerf = document.body.classList.contains('perf') || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -20011,7 +20011,7 @@ function bindCoverHoldZoom(wrapEl) {
 
     if (!avail.includes(homeMode)) {
       homeMode = avail[0];
-      localStorage.setItem('riff_home_pane', homeMode);
+      localStorage.setItem('melo_home_pane', homeMode);
     }
 
     updateHomeDots();
@@ -20110,7 +20110,7 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   async function fetchPersonalVibe(forceRefresh = false) {
-    const cachedWave = safeJson('riff_my_wave_cache', null);
+    const cachedWave = safeJson('melo_my_wave_cache', null);
     if (!forceRefresh && cachedWave && Array.isArray(cachedWave.tracks) && cachedWave.tracks.length > 0) {
       state.vibeTracks = cachedWave.tracks;
       renderVibeCards(state.vibeTracks);
@@ -20198,7 +20198,7 @@ function bindCoverHoldZoom(wrapEl) {
           }
           if (uniqueTracks.length > 0) {
             state.vibeTracks = uniqueTracks;
-            try { localStorage.setItem('riff_my_wave_cache', JSON.stringify({ ts: Date.now(), tracks: state.vibeTracks })); } catch (_) {}
+            try { localStorage.setItem('melo_my_wave_cache', JSON.stringify({ ts: Date.now(), tracks: state.vibeTracks })); } catch (_) {}
           }
         }
       } catch (_) {}
@@ -20248,7 +20248,7 @@ function bindCoverHoldZoom(wrapEl) {
 
       myWaveCurrentTracks = uniqueTracks;
       state.vibeTracks = uniqueTracks;
-      try { localStorage.setItem('riff_my_wave_cache', JSON.stringify({ ts: Date.now(), tracks: state.vibeTracks })); } catch (_) {}
+      try { localStorage.setItem('melo_my_wave_cache', JSON.stringify({ ts: Date.now(), tracks: state.vibeTracks })); } catch (_) {}
       currentWaveFocusedIndex = 0;
       if (homeMode === 'wave') {
         if (vibeGrid) {
@@ -20503,7 +20503,7 @@ function bindCoverHoldZoom(wrapEl) {
     sec.hidden = false;
 
     let hasCachedTracks = false;
-    const cached = safeJson('riff_trending_cache', null);
+    const cached = safeJson('melo_trending_cache', null);
     if (cached && Array.isArray(cached.tracks) && cached.tracks.length > 0) {
       renderTrendingCards(row, cached.tracks);
       hasCachedTracks = true;
@@ -20524,7 +20524,7 @@ function bindCoverHoldZoom(wrapEl) {
       const data = await res.json();
       if (data && data.success && Array.isArray(data.tracks) && data.tracks.length > 0) {
         try {
-          localStorage.setItem('riff_trending_cache', JSON.stringify({ ts: Date.now(), tracks: data.tracks }));
+          localStorage.setItem('melo_trending_cache', JSON.stringify({ ts: Date.now(), tracks: data.tracks }));
         } catch (_) {}
         renderTrendingCards(row, data.tracks);
         sec.hidden = false;
@@ -20557,7 +20557,7 @@ function bindCoverHoldZoom(wrapEl) {
     requestAnimationFrame(() => updateRowFade(row));
   }
 
-  const MIX_KEY = 'riff_daily_mixes';
+  const MIX_KEY = 'melo_daily_mixes';
 
   function getLocalDateString() {
     const d = new Date();
@@ -20635,7 +20635,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   async function generateDailyMixes(force = false) {
     if (!getAdv('my_wave', true)) return null;
-    const sp = (localStorage.getItem('riff_home_layout') || 'spotify') === 'spotify';
+    const sp = (localStorage.getItem('melo_home_layout') || 'spotify') === 'spotify';
     if (!sp) return null;
 
     const today = getLocalDateString();
@@ -20914,26 +20914,26 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   function applyHomeLayout() {
-    const sp = (localStorage.getItem('riff_home_layout') || 'spotify') === 'spotify';
+    const sp = (localStorage.getItem('melo_home_layout') || 'spotify') === 'spotify';
     document.body.classList.toggle('home-spotify', sp);
     const btnSp = document.getElementById('home-layout-spotify');
-    const btnRiff = document.getElementById('home-layout-riff');
+    const btnmelo = document.getElementById('home-layout-melo');
     if (btnSp) btnSp.classList.toggle('active', sp);
-    if (btnRiff) btnRiff.classList.toggle('active', !sp);
+    if (btnmelo) btnmelo.classList.toggle('active', !sp);
     if (sp) renderSpotifyHome();
   }
 
   const btnHomeSpotify = document.getElementById('home-layout-spotify');
-  const btnHomeRiff = document.getElementById('home-layout-riff');
+  const btnHomemelo = document.getElementById('home-layout-melo');
   if (btnHomeSpotify) {
     btnHomeSpotify.addEventListener('click', () => {
-      localStorage.setItem('riff_home_layout', 'spotify');
+      localStorage.setItem('melo_home_layout', 'spotify');
       applyHomeLayout();
     });
   }
-  if (btnHomeRiff) {
-    btnHomeRiff.addEventListener('click', () => {
-      localStorage.setItem('riff_home_layout', 'riff');
+  if (btnHomemelo) {
+    btnHomemelo.addEventListener('click', () => {
+      localStorage.setItem('melo_home_layout', 'melo');
       applyHomeLayout();
     });
   }
@@ -21230,7 +21230,7 @@ function bindCoverHoldZoom(wrapEl) {
       }
       const move = window.confirm(
         'Move your existing music to the new folder?\n\n' +
-        'OK: move all downloaded and imported files, then restart Riff.\n' +
+        'OK: move all downloaded and imported files, then restart melo.\n' +
         'Cancel: switch to the new folder without moving (files stay in the old one).'
       );
       btnChangeMusicFolder.disabled = true;
@@ -21250,7 +21250,7 @@ function bindCoverHoldZoom(wrapEl) {
         return;
       }
       btnChangeMusicFolder.textContent = 'Restarting...';
-      showToast('Restarting Riff...');
+      showToast('Restarting melo...');
       setTimeout(() => { if (window.electronAPI.restartApp) window.electronAPI.restartApp(); }, 400);
     });
   }
@@ -21581,7 +21581,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (data.progress && data.progress.status === 'downloading') {
         pollToolsStatus();
       } else if (promptUser && (!data.ytDlp || !data.ffmpeg)) {
-        if (!sessionStorage.getItem('riff_tools_prompt_dismissed')) {
+        if (!sessionStorage.getItem('melo_tools_prompt_dismissed')) {
           const modal = document.getElementById('tools-install-modal');
           if (modal) openModal(modal);
         }
@@ -21616,14 +21616,14 @@ function bindCoverHoldZoom(wrapEl) {
 
   if (btnDismissToolsModal && toolsModal) {
     btnDismissToolsModal.addEventListener('click', () => {
-      sessionStorage.setItem('riff_tools_prompt_dismissed', '1');
+      sessionStorage.setItem('melo_tools_prompt_dismissed', '1');
       closeModal(toolsModal);
     });
   }
 
   if (btnCloseToolsModal && toolsModal) {
     btnCloseToolsModal.addEventListener('click', () => {
-      sessionStorage.setItem('riff_tools_prompt_dismissed', '1');
+      sessionStorage.setItem('melo_tools_prompt_dismissed', '1');
       closeModal(toolsModal);
     });
   }
@@ -21730,7 +21730,7 @@ function bindCoverHoldZoom(wrapEl) {
     const bannerVid = document.getElementById('track-art-banner-vid');
     const bannerPh = document.getElementById('track-art-banner-placeholder');
     const bannerStatus = document.getElementById('track-art-banner-status');
-    const activeBanner = art.banner || localStorage.getItem('riff_banner_media') || activeCover;
+    const activeBanner = art.banner || localStorage.getItem('melo_banner_media') || activeCover;
     const isVideo = activeBanner && /\.(mp4|webm)($|\?)/i.test(activeBanner);
 
     if (activeBanner) {
@@ -21753,7 +21753,7 @@ function bindCoverHoldZoom(wrapEl) {
       if (bannerVid) bannerVid.style.display = 'none';
       if (bannerPh) bannerPh.style.display = 'block';
     }
-    if (bannerStatus) bannerStatus.textContent = art.banner ? 'Custom banner' : (localStorage.getItem('riff_banner_media') ? 'Global banner' : 'Default art');
+    if (bannerStatus) bannerStatus.textContent = art.banner ? 'Custom banner' : (localStorage.getItem('melo_banner_media') ? 'Global banner' : 'Default art');
 
     const btnCustomFx = document.getElementById('btn-track-banner-custom-fx');
     const fxControls = document.getElementById('track-banner-fx-controls');
@@ -21979,7 +21979,7 @@ function bindCoverHoldZoom(wrapEl) {
   updateLyricsTranslationUI();
   loadCustomThemes();
   applyCustomStyles();
-  const initCat = localStorage.getItem('riff_settings_cat');
+  const initCat = localStorage.getItem('melo_settings_cat');
   showSettingsCategory((initCat === 'overview' || !initCat) ? 'home' : initCat);
   refreshStacks();
   requestAnimationFrame(() => requestAnimationFrame(refreshStacks));
@@ -21987,7 +21987,7 @@ function bindCoverHoldZoom(wrapEl) {
   if (typeof m3cInit === 'function') m3cInit();
   requestAnimationFrame(() => requestAnimationFrame(() => updateNavIndicator(false)));
 
-  const heroBanner = document.querySelector('.riff-hero-banner');
+  const heroBanner = document.querySelector('.melo-hero-banner');
   if (heroBanner) {
     heroBanner.addEventListener('pointermove', (e) => {
       if (document.body.classList.contains('perf')) return;

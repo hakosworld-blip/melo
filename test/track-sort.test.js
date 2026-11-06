@@ -79,7 +79,7 @@ for (const stored of ['title-asc', 'artist-asc', 'duration-asc', 'unknown']) {
     assert.ok(start >= 0 && end > start);
     const mode = vm.runInNewContext(`${source.slice(start, end)}\ngetTrackSortMode('favorites')`, {
       localStorage: { getItem: () => stored },
-      TRACK_SORT_KEYS: { favorites: 'riff_favorites_sort' },
+      TRACK_SORT_KEYS: { favorites: 'melo_favorites_sort' },
       TRACK_SORT_MODES
     });
     assert.strictEqual(mode, 'manual');

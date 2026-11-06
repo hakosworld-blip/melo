@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
 
-  class RiffAudioEngine {
+  class meloAudioEngine {
     constructor() {
       this.ctx = null;
       this.mediaSource = null;
@@ -804,7 +804,7 @@
         }
       };
 
-      writeString(0, 'RIFF');
+      writeString(0, 'MELO');
       view.setUint32(4, totalSize - 8, true);
       writeString(8, 'WAVE');
 
@@ -833,6 +833,6 @@
     }
   }
 
-  global.RiffAudioEngine = RiffAudioEngine;
+  global.meloAudioEngine = meloAudioEngine;
 
 })(typeof window !== 'undefined' ? window : globalThis);

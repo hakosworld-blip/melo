@@ -1,0 +1,453 @@
+/* ---------------------------------------------------------------------------
+   melo desktop theme
+   ---------------------------------------------------------------------------
+   The mobile app runs on the shadcn token language: zinc neutrals, 1px hairline
+   borders, one radius scale, type at 500/600, flat surfaces (no elevation) and a
+   single accent. This file ports that to the Electron player, which still keys
+   off --md-sys-color-* / --md-shape-corner-* (app.js writes those inline at
+   runtime, hence !important on structural overrides).
+
+   The user's accent (--md-sys-color-primary) is deliberately NOT overridden:
+   accent picking keeps working, everything structural becomes zinc.
+
+   Desktop adaptation (mobile -> desktop, per /adapt):
+     - the phone's 48px circular icon row becomes a labelled sidebar (labels come
+       from each button's existing title attribute, so no markup changes)
+     - the content column gets real width and a max-width so 4K does not stretch
+     - hover affordances + a visible keyboard focus ring (the app disables focus
+       outlines globally, desktop needs them for keyboard use)
+     - 32px controls and 13px labels: pointer-density, not thumb-density
+     - below 960px the phone layout comes back untouched
+--------------------------------------------------------------------------- */
+
+/* ================================================================= tokens = */
+
+:root {
+  /* zinc-950 -> zinc-700 */
+  --md-sys-color-background-solid: #09090b !important;
+  --md-sys-color-background: color-mix(in srgb, #09090b var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-solid: #09090b !important;
+  --md-sys-color-surface: color-mix(in srgb, #09090b var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-dim-solid: #09090b !important;
+  --md-sys-color-surface-dim: color-mix(in srgb, #09090b var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-bright-solid: #3f3f46 !important;
+  --md-sys-color-surface-bright: color-mix(in srgb, #3f3f46 var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-lowest-solid: #000000 !important;
+  --md-sys-color-surface-container-lowest: color-mix(in srgb, #000000 var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-low-solid: #101012 !important;
+  --md-sys-color-surface-container-low: color-mix(in srgb, #101012 var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-solid: #18181b !important;
+  --md-sys-color-surface-container: color-mix(in srgb, #18181b var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-high-solid: #27272a !important;
+  --md-sys-color-surface-container-high: color-mix(in srgb, #27272a var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-highest-solid: #34343a !important;
+  --md-sys-color-surface-container-highest: color-mix(in srgb, #34343a var(--ui-alpha, 100%), transparent) !important;
+
+  /* text */
+  --md-sys-color-on-surface-solid: #fafafa !important;
+  --md-sys-color-on-surface: color-mix(in srgb, #fafafa var(--text-alpha, 100%), transparent) !important;
+  --md-sys-color-on-surface-variant-solid: #a1a1aa !important;
+  --md-sys-color-on-surface-variant: color-mix(in srgb, #a1a1aa var(--text-alpha, 100%), transparent) !important;
+
+  /* only hairlines: zinc-800 on dark, the way shadcn draws every border */
+  --md-sys-color-outline: #52525b !important;
+  --md-sys-color-outline-variant: #27272a !important;
+
+  /* supporting containers drop their Material tints */
+  --md-sys-color-secondary-container: #27272a !important;
+  --md-sys-color-on-secondary-container: #e4e4e7 !important;
+  --md-sys-color-tertiary-container: #27272a !important;
+  --md-sys-color-error: #f87171 !important;
+  --md-sys-color-on-error: #180a0a !important;
+
+  /* one radius scale */
+  --md-shape-corner-xs: 4px !important;
+  --md-shape-corner-s: 6px !important;
+  --md-shape-corner-m: 8px !important;
+  --md-shape-corner-l: 10px !important;
+  --md-shape-corner-xl: 12px !important;
+
+  /* short, decelerating motion -- never springy */
+  --transition-fast: 120ms cubic-bezier(0.2, 0, 0, 1) !important;
+  --transition-normal: 160ms cubic-bezier(0.2, 0, 0, 1) !important;
+  --transition-m3: 200ms cubic-bezier(0.2, 0, 0, 1) !important;
+  --transition-emphasized: 200ms cubic-bezier(0.2, 0, 0, 1) !important;
+  --transition-jelly: 200ms cubic-bezier(0.2, 0, 0, 1) !important;
+
+  --font-family: 'Inter', 'Inter Variable', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Noto Sans', sans-serif !important;
+
+  --melo-sidebar-w: 216px;
+  --melo-gap: 12px;
+  --melo-hairline: 1px solid var(--md-sys-color-outline-variant);
+}
+
+html,
+body {
+  background: var(--md-sys-color-background-solid) !important;
+  color: var(--md-sys-color-on-surface-solid);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================== titlebar = */
+
+.titlebar {
+  height: 36px !important;
+  background: var(--md-sys-color-background-solid) !important;
+  border-bottom: var(--melo-hairline);
+  padding: 0 8px !important;
+}
+
+.titlebar-melo-icon {
+  width: 18px;
+  height: 18px;
+  background-color: transparent !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  background-image: url('../../assets/melo-icon.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  border-radius: 4px;
+}
+
+/* keyboard access is not optional on desktop; the app kills outlines globally */
+*:focus-visible,
+button:focus-visible,
+.nav-item:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--md-sys-color-primary) 70%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+/* ============================================================ desktop == */
+
+@media (min-width: 861px) {
+  /* phone-sized type scale is oversized on a monitor; no !important, so a user who
+     raised the app's own text scale (written inline) still wins */
+  :root {
+    --font-scale: 1;
+  }
+
+  .app-layout {
+    height: calc(100% - 36px - 64px) !important;
+    gap: var(--melo-gap) !important;
+    padding: 0 var(--melo-gap) !important;
+    margin-bottom: var(--melo-gap) !important;
+  }
+
+  /* ---------------------------------------------------------- sidebar --- */
+
+  #sidebar {
+    width: var(--melo-sidebar-w) !important;
+    min-width: var(--melo-sidebar-w) !important;
+    align-items: stretch !important;
+    padding: 8px !important;
+    gap: 8px !important;
+    border-radius: 10px !important;
+    background: var(--md-sys-color-surface-container-low-solid) !important;
+    border: var(--melo-hairline) !important;
+    box-shadow: none !important;
+  }
+
+  .sidebar-nav {
+    align-items: stretch !important;
+    gap: 2px !important;
+  }
+
+  /* the mobile app uses 48px circular icon buttons; desktop wants rows with labels */
+  #sidebar .sidebar-nav .nav-item {
+    width: 100% !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    border-radius: 6px !important;
+    margin: 0 !important;
+    padding: 0 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px;
+    background: transparent !important;
+    color: var(--md-sys-color-on-surface-variant-solid) !important;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  /* labels come from the button's own title so no markup had to change */
+  #sidebar .sidebar-nav .nav-item::before {
+    content: attr(title);
+    order: 1;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #sidebar .sidebar-nav .nav-item:hover:not(.active) {
+    background: color-mix(in srgb, #ffffff 6%, transparent) !important;
+    color: var(--md-sys-color-on-surface-solid) !important;
+  }
+
+  #sidebar .sidebar-nav .nav-item.active {
+    background: color-mix(in srgb, #ffffff 9%, transparent) !important;
+    box-shadow: inset 2px 0 0 var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-surface-solid) !important;
+  }
+
+  #sidebar .nav-item.active .nav-indicator,
+  #sidebar .nav-item.active svg {
+    color: inherit !important;
+  }
+
+  #sidebar .sidebar-nav .nav-indicator {
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    flex-shrink: 0;
+  }
+
+  #sidebar .nav-indicator svg,
+  #sidebar .nav-item svg {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+  }
+
+  /* the sliding accent pill belongs to the phone bar; rows mark the active item instead */
+  .nav-active-indicator {
+    display: none !important;
+  }
+
+  /* the home nav uses the colourful app icon as its glyph; the phone build draws it at
+     40px, which swallows a 32px desktop row */
+  #sidebar .nav-home-app-icon {
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 5px !important;
+    object-fit: cover;
+  }
+
+  /* counts sit at the end of the row instead of after the icon */
+  #sidebar .nav-badge {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    background: color-mix(in srgb, #ffffff 10%, transparent);
+    color: var(--md-sys-color-on-surface-solid);
+  }
+
+  /* ------------------------------------------------------ main content --- */
+
+  .main-content {
+    border-radius: 10px !important;
+    border: var(--melo-hairline);
+    background: var(--md-sys-color-surface-container-low-solid) !important;
+    padding: 20px 24px 120px !important;
+    min-width: 0;
+  }
+
+  .content-view {
+    max-width: 1120px;
+    margin-inline: auto;
+  }
+
+  h1,
+  .page-title {
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.011em !important;
+  }
+
+  h2,
+  h3,
+  .section-title {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.006em !important;
+  }
+
+  /* rows read as a list with hairlines, not as floating pills */
+  .track-row {
+    border-radius: 6px !important;
+    min-height: 52px;
+    transition: background-color 100ms ease;
+  }
+
+  .track-row:hover {
+    background: color-mix(in srgb, #ffffff 5%, transparent) !important;
+  }
+
+  .track-row.is-playing,
+  .track-row.selected {
+    background: color-mix(in srgb, #ffffff 7%, transparent) !important;
+  }
+
+  /* --------------------------------------------------------- right rail --- */
+
+  .right-panel {
+    border-radius: 10px !important;
+    border: var(--melo-hairline);
+    background: var(--md-sys-color-surface-container-low-solid) !important;
+    padding: 18px !important;
+    gap: 16px !important;
+    box-shadow: none !important;
+  }
+
+  /* ------------------------------------------------------------- playbar --- */
+
+  #playbar {
+    border-radius: 10px !important;
+    border: var(--melo-hairline) !important;
+    background: color-mix(in srgb, #101012 92%, transparent) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: none !important;
+  }
+
+  /* ------------------------------------------------- controls and inputs --- */
+
+  .btn-pill-primary,
+  .btn-outline-pill,
+  .btn-primary,
+  .btn-ghost,
+  .btn-icon-pill,
+  .rail-icon-btn {
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .btn-outline-pill,
+  .btn-icon-pill {
+    border: var(--melo-hairline) !important;
+    background: transparent !important;
+  }
+
+  .btn-outline-pill:hover,
+  .btn-icon-pill:hover {
+    background: color-mix(in srgb, #ffffff 6%, transparent) !important;
+    border-color: var(--md-sys-color-outline) !important;
+  }
+
+  input[type='text'],
+  input[type='search'],
+  input[type='number'],
+  textarea,
+  select,
+  .search-box-wrapper {
+    background: var(--md-sys-color-surface-container-lowest-solid) !important;
+    border: var(--melo-hairline) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    border-color: var(--md-sys-color-primary) !important;
+    box-shadow: 0 0 0 1px var(--md-sys-color-primary) !important;
+  }
+
+  /* cards and panels: hairline + flat, like a shadcn Card */
+  .card,
+  .panel,
+  .settings-group,
+  .album-card,
+  .playlist-card,
+  .mix-card {
+    background: var(--md-sys-color-surface-container-solid) !important;
+    border: var(--melo-hairline) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+  }
+
+  /* thin neutral scrollbars -- Chromium's default reads as "web page" */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, #ffffff 12%, transparent);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, #ffffff 22%, transparent);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Very wide windows: keep the reading column from stretching across the display. */
+@media (min-width: 1600px) {
+  :root {
+    --melo-sidebar-w: 240px;
+  }
+  .content-view {
+    max-width: 1280px;
+  }
+}
+
+/* Narrow-but-not-phone windows: the rail loses its labels before the content does. */
+@media (min-width: 861px) and (max-width: 1023px) {
+  :root {
+    --melo-sidebar-w: 64px;
+  }
+  #sidebar .sidebar-nav .nav-item::before {
+    display: none;
+  }
+  #sidebar .sidebar-nav .nav-item {
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+  /* no room beside the icon here, so the count sits on its corner */
+  #sidebar .sidebar-nav .nav-indicator {
+    position: relative;
+  }
+  #sidebar .nav-badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    margin: 0;
+    order: 0;
+    font-size: 9px;
+    padding: 0 3px;
+  }
+}
+
+/* Short windows (split-screen laptops): the hero art must not push the list out of view. */
+@media (max-height: 640px) {
+  .hero,
+  .home-hero,
+  .featured-banner {
+    display: none !important;
+  }
+}
+
+/* Respect the OS setting; motion is polish, never information. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,9 +1,9 @@
 {
-  "name": "riff",
+  "name": "melo",
   "version": "43.0.0",
   "main": "src/main/main.js",
   "bin": {
-    "riff": "src/main/cli.js"
+    "melo": "src/main/cli.js"
   },
   "scripts": {
     "start": "electron .",
@@ -14,9 +14,9 @@
     "release:major": "npm version major && git push --follow-tags"
   },
   "keywords": [],
-  "author": "rootscripts",
+  "author": "hakosworld-blip",
   "license": "MIT",
-  "description": "made for humans, Riff - audio player.",
+  "description": "melo - a desktop music player.",
   "devDependencies": {
     "electron": "^41.7.1",
     "electron-builder": "^26.15.3"
@@ -28,18 +28,18 @@
     "hls.js": "^1.7.1",
     "tone": "^15.1.22"
   },
-  "productName": "Riff",
-  "homepage": "https://github.com/rootscripts/riff",
+  "productName": "melo",
+  "homepage": "https://github.com/hakosworld-blip/melo",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rootscripts/riff.git"
+    "url": "git+https://github.com/hakosworld-blip/melo.git"
   },
   "bugs": {
-    "url": "https://github.com/rootscripts/riff/issues"
+    "url": "https://github.com/hakosworld-blip/melo/issues"
   },
   "build": {
-    "appId": "io.github.rootscripts.riff",
-    "productName": "Riff",
+    "appId": "app.melo.player",
+    "productName": "melo",
     "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist"
@@ -73,10 +73,18 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.png",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "maintainer": "hakosworld-blip <hakosworld-blip@users.noreply.github.com>",
+      "synopsis": "melo - a desktop music player"
     },
     "mac": {
       "category": "public.app-category.music",
@@ -104,8 +112,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "rootscripts",
-        "repo": "riff",
+        "owner": "hakosworld-blip",
+        "repo": "melo",
         "releaseType": "release"
       }
     ]

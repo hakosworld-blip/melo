@@ -26,7 +26,7 @@ function ffmpegAsset() {
 
 function get(url, redirects = 6) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'Riff' } }, (res) => {
+    https.get(url, { headers: { 'User-Agent': 'melo' } }, (res) => {
       if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && redirects > 0) {
         res.resume();
         return resolve(get(new URL(res.headers.location, url).toString(), redirects - 1));
@@ -138,10 +138,10 @@ async function installFfmpeg() {
   const sums = await getText(`${base}/checksums.sha256`);
   const want = expectedHash(sums, asset.name);
   if (!want) throw new Error(`No checksum published for ${asset.name}`);
-  const archive = path.join(os.tmpdir(), `riff-${asset.name}`);
+  const archive = path.join(os.tmpdir(), `melo-${asset.name}`);
   const got = await downloadFile(`${base}/${asset.name}`, archive);
   if (got !== want) { fs.rmSync(archive, { force: true }); throw new Error('ffmpeg checksum mismatch'); }
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'riff-ffmpeg-'));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'melo-ffmpeg-'));
   try {
     await run('tar', ['-xf', archive, '-C', work]);
     for (const name of ['ffmpeg', 'ffprobe']) {

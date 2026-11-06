@@ -2,11 +2,21 @@ const { app, BrowserWindow, dialog, ipcMain, screen, shell, Tray, Menu, nativeIm
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+
+// Electron derives userData from productName, so a rename would otherwise look like a fresh
+// profile (settings, cache, window state). Move the old folder across once, before anything
+// reads app.getPath('userData').
+try {
+  const appData = app.getPath('appData');
+  const legacyProfile = path.join(appData, 'Riff');
+  const profile = path.join(appData, 'melo');
+  if (!fs.existsSync(profile) && fs.existsSync(legacyProfile)) fs.renameSync(legacyProfile, profile);
+} catch (_) {}
 const { pathToFileURL } = require('url');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const zlib = require('zlib');
-const RFACC_KEY = crypto.createHash('sha256').update('riff-account-key-v1').digest();
+const RFACC_KEY = crypto.createHash('sha256').update('melo-account-key-v1').digest();
 
 function encryptAccount(dataObj) {
   const jsonStr = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
@@ -53,7 +63,7 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
   app.commandLine.appendSwitch('disable-features', 'Vulkan,AudioServiceOutOfProcess');
 
-  if (process.env.RIFF_SKIP_GPU_BUFFER_FLAGS !== '1') {
+  if (process.env.MELO_SKIP_GPU_BUFFER_FLAGS !== '1') {
     app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames');
     app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
   }
@@ -80,14 +90,14 @@ app.commandLine.appendSwitch('disable-sync');
 app.commandLine.appendSwitch('disable-speech-api');
 app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
-const extraFlags = (process.env.RIFF_FLAGS || '').split(';').map((s) => s.trim()).filter(Boolean);
+const extraFlags = (process.env.MELO_FLAGS || '').split(';').map((s) => s.trim()).filter(Boolean);
 for (const flag of extraFlags) {
   const eq = flag.indexOf('=');
   if (eq > 0) app.commandLine.appendSwitch(flag.slice(0, eq), flag.slice(eq + 1));
   else app.commandLine.appendSwitch(flag);
 }
 
-if (process.env.RIFF_DEBUG === '1') {
+if (process.env.MELO_DEBUG === '1') {
   app.whenReady().then(async () => {
     console.log('[gpu] features', JSON.stringify(app.getGPUFeatureStatus()));
     try {
@@ -157,7 +167,7 @@ function runGUI() {
         }
       }
     } catch (e) {
-      console.warn('[riff] storage.json read warning:', e.message);
+      console.warn('[melo] storage.json read warning:', e.message);
     }
     return null;
   }
@@ -299,16 +309,19 @@ function runGUI() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const scaleFactor = primaryDisplay.scaleFactor;
 
-    app.setAppUserModelId('io.github.rootscripts.riff');
+    app.setAppUserModelId('io.github.rootscripts.melo');
     mainWindow = new BrowserWindow({
       x: initialBounds.x,
       y: initialBounds.y,
       width: initialBounds.width,
       height: initialBounds.height,
+      // desktop-sized by default: the UI is adapted for a pointer, not a phone column
+      width: 1200,
+      height: 800,
       minWidth: 800,
       minHeight: 540,
                                    backgroundColor: firstRun ? '#8d5ef2' : '#000000',
-                                   title: 'Riff',
+                                   title: 'melo',
                                    icon: path.join(__dirname, '../../assets', 'icon.png'),
                                    frame: false,
                                    titleBarStyle: 'hidden',
@@ -316,7 +329,7 @@ function runGUI() {
                                    useContentSize: true,
                                    webPreferences: {
                                      preload: path.join(__dirname, 'preload.js'),
-                                   additionalArguments: [`--riff-token=${getServerToken()}`],
+                                   additionalArguments: [`--melo-token=${getServerToken()}`],
                                    nodeIntegration: false,
                                    contextIsolation: true,
                                    webSecurity: false,
@@ -446,7 +459,7 @@ function runGUI() {
     });
 
     ipcMain.handle('get-diagnostics', async () => {
-      const lines = [`Riff ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
+      const lines = [`melo ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
       for (const name of ['yt-dlp', 'ffmpeg']) {
         const bin = resolveBinary(name);
         lines.push(`${name}: ${bin || 'NOT FOUND'}`);
@@ -703,7 +716,7 @@ function runGUI() {
       let mediaKeysWanted = true;
       let mediaKeysActive = false;
       const sendMedia = (cmd) => {
-        if (process.env.RIFF_DEBUG === '1') console.log('[media] globalShortcut', cmd);
+        if (process.env.MELO_DEBUG === '1') console.log('[media] globalShortcut', cmd);
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('media-command', cmd);
       };
       function unregisterMediaKeys() {
@@ -800,9 +813,9 @@ function runGUI() {
         try {
           const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
           const r = await dialog.showSaveDialog(win, {
-            title: 'Export Riff account',
-            defaultPath: 'riff-account.rfacc',
-            filters: [{ name: 'Riff Account (.rfacc)', extensions: ['rfacc'] }]
+            title: 'Export melo account',
+            defaultPath: 'melo-account.rfacc',
+            filters: [{ name: 'melo Account (.rfacc)', extensions: ['rfacc'] }]
           });
           if (r.canceled || !r.filePath) return { canceled: true };
           const buffer = encryptAccount(payload || {});
@@ -817,9 +830,9 @@ function runGUI() {
         try {
           const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
           const r = await dialog.showOpenDialog(win, {
-            title: 'Import Riff account',
+            title: 'Import melo account',
             properties: ['openFile'],
-            filters: [{ name: 'Riff Account (.rfacc)', extensions: ['rfacc'] }]
+            filters: [{ name: 'melo Account (.rfacc)', extensions: ['rfacc'] }]
           });
           if (r.canceled || !r.filePaths || !r.filePaths.length) return { canceled: true };
           const buffer = await fs.promises.readFile(r.filePaths[0]);
@@ -848,7 +861,7 @@ function runGUI() {
 
       ipcMain.handle('google-auth-status', async () => {
         try {
-          const s = session.fromPartition('persist:riff-google');
+          const s = session.fromPartition('persist:melo-google');
           const cookies = await s.cookies.get({ name: 'SAPISID' });
           const loggedIn = Array.isArray(cookies) && cookies.some(c => c && c.value);
           return { loggedIn };
@@ -859,7 +872,7 @@ function runGUI() {
 
       ipcMain.handle('google-logout', async () => {
         try {
-          const s = session.fromPartition('persist:riff-google');
+          const s = session.fromPartition('persist:melo-google');
           await s.clearStorageData();
           return { success: true };
         } catch (e) {
@@ -869,7 +882,7 @@ function runGUI() {
 
       ipcMain.handle('google-login', async (event) => {
         const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
-        const s = session.fromPartition('persist:riff-google');
+        const s = session.fromPartition('persist:melo-google');
         const chromeUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
         try { s.setUserAgent(chromeUA); } catch (e) {}
 
@@ -935,7 +948,7 @@ function runGUI() {
         const doLikes = !opts || opts.doLikes !== false;
         const doPlaylists = !opts || opts.doPlaylists !== false;
 
-        const s = session.fromPartition('persist:riff-google');
+        const s = session.fromPartition('persist:melo-google');
         const cookies = await s.cookies.get({ name: 'SAPISID' });
         const sapisidCookie = Array.isArray(cookies) ? cookies.find(c => c && c.value) : null;
         if (!sapisidCookie) {
@@ -1257,7 +1270,7 @@ function runGUI() {
           let trayIcon = nativeImage.createFromPath(iconPath);
           trayIcon = trayIcon.resize({ width: 22, height: 22 });
           tray = new Tray(trayIcon);
-          tray.setToolTip('Riff');
+          tray.setToolTip('melo');
           const contextMenu = Menu.buildFromTemplate([
             {
               label: 'Show/Hide',

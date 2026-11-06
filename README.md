@@ -140,7 +140,7 @@ Streaming providers and their services may change at any time. Users are respons
 
 Credits and License
 
-melo is derived from Riff, an open-source music player.
+melo is derived from melo, an open-source music player.
 
 We appreciate the original developers and the open-source community whose work helped make this project possible.
 

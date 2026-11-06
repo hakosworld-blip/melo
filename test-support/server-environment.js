@@ -11,8 +11,8 @@ const childProcess = require('node:child_process');
 
 function setupServerEnvironment() {
   const tempRoot = path.resolve(os.tmpdir());
-  const dir = fs.mkdtempSync(path.join(tempRoot, 'riff-test-'));
-  const saved = new Map(['RIFF_DATA_DIR', 'LOCALAPPDATA', 'APPDATA', 'XDG_CONFIG_HOME']
+  const dir = fs.mkdtempSync(path.join(tempRoot, 'melo-test-'));
+  const saved = new Map(['MELO_DATA_DIR', 'LOCALAPPDATA', 'APPDATA', 'XDG_CONFIG_HOME']
     .map(key => [key, process.env[key]]));
   const blocked = [];
 
@@ -69,7 +69,7 @@ function setupServerEnvironment() {
         else process.env[key] = value;
       }
       assert.equal(path.dirname(dir), tempRoot);
-      assert.ok(path.basename(dir).startsWith('riff-test-'));
+      assert.ok(path.basename(dir).startsWith('melo-test-'));
       fs.rmSync(dir, { recursive: true, force: true });
     }
     assert.deepEqual(blocked, [], 'server tests attempted uncontrolled side effects');

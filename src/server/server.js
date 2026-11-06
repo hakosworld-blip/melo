@@ -685,7 +685,7 @@ async function httpGetJson(url, timeoutMs = 6000) {
     try {
       const parsed = new URL(url);
       const mod = parsed.protocol === 'http:' ? http : https;
-      const req = mod.get(url, { headers: { 'User-Agent': 'Riff' }, timeout: timeoutMs }, (res) => {
+      const req = mod.get(url, { headers: { 'User-Agent': 'melo' }, timeout: timeoutMs }, (res) => {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           res.resume();
           return resolve(null);
@@ -1409,7 +1409,7 @@ async function lookupCoverArt(artist, title) {
 async function imageContentType(buf) {
   if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8) return 'image/jpeg';
   if (buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50) return 'image/png';
-  if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'MELO' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
   if (buf.length > 6 && buf.toString('ascii', 0, 3) === 'GIF') return 'image/gif';
   return 'image/jpeg';
 }
@@ -5196,7 +5196,7 @@ async function getSpotifyAccessToken(forceRefresh = false) {
       spotifyAuthError = '';
       if (typeof result.data.refresh_token === 'string' && result.data.refresh_token) {
         spotifyAuth.refreshToken = result.data.refresh_token;
-        if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Riff.';
+        if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting melo.';
       }
       return spotifyAuth.token;
     })().finally(() => { spotifyRefreshPromise = null; });
@@ -5925,8 +5925,8 @@ function callLastFmApi(params, secret, method = 'POST') {
       hostname: 'ws.audioscrobbler.com',
       path: reqPath,
       method,
-      headers: isGet ? { 'User-Agent': 'Riff-Desktop-Player/43.0' } : {
-        'User-Agent': 'Riff-Desktop-Player/43.0',
+      headers: isGet ? { 'User-Agent': 'melo-Desktop-Player/43.0' } : {
+        'User-Agent': 'melo-Desktop-Player/43.0',
         'Content-Type': 'application/x-www-form-urlencoded',
         'Content-Length': Buffer.byteLength(bodyData)
       },
@@ -6073,7 +6073,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname.startsWith('/api/lastfm/')) { handleLastFmRoute(req, res, pathname); return; }
 
-  if (TOKEN_PROTECTED_ROUTES.has(parsedUrl.pathname) && !tokenMatches(req.headers['x-riff-token'])) {
+  if (TOKEN_PROTECTED_ROUTES.has(parsedUrl.pathname) && !tokenMatches(req.headers['x-melo-token'])) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ success: false, error: 'forbidden' }));
   }
@@ -6304,7 +6304,7 @@ const server = http.createServer(async (req, res) => {
       spotifyAuthError = errParam === 'access_denied' ? 'Spotify authorization was denied.' : 'Spotify login failed. Check the Client ID, allowed account and redirect URI.';
       spotifyAuth.state = '';
       res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Riff for details.</p></body></html>');
+      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to melo for details.</p></body></html>');
     }
     const redirectUri = getSpotifyRedirectUri();
     try {
@@ -6312,7 +6312,7 @@ const server = http.createServer(async (req, res) => {
       const tokenResult = await requestSpotifyToken({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: spotifyAuth.clientId, code_verifier: spotifyAuth.verifier });
       if (spotifyAuth !== session) {
         res.writeHead(409, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Spotify login session changed. Return to Riff and try again.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Spotify login session changed. Return to melo and try again.</p></body></html>');
       }
       spotifyAuth.state = '';
       if (tokenResult.status >= 200 && tokenResult.status < 300 && typeof tokenResult.data?.access_token === 'string' && tokenResult.data.access_token) {
@@ -6320,20 +6320,20 @@ const server = http.createServer(async (req, res) => {
         spotifyAuth.refreshToken = typeof tokenResult.data.refresh_token === 'string' ? tokenResult.data.refresh_token : '';
         spotifyAuth.expiresAt = Date.now() + (Number.isFinite(tokenResult.data.expires_in) && tokenResult.data.expires_in > 0 ? tokenResult.data.expires_in : 3600) * 1000;
         if (!spotifyAuth.refreshToken) spotifyAuthError = 'Spotify did not provide a refresh token; reconnect when this session expires.';
-        else if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Riff.';
+        else if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting melo.';
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Riff is connected to Spotify. You can close this tab.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>melo is connected to Spotify. You can close this tab.</p></body></html>');
       } else {
         const reason = tokenResult.data?.error_description || tokenResult.data?.error || `HTTP ${tokenResult.status}`;
         spotifyAuthError = `Spotify token exchange failed: ${reason}`;
         res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Riff for details.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to melo for details.</p></body></html>');
       }
     } catch (err) {
       spotifyAuth.state = '';
       spotifyAuthError = `Could not reach Spotify: ${err.message}`;
       res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Riff for details.</p></body></html>');
+      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to melo for details.</p></body></html>');
     }
   }
 

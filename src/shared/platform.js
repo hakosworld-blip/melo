@@ -4,17 +4,32 @@ const path = require('path');
 
 const IS_WIN = process.platform === 'win32';
 
+/**
+ * Rebrand migration. Older builds wrote the library under a different folder name; move that
+ * folder into place once so an upgrade does not present itself as a fresh install.
+ */
+function migrateLegacyDir(target, legacyNames) {
+  try {
+    if (fs.existsSync(target)) return;
+    const parent = path.dirname(target);
+    for (const name of legacyNames) {
+      const legacy = path.join(parent, name);
+      if (fs.existsSync(legacy)) { fs.renameSync(legacy, target); return; }
+    }
+  } catch (e) {}
+}
+
 const DEFAULT_DATA_DIR = IS_WIN
-  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Riff')
+  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'melo')
   : process.platform === 'darwin'
-  ? path.join(os.homedir(), 'Library', 'Application Support', 'Riff')
-  : path.join(os.homedir(), '.cache', 'devsize');
+  ? path.join(os.homedir(), 'Library', 'Application Support', 'melo')
+  : path.join(os.homedir(), '.cache', 'melo');
 
 const CONFIG_DIR = IS_WIN
-  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Riff')
+  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'melo')
   : process.platform === 'darwin'
-  ? path.join(os.homedir(), 'Library', 'Application Support', 'Riff')
-  : path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'devsize');
+  ? path.join(os.homedir(), 'Library', 'Application Support', 'melo')
+  : path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'melo');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
 function readConfig() {
@@ -27,7 +42,7 @@ function readConfig() {
 }
 
 function resolveDataDir() {
-  const override = process.env.RIFF_DATA_DIR;
+  const override = process.env.MELO_DATA_DIR;
   if (override && override.trim()) {
     try { return path.resolve(override.trim()); } catch (e) {}
   }
@@ -64,6 +79,9 @@ function setDownloadDir(dir) {
   return cfg.downloadDir || null;
 }
 
+migrateLegacyDir(DEFAULT_DATA_DIR, ['Riff', 'devsize']);
+migrateLegacyDir(CONFIG_DIR, ['Riff', 'devsize']);
+
 const DATA_DIR = resolveDataDir();
 
 const CACHE_DIR = path.join(DATA_DIR, 'tracks');
@@ -74,8 +92,8 @@ const METADATA_PATH = path.join(DATA_DIR, 'metadata.json');
 const LIBRARY_DIR = path.join(DATA_DIR, 'library');
 const LIBRARY_PATH = path.join(DATA_DIR, 'library.json');
 const BIN_DIR = path.join(DATA_DIR, 'bin');
-const TUTORIAL_MARKER = IS_WIN ? 'C:\\Riff\\.rifftutorial' : path.join(os.homedir(), '.rifftutorial');
-const TUTORIAL_MARKER_FALLBACK = path.join(DATA_DIR, '.rifftutorial');
+const TUTORIAL_MARKER = path.join(DATA_DIR, '.melotutorial');
+const TUTORIAL_MARKER_FALLBACK = path.join(DATA_DIR, '.melotutorial');
 const STARTUP_PATH = path.join(DATA_DIR, 'startup.json');
 function readStartupConfig() { try { return JSON.parse(fs.readFileSync(STARTUP_PATH, 'utf8')) || {}; } catch (e) { return {}; } }
 function writeStartupConfig(patch) {
@@ -147,7 +165,7 @@ const binaryCache = {};
 function resolveBinary(name) {
   if (name in binaryCache) return binaryCache[name];
   const exe = IS_WIN ? `${name}.exe` : name;
-  const envKey = `RIFF_${name.replace(/[^a-z0-9]/gi, '').toUpperCase()}`;
+  const envKey = `MELO_${name.replace(/[^a-z0-9]/gi, '').toUpperCase()}`;
   const candidates = [
     process.env[envKey],
     path.join(BIN_DIR, exe),

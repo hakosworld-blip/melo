@@ -12,7 +12,7 @@ const { dir } = require('../test-support/server-environment').setupServerEnviron
 
 function get(port, route, token) {
   return new Promise((resolve, reject) => {
-    http.get({ host: '127.0.0.1', port, path: route, headers: { 'X-Riff-Token': token } }, (res) => {
+    http.get({ host: '127.0.0.1', port, path: route, headers: { 'X-melo-Token': token } }, (res) => {
       let body = '';
       res.on('data', chunk => body += chunk);
       res.on('end', () => {

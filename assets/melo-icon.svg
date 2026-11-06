@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 108 108">
+  <!-- melo mark. Path data is copied from the Android launcher drawable
+       (res/drawable/ic_mark_01.xml) so the desktop and mobile logos cannot drift. -->
+  <rect width="108" height="108" rx="22" fill="#000000"/>
+  <path fill="#DCDCDC" d="M21,54 A33,33 0 1,0 87,54 A33,33 0 1,0 21,54 Z"/>
+  <g fill="#000000">
+    <path d="M27,43 H35 V67 H27 Z"/>
+    <path d="M55,43 H63 V67 H55 Z"/>
+    <path d="M83,43 H91 V67 H83 Z"/>
+    <path d="M35,43 C40,40 50,40 55,43 L55,51 C50,57 40,57 35,51 Z"/>
+    <path d="M63,43 C68,40 78,40 83,43 L83,51 C78,57 68,57 63,51 Z"/>
+    <path d="M24,63 H38 V67 H24 Z"/>
+    <path d="M52,63 H66 V67 H52 Z"/>
+    <path d="M80,63 H94 V67 H80 Z"/>
+  </g>
+</svg>
