@@ -1,5 +1,6 @@
 package app.melo.player.ui.components
 
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +44,7 @@ import app.melo.player.data.model.Track
 import app.melo.player.data.model.VerifiedArtistLabel
 import app.melo.player.ui.shadcn.Icon
 import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.MeloMotion
 import app.melo.player.ui.shadcn.MeloSpinner
 import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
@@ -157,6 +160,13 @@ fun TrackRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = LocalMeloColors.current
+    // The active row fades between tints instead of switching, so starting a list does not
+    // flash a hard white-to-accent edge.
+    val titleColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isActive) MeloTheme.scheme.primary else colors.textPrimary,
+        animationSpec = tween(MeloMotion.Standard, easing = MeloMotion.EaseOut),
+        label = "row-title",
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -180,7 +190,7 @@ fun TrackRow(
                     track.title,
                     style = MeloTheme.type.titleMedium,
                     fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (isActive) MeloTheme.scheme.primary else colors.textPrimary,
+                    color = titleColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),

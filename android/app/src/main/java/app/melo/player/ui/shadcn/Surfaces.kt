@@ -1,29 +1,29 @@
 package app.melo.player.ui.shadcn
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -45,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -59,11 +61,12 @@ import app.melo.player.ui.theme.MeloTheme
 import kotlinx.coroutines.delay
 
 /*
- * shadcn surfaces: cards, dialogs, sheets, menus and popovers.
+ * shadcn surfaces: cards, dialogs, sheets, menus and inputs.
  *
  * Material expressed elevation with tint and shadow. shadcn expresses it with a hairline border
- * on a flat fill, which is what these all do - so there is no `tonalElevation` to translate and
- * no shadow to tune.
+ * on a flat fill, and the motion follows the same principle: surfaces arrive with a short
+ * decelerating fade plus a couple of percent of scale or travel - enough to explain where the
+ * surface came from, never enough to wait for.
  */
 
 /** A shadcn card: flat fill, 1dp border, shared radius, 16dp padding. */
@@ -88,7 +91,8 @@ fun MeloCard(
 
 /**
  * A centered shadcn dialog. Same slots Material's `AlertDialog` offered (title, text, confirm,
- * dismiss), so the confirmation and picker flows move over unchanged.
+ * dismiss), so the confirmation and picker flows move over unchanged. It fades in and scales up
+ * from 96%, which reads as "this came from the control you pressed" rather than a page swap.
  */
 @Composable
 fun MeloDialog(
@@ -98,77 +102,104 @@ fun MeloDialog(
     confirmButton: @Composable () -> Unit = {},
     dismissButton: (@Composable () -> Unit)? = null,
 ) {
+    val entered = remember { MutableTransitionState(false) }
+    LaunchedEffect(Unit) { entered.targetState = true }
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = true),
     ) {
         val shape = RoundedCornerShape(MeloTheme.radiusScale.lg)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(MeloTheme.scheme.popover)
-                .border(1.dp, MeloTheme.scheme.border, shape)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        AnimatedVisibility(
+            visibleState = entered,
+            enter = fadeIn(tween(MeloMotion.Standard)) + scaleIn(
+                initialScale = 0.96f,
+                animationSpec = tween(MeloMotion.Standard, easing = MeloMotion.EaseOut),
+            ),
+            exit = fadeOut(tween(120)),
         ) {
-            CompositionLocalProvider(LocalMeloTextStyle provides MeloTheme.type.titleLarge) {
-                title()
-            }
-            CompositionLocalProvider(LocalMeloTextStyle provides MeloTheme.type.bodyMedium) {
-                Box(Modifier.padding(top = 2.dp)) { text() }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(MeloTheme.scheme.popover)
+                    .border(1.dp, MeloTheme.scheme.border, shape)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                dismissButton?.invoke()
-                confirmButton()
+                CompositionLocalProvider(LocalMeloTextStyle provides MeloTheme.type.titleLarge) {
+                    title()
+                }
+                CompositionLocalProvider(LocalMeloTextStyle provides MeloTheme.type.bodyMedium) {
+                    Box(Modifier.padding(top = 2.dp)) { text() }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    dismissButton?.invoke()
+                    confirmButton()
+                }
             }
         }
     }
 }
 
 /**
- * Bottom sheet with the shadcn treatment: hairline border, top-only radius, a 36x4 grabber.
- * Being a plain Dialog means no sheet state to remember at the call site.
+ * Bottom sheet with the shadcn treatment: hairline border, top-only radius, a 36x4 grabber. It
+ * rises the full height of its own content on a quint curve, so the arrival matches the dismiss
+ * gesture instead of snapping into place.
  */
 @Composable
 fun MeloSheet(
     onDismissRequest: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val entered = remember { MutableTransitionState(false) }
+    LaunchedEffect(Unit) { entered.targetState = true }
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         val shape = RoundedCornerShape(topStart = MeloTheme.radiusScale.xl, topEnd = MeloTheme.radiusScale.xl)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(MeloTheme.scheme.popover)
-                .border(1.dp, MeloTheme.scheme.border, shape)
-                .navigationBarsPadding()
-                .imePadding(),
+        AnimatedVisibility(
+            visibleState = entered,
+            enter = slideInVertically(
+                animationSpec = tween(MeloMotion.Slow, easing = MeloMotion.EaseOutQuint),
+                initialOffsetY = { it },
+            ) + fadeIn(tween(MeloMotion.Fast)),
+            exit = fadeOut(tween(120)),
         ) {
-            Box(Modifier.fillMaxWidth().padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(MeloTheme.scheme.popover)
+                    .border(1.dp, MeloTheme.scheme.border, shape)
+                    .navigationBarsPadding()
+                    .imePadding(),
+            ) {
                 Box(
-                    Modifier
-                        .size(36.dp, 4.dp)
-                        .clip(CircleShape)
-                        .background(MeloTheme.scheme.border),
-                )
+                    Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(36.dp, 4.dp)
+                            .clip(CircleShape)
+                            .background(MeloTheme.scheme.border),
+                    )
+                }
+                content()
             }
-            content()
         }
     }
 }
 
 /**
  * Dropdown menu. Anchored to the composable that emits it - the call sites already wrap the
- * overflow button in a Box - so it needs no anchor reference.
+ * overflow button in a Box - so it needs no anchor reference. It fades in from its own corner
+ * at 97%, which visually ties it to the button it belongs to.
  */
 @Composable
 fun MeloMenu(
@@ -178,6 +209,8 @@ fun MeloMenu(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (!expanded) return
+    val entered = remember { MutableTransitionState(false) }
+    LaunchedEffect(Unit) { entered.targetState = true }
     Popup(
         alignment = Alignment.TopEnd,
         offset = IntOffset(0, 0),
@@ -185,19 +218,29 @@ fun MeloMenu(
         properties = PopupProperties(focusable = true),
     ) {
         val shape = RoundedCornerShape(MeloTheme.radiusScale.md)
-        Column(
-            modifier = modifier
-                .widthIn(min = 180.dp, max = 280.dp)
-                .clip(shape)
-                .background(MeloTheme.scheme.popover)
-                .border(1.dp, MeloTheme.scheme.border, shape)
-                .padding(vertical = 4.dp),
-            content = content,
-        )
+        AnimatedVisibility(
+            visibleState = entered,
+            enter = fadeIn(tween(MeloMotion.Fast)) + scaleIn(
+                initialScale = 0.97f,
+                transformOrigin = TransformOrigin(1f, 0f),
+                animationSpec = tween(MeloMotion.Fast, easing = MeloMotion.EaseOut),
+            ),
+            exit = fadeOut(tween(90)),
+        ) {
+            Column(
+                modifier = modifier
+                    .widthIn(min = 180.dp, max = 280.dp)
+                    .clip(shape)
+                    .background(MeloTheme.scheme.popover)
+                    .border(1.dp, MeloTheme.scheme.border, shape)
+                    .padding(vertical = 4.dp),
+                content = content,
+            )
+        }
     }
 }
 
-/** One menu row: 36dp tall, quiet press layer, optional destructive tint. */
+/** Menu row with the caller's own text, for rows that need a tint of their own. */
 @Composable
 fun MeloMenuItem(
     text: @Composable () -> Unit,
@@ -205,18 +248,11 @@ fun MeloMenuItem(
     modifier: Modifier = Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 36.dp)
-            .then(
-                if (pressed) {
-                    Modifier.background(MeloTheme.scheme.onBackground.copy(alpha = 0.06f))
-                } else {
-                    Modifier
-                },
-            )
+            .background(MeloTheme.scheme.onBackground.copy(alpha = pressAlpha(interaction, 0.06f)))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -225,6 +261,7 @@ fun MeloMenuItem(
     }
 }
 
+/** One menu row: 36dp tall, quiet animated press layer, optional destructive tint. */
 @Composable
 fun MeloMenuItem(
     label: String,
@@ -233,37 +270,27 @@ fun MeloMenuItem(
     leadingIcon: ImageVector? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val content = if (destructive) MeloTheme.scheme.error else MeloTheme.scheme.popoverForeground
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 36.dp)
-            .then(
-                if (pressed) {
-                    Modifier.background(MeloTheme.scheme.onBackground.copy(alpha = 0.06f))
-                } else {
-                    Modifier
-                },
-            )
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick,
-            )
+            .background(MeloTheme.scheme.onBackground.copy(alpha = pressAlpha(interaction, 0.06f)))
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (leadingIcon != null) Icon(leadingIcon, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+        if (leadingIcon != null) {
+            Icon(leadingIcon, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+        }
         Text(label, style = MeloTheme.type.bodyMedium, color = content, maxLines = 1)
     }
 }
 
 /**
- * shadcn input: a muted fill, 1dp border that switches to the accent ring on focus, 10dp padding.
- * `OutlinedTextField` carried a floating label and a 56dp minimum height that do not fit the
- * compact language, so the label sits above the field instead.
+ * shadcn input: a muted fill, 1dp border that becomes the accent ring on focus, 10dp padding.
+ * The ring colour is animated, so focus reads as a glow rather than a flicker.
  */
 @Composable
 fun MeloTextField(
@@ -278,11 +305,16 @@ fun MeloTextField(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(MeloTheme.radiusScale.md),
+    shape: Shape = RoundedCornerShape(MeloTheme.radiusScale.md),
 ) {
     var focused by remember { mutableStateOf(false) }
     val scheme = MeloTheme.scheme
     val interaction = remember { MutableInteractionSource() }
+    val border by animateColorAsState(
+        targetValue = if (focused) scheme.ring else scheme.input,
+        animationSpec = tween(MeloMotion.Fast, easing = MeloMotion.EaseOut),
+        label = "field-ring",
+    )
 
     Column(modifier) {
         if (label != null) {
@@ -309,7 +341,7 @@ fun MeloTextField(
                         .fillMaxWidth()
                         .clip(shape)
                         .background(scheme.surfaceVariant.copy(alpha = 0.5f))
-                        .border(1.dp, if (focused) scheme.ring else scheme.input, shape)
+                        .border(1.dp, border, shape)
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -337,7 +369,8 @@ fun MeloTextField(
 /**
  * A minimal scaffold. Material's version brought a SnackbarHost, insets and content colours we
  * do not use; this reserves only the bottom bar's measured height, which is all the navigation
- * host needs to keep content clear of the mini player.
+ * host needs to keep content clear of the mini player. That height animates, so list content
+ * slides rather than jumping a whole mini player's worth when playback starts.
  */
 @Composable
 fun MeloScaffold(
@@ -348,7 +381,12 @@ fun MeloScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     var barHeightPx by remember { mutableIntStateOf(0) }
-    val barHeight = with(LocalDensity.current) { barHeightPx.toDp() }
+    val measured = with(LocalDensity.current) { barHeightPx.toDp() }
+    val barHeight by animateDpAsState(
+        targetValue = measured,
+        animationSpec = tween(MeloMotion.Standard, easing = MeloMotion.EaseOut),
+        label = "bottom-bar-height",
+    )
     Box(modifier.fillMaxSize().background(containerColor)) {
         content(PaddingValues(bottom = barHeight))
         Column(Modifier.align(Alignment.BottomCenter)) {
@@ -396,8 +434,11 @@ fun MeloToastHost(state: MeloToastState) {
     }
     AnimatedVisibility(
         visible = message != null,
-        enter = fadeIn() + slideInVertically { it / 3 },
-        exit = fadeOut(),
+        enter = fadeIn(tween(MeloMotion.Fast)) + slideInVertically(
+            animationSpec = tween(MeloMotion.Standard, easing = MeloMotion.EaseOut),
+            initialOffsetY = { it / 3 },
+        ),
+        exit = fadeOut(tween(120)),
     ) {
         val shape = RoundedCornerShape(MeloTheme.radiusScale.md)
         Row(
@@ -418,7 +459,3 @@ fun MeloToastHost(state: MeloToastState) {
         }
     }
 }
-
-/** Keeps the API honest: nothing in this package may reach for a window inset we ignore. */
-@Suppress("unused")
-private val IgnoredInsets = WindowInsets(0, 0, 0, 0)

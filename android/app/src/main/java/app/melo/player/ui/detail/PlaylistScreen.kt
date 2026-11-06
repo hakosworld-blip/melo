@@ -209,6 +209,7 @@ fun PlaylistScreen(
                 itemsIndexed(tracks, key = { _, t -> t.key }) { index, track ->
                     TrackRow(
                         track = track,
+                        modifier = Modifier.animateItem(),
                         isActive = current?.key == track.key,
                         onClick = { onPlay(tracks, index) },
                         leading = {

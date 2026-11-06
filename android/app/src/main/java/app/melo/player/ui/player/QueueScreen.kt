@@ -107,6 +107,7 @@ fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .animateItem()
                                 .clickable { app.playback.playQueueIndex(index) }
                                 .background(
                                     if (active) MeloTheme.scheme.primary.copy(alpha = 0.10f)

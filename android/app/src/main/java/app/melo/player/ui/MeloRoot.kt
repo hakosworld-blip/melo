@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -80,6 +81,7 @@ import app.melo.player.ui.search.SearchScreen
 import app.melo.player.ui.settings.SettingsScreen
 import app.melo.player.ui.settings.StorageScreen
 import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloMotion
 import app.melo.player.ui.shadcn.MeloProgress
 import app.melo.player.ui.shadcn.MeloScaffold
 import app.melo.player.ui.shadcn.MeloToastHost
@@ -149,12 +151,23 @@ fun MeloRoot(
             bottomBar = {
                 if (showChrome) {
                     Column {
-                        MiniPlayer(
-                            state = playbackState,
-                            position = app.playback.position,
-                            onOpen = { nav.navigateSingleTop(Routes.PLAYER) },
-                            onToggle = { app.playback.toggle() },
-                        )
+                        // The bar rides in from below when playback starts; the scaffold's
+                        // animated bottom padding keeps list content from jumping for it.
+                        AnimatedVisibility(
+                            visible = playbackState.current != null,
+                            enter = fadeIn(tween(180)) + slideInVertically(
+                                animationSpec = tween(220, easing = MeloMotion.EaseOut),
+                                initialOffsetY = { it / 2 },
+                            ),
+                            exit = fadeOut(tween(120)) + slideOutVertically(tween(150)) { it / 3 },
+                        ) {
+                            MiniPlayer(
+                                state = playbackState,
+                                position = app.playback.position,
+                                onOpen = { nav.navigateSingleTop(Routes.PLAYER) },
+                                onToggle = { app.playback.toggle() },
+                            )
+                        }
                         MeloNavBar(current = route, nav = nav)
                     }
                 }
@@ -396,11 +409,21 @@ private fun MeloNavBar(current: String?, nav: NavHostController) {
     ) {
         items.forEach { (route, label, icon) ->
             val selected = current == route
+            val tint by androidx.compose.animation.animateColorAsState(
+                targetValue = if (selected) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
+                animationSpec = tween(MeloMotion.Fast, easing = MeloMotion.EaseOut),
+                label = "nav-tint",
+            )
+            val pill by androidx.compose.animation.animateColorAsState(
+                targetValue = if (selected) MeloTheme.scheme.secondary else Color.Transparent,
+                animationSpec = tween(MeloMotion.Fast, easing = MeloMotion.EaseOut),
+                label = "nav-pill",
+            )
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(MeloTheme.radiusScale.md))
-                    .background(if (selected) MeloTheme.scheme.secondary else Color.Transparent)
+                    .background(pill)
                     .clickable {
                         nav.navigate(route) {
                             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -416,12 +439,12 @@ private fun MeloNavBar(current: String?, nav: NavHostController) {
                     icon,
                     contentDescription = label,
                     modifier = Modifier.size(18.dp),
-                    tint = if (selected) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
+                    tint = tint,
                 )
                 Text(
                     label,
                     style = MeloTheme.type.labelSmall,
-                    color = if (selected) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
+                    color = tint,
                 )
             }
         }

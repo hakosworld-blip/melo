@@ -1,7 +1,9 @@
 package app.melo.player.ui.player
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +61,7 @@ import app.melo.player.ui.components.LocalTrackActions
 import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.formatDuration
 import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloMotion
 import app.melo.player.ui.shadcn.MeloSlider
 import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
@@ -139,16 +142,24 @@ fun NowPlayingScreen(
 
             Spacer(Modifier.height(Spacing.md))
 
-            MeloArt(
-                url = track?.artwork,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .shadow(24.dp, RoundedCornerShape(12.dp))
-                    .clip(RoundedCornerShape(12.dp)),
-                corner = 12.dp,
-                contentDescription = "Album artwork",
-            )
+            // Crossfade rather than swap: the artwork is the largest thing here, and a hard cut
+            // between two covers reads as a glitch.
+            Crossfade(
+                targetState = track?.artwork,
+                animationSpec = tween(240, easing = MeloMotion.EaseOut),
+                label = "artwork",
+            ) { artwork ->
+                MeloArt(
+                    url = artwork,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .shadow(24.dp, RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(12.dp)),
+                    corner = 12.dp,
+                    contentDescription = "Album artwork",
+                )
+            }
 
             Spacer(Modifier.height(Spacing.xl))
 

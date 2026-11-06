@@ -104,7 +104,6 @@ fun MeloButton(
     }
     val shape = RoundedCornerShape(MeloTheme.radiusScale.md)
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val content = if (enabled) paint.content else paint.content.copy(alpha = 0.45f)
     val fill = if (enabled) paint.fill else paint.fill.copy(alpha = 0.45f)
 
@@ -114,13 +113,8 @@ fun MeloButton(
             .clip(shape)
             .background(fill)
             .then(if (paint.stroke != null) Modifier.border(1.dp, paint.stroke, shape) else Modifier)
-            .then(
-                if (pressed) {
-                    Modifier.background(paint.content.copy(alpha = 0.10f).takeIf { it.alpha > 0f } ?: Color.Transparent)
-                } else {
-                    Modifier
-                },
-            )
+            .background(paint.content.copy(alpha = pressAlpha(interaction, 0.10f)))
+            .then(Modifier.pressScale(interaction, 0.98f))
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -153,19 +147,13 @@ fun MeloIconButton(
     content: @Composable () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(MeloTheme.radiusScale.md)
     Box(
         modifier = modifier
             .size(size)
             .clip(shape)
-            .then(
-                if (pressed && enabled) {
-                    Modifier.background(MeloTheme.scheme.onBackground.copy(alpha = 0.08f))
-                } else {
-                    Modifier
-                },
-            )
+            .background(MeloTheme.scheme.onBackground.copy(alpha = pressAlpha(interaction, 0.08f)))
+            .then(Modifier.pressScale(interaction, 0.94f))
             .clickable(
                 interactionSource = interaction,
                 indication = null,
