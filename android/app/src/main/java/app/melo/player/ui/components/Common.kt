@@ -23,11 +23,6 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Verified
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +40,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melo.player.data.model.Track
 import app.melo.player.data.model.VerifiedArtistLabel
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.MeloSpinner
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import coil.compose.AsyncImage
@@ -66,7 +66,7 @@ fun MeloArt(
     val placeholder = Brush.linearGradient(
         listOf(
             colors.surfaceElevated,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+            MeloTheme.scheme.primary.copy(alpha = 0.22f),
         ),
     )
 
@@ -116,7 +116,7 @@ fun SectionHeader(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MeloTheme.type.titleLarge,
                 color = LocalMeloColors.current.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -124,7 +124,7 @@ fun SectionHeader(
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -134,8 +134,8 @@ fun SectionHeader(
         if (onAction != null) {
             Text(
                 actionLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = MeloTheme.type.labelLarge,
+                color = MeloTheme.scheme.primary,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(onClick = onAction)
@@ -178,9 +178,9 @@ fun TrackRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     track.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MeloTheme.type.titleMedium,
                     fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (isActive) MaterialTheme.colorScheme.primary else colors.textPrimary,
+                    color = if (isActive) MeloTheme.scheme.primary else colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -200,7 +200,7 @@ fun TrackRow(
                     append(track.artist)
                     if (track.album.isNotBlank()) append(" · ").append(track.album)
                 },
-                style = MaterialTheme.typography.bodySmall,
+                style = MeloTheme.type.bodySmall,
                 color = colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -209,7 +209,7 @@ fun TrackRow(
         if (trailing != null) trailing() else {
             Text(
                 formatDuration(track.durationMs),
-                style = MaterialTheme.typography.bodySmall,
+                style = MeloTheme.type.bodySmall,
                 color = colors.textSecondary,
             )
         }
@@ -218,7 +218,7 @@ fun TrackRow(
 
 @Composable
 fun OverflowButton(description: String = "More options", onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+    MeloIconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
         Icon(
             Icons.Rounded.MoreVert,
             contentDescription = description,
@@ -250,13 +250,13 @@ fun EmptyState(
         )
         Text(
             title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MeloTheme.type.titleMedium,
             color = LocalMeloColors.current.textPrimary,
             textAlign = TextAlign.Center,
         )
         Text(
             message,
-            style = MaterialTheme.typography.bodySmall,
+            style = MeloTheme.type.bodySmall,
             color = LocalMeloColors.current.textSecondary,
             textAlign = TextAlign.Center,
         )
@@ -281,11 +281,11 @@ fun OfflineState(onRetry: () -> Unit) {
 fun MeloTextButton(label: String, onClick: () -> Unit) {
     Text(
         label,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        style = MeloTheme.type.labelLarge,
+        color = MeloTheme.scheme.primary,
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .background(MeloTheme.scheme.primary.copy(alpha = 0.12f))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 9.dp),
     )
@@ -300,15 +300,15 @@ fun LoadingRow(label: String = "Loading") {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CircularProgressIndicator(
+        MeloSpinner(
             strokeWidth = 2.dp,
             modifier = Modifier
                 .size(18.dp)
                 .semantics { contentDescription = label },
-            color = MaterialTheme.colorScheme.primary,
+            color = MeloTheme.scheme.primary,
         )
         Spacer(Modifier.width(Spacing.md))
-        Text(label, style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
+        Text(label, style = MeloTheme.type.bodySmall, color = LocalMeloColors.current.textSecondary)
     }
 }
 
@@ -316,7 +316,7 @@ fun LoadingRow(label: String = "Loading") {
 fun TagChip(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = MaterialTheme.typography.labelSmall,
+        style = MeloTheme.type.labelSmall,
         color = LocalMeloColors.current.textSecondary,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
@@ -352,7 +352,7 @@ fun formatBytes(bytes: Long): String = when {
 /** Soft vertical fade used behind long lists so the mini player never fights content. */
 @Composable
 fun BottomFade(modifier: Modifier = Modifier) {
-    val bg = MaterialTheme.colorScheme.background
+    val bg = MeloTheme.scheme.background
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -369,7 +369,7 @@ fun BottomFade(modifier: Modifier = Modifier) {
 fun VerifiedBadge(
     modifier: Modifier = Modifier,
     size: Dp = 16.dp,
-    tint: Color = MaterialTheme.colorScheme.primary,
+    tint: Color = MeloTheme.scheme.primary,
 ) {
     Icon(
         Icons.Rounded.Verified,
@@ -386,7 +386,7 @@ fun VerifiedBadge(
 @Composable
 fun AddToPlaylistButton(track: Track, modifier: Modifier = Modifier) {
     val actions = LocalTrackActions.current
-    IconButton(
+    MeloIconButton(
         onClick = { actions.addToPlaylist(track) },
         modifier = modifier.size(40.dp),
     ) {

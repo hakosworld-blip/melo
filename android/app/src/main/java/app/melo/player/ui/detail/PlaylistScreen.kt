@@ -29,12 +29,6 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,13 +55,19 @@ import app.melo.player.ui.components.OverflowButton
 import app.melo.player.ui.components.ScreenHeader
 import app.melo.player.ui.components.TrackRow
 import app.melo.player.ui.components.formatDuration
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.MeloMenu
+import app.melo.player.ui.shadcn.MeloMenuItem
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 @Composable
 fun PlaylistScreen(
@@ -113,29 +113,29 @@ fun PlaylistScreen(
             subtitle = "${tracks.size} tracks · ${formatDuration(totalDuration)}",
             trailing = {
                 Box {
-                    IconButton(onClick = { menuOpen = true }) {
+                    MeloIconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist options")
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("Rename") }, onClick = {
+                    MeloMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        MeloMenuItem(text = { Text("Rename") }, onClick = {
                             menuOpen = false
                             renaming = true
                         })
-                        DropdownMenuItem(text = { Text("Change cover") }, onClick = {
+                        MeloMenuItem(text = { Text("Change cover") }, onClick = {
                             menuOpen = false
                             pickCover()
                         })
                         if (!playlist?.coverArtwork.isNullOrBlank()) {
-                            DropdownMenuItem(text = { Text("Remove cover") }, onClick = {
+                            MeloMenuItem(text = { Text("Remove cover") }, onClick = {
                                 menuOpen = false
                                 scope.launch { library.setPlaylistCover(playlistId, "") }
                             })
                         }
-                        DropdownMenuItem(text = { Text("Reorder / remove tracks") }, onClick = {
+                        MeloMenuItem(text = { Text("Reorder / remove tracks") }, onClick = {
                             menuOpen = false
                             editing = !editing
                         })
-                        DropdownMenuItem(
+                        MeloMenuItem(
                             text = { Text("Download all") },
                             onClick = {
                                 menuOpen = false
@@ -144,15 +144,15 @@ fun PlaylistScreen(
                                 }
                             },
                         )
-                        DropdownMenuItem(
+                        MeloMenuItem(
                             text = { Text("Queue all") },
                             onClick = {
                                 menuOpen = false
                                 onPlay(tracks.drop(1), 0)
                             },
                         )
-                        DropdownMenuItem(
-                            text = { Text("Delete playlist", color = MaterialTheme.colorScheme.error) },
+                        MeloMenuItem(
+                            text = { Text("Delete playlist", color = MeloTheme.scheme.error) },
                             onClick = {
                                 menuOpen = false
                                 confirmDelete = true
@@ -214,7 +214,7 @@ fun PlaylistScreen(
                         leading = {
                             Text(
                                 "${index + 1}",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MeloTheme.type.bodySmall,
                                 color = LocalMeloColors.current.textSecondary,
                             )
                         },
@@ -306,7 +306,7 @@ internal fun RoundButton(
             .size(if (primary) 52.dp else 44.dp)
             .clip(RoundedCornerShape(50))
             .background(
-                if (primary) MaterialTheme.colorScheme.primary
+                if (primary) MeloTheme.scheme.primary
                 else LocalMeloColors.current.surfaceElevated,
             )
             .clickable(onClick = onClick),
@@ -315,7 +315,7 @@ internal fun RoundButton(
         Icon(
             icon,
             contentDescription = description,
-            tint = if (primary) MaterialTheme.colorScheme.onPrimary else LocalMeloColors.current.textPrimary,
+            tint = if (primary) MeloTheme.scheme.onPrimary else LocalMeloColors.current.textPrimary,
             modifier = Modifier.size(if (primary) 24.dp else 20.dp),
         )
     }

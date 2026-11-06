@@ -1,10 +1,6 @@
 package app.melo.player.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -12,18 +8,30 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.melo.player.ui.shadcn.LocalMeloRadius
+import app.melo.player.ui.shadcn.LocalMeloScheme
+import app.melo.player.ui.shadcn.LocalMeloTextStyle
+import app.melo.player.ui.shadcn.LocalMeloTokens
+import app.melo.player.ui.shadcn.LocalMeloType
+import app.melo.player.ui.shadcn.MeloRadius
+import app.melo.player.ui.shadcn.MeloScheme
+import app.melo.player.ui.shadcn.MeloTokens
+import app.melo.player.ui.shadcn.MeloType
+import app.melo.player.ui.shadcn.meloScheme
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 
 @Immutable
 data class MeloThemeConfig(
     val themeMode: String = "dark", // dark | light | system
     val paletteId: String = "spotify",
-    val cornerRadius: Int = 12,
+    val cornerRadius: Int = 8,
     val compact: Boolean = false,
     /** A colour the user mixed in Customization; it takes over from the preset palette. */
     val customAccent: Color? = null,
 )
 
-/** Extra tokens Material3 does not model. */
+/** Text and outline roles the screens read directly; the rest lives on [MeloScheme]. */
 @Immutable
 data class MeloColors(
     val textPrimary: Color,
@@ -35,7 +43,7 @@ data class MeloColors(
     val scrim: Color,
 )
 
-// Spotty checks the default at startup; the preview stays aligned with that choice.
+// Previews and any composable outside MeloTheme stay aligned with the dark default.
 val LocalMeloColors = staticCompositionLocalOf {
     MeloColors(
         textPrimary = TextPrimaryDark,
@@ -57,10 +65,29 @@ object MeloTheme {
     val config: MeloThemeConfig
         @Composable get() = LocalMeloConfig.current
 
+    /** shadcn colour roles (primary/accent, border, popover, muted, destructive). */
+    val scheme: MeloScheme
+        @Composable get() = LocalMeloScheme.current
+
+    /** The shadcn type scale. */
+    val type: MeloType
+        @Composable get() = LocalMeloType.current
+
+    /** Base radius as a plain Dp, for artwork corners and one-off shapes. */
     val radius: Dp
-        @Composable get() = LocalMeloConfig.current.cornerRadius.dp
+        @Composable get() = LocalMeloRadius.current.md
+
+    val radiusScale: MeloRadius
+        @Composable get() = LocalMeloRadius.current
+
+    val tokens: MeloTokens
+        @Composable get() = LocalMeloTokens.current
 }
 
+/**
+ * The app theme. It no longer wraps `MaterialTheme`: colours, type and radius are plain data
+ * classes provided through CompositionLocals, so nothing here needs Material 3 at runtime.
+ */
 @Composable
 fun MeloTheme(
     config: MeloThemeConfig = MeloThemeConfig(),
@@ -75,8 +102,10 @@ fun MeloTheme(
     val palette = paletteById(config.paletteId)
     // A colour the user mixed wins over the preset; otherwise the preset supplies the accent.
     val accent = config.customAccent ?: palette.accent
-    val accentSoft = accentSoftFor(accent, dark)
-    val onAccent = onAccentFor(accent)
+    val scheme = meloScheme(dark, accent)
+    val type = MeloTypography
+    // shadcn ships one radius; the setting moves the whole scale within a sane range.
+    val radius = MeloRadius(config.cornerRadius.coerceIn(4, 16).dp)
 
     val melo = if (dark) {
         MeloColors(
@@ -100,67 +129,16 @@ fun MeloTheme(
         )
     }
 
-    val scheme = if (dark) {
-        darkColorScheme(
-            primary = accent,
-            onPrimary = onAccent,
-            primaryContainer = accentSoft,
-            onPrimaryContainer = onAccent,
-            secondary = accent,
-            background = Ink,
-            onBackground = melo.textPrimary,
-            surface = Surface,
-            onSurface = melo.textPrimary,
-            surfaceVariant = SurfaceElevated,
-            onSurfaceVariant = melo.textSecondary,
-            surfaceContainer = Surface,
-            surfaceContainerHigh = SurfaceElevated,
-            surfaceContainerHighest = SurfaceTop,
-            outline = OutlineSoft,
-            outlineVariant = Color(0xFF1A1A1C),
-            error = Color(0xFFE08C7E),
-            onError = Color(0xFF2A120E),
-        )
-    } else {
-        lightColorScheme(
-            primary = accent,
-            onPrimary = onAccent,
-            primaryContainer = accentSoft,
-            onPrimaryContainer = onAccent,
-            secondary = accent,
-            background = Paper,
-            onBackground = melo.textPrimary,
-            surface = Paper,
-            onSurface = melo.textPrimary,
-            surfaceVariant = PaperSurface,
-            onSurfaceVariant = melo.textSecondary,
-            surfaceContainer = PaperSurface,
-            surfaceContainerHigh = PaperElevated,
-            surfaceContainerHighest = Color.White,
-            outline = OutlineSoftLight,
-            outlineVariant = Color(0xFFEAE3D8),
-            error = Color(0xFFB4553F),
-            onError = Color.White,
-        )
-    }
-
-    val r = config.cornerRadius
-    val shapes = MeloShapes.copy(
-        small = RoundedCornerShape((r * 0.5f).dp),
-        medium = RoundedCornerShape(r.dp),
-        large = RoundedCornerShape((r * 1.5f).dp),
-        extraLarge = RoundedCornerShape((r * 2.0f).dp),
-    )
+    val tokens = MeloTokens(scheme = scheme, type = type, radius = radius, dark = dark)
 
     CompositionLocalProvider(
         LocalMeloColors provides melo,
         LocalMeloConfig provides config,
-    ) {
-        MaterialTheme(
-            colorScheme = scheme,
-            typography = MeloTypography,
-            shapes = shapes,
-            content = content,
-        )
-    }
+        LocalMeloScheme provides scheme,
+        LocalMeloType provides type,
+        LocalMeloRadius provides radius,
+        LocalMeloTextStyle provides type.bodyMedium,
+        LocalMeloTokens provides tokens,
+        content = content,
+    )
 }

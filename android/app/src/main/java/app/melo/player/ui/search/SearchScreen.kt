@@ -25,13 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,7 +58,14 @@ import app.melo.player.ui.components.OverflowButton
 import app.melo.player.ui.components.TrackRow
 import app.melo.player.ui.components.VerifiedBadge
 import app.melo.player.ui.components.formatCount
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.MeloSpinner
+import app.melo.player.ui.shadcn.MeloTextField
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -215,7 +215,7 @@ fun SearchScreen(
         gradient = settings.backgroundGradient,
     ) {
         Column(Modifier.fillMaxSize().imePadding()) {
-            OutlinedTextField(
+            MeloTextField(
                 value = query,
                 onValueChange = vm::onQueryChange,
                 modifier = Modifier
@@ -226,24 +226,17 @@ fun SearchScreen(
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotBlank()) {
-                        IconButton(onClick = { vm.onQueryChange("") }) {
+                        MeloIconButton(onClick = { vm.onQueryChange("") }) {
                             Icon(Icons.Rounded.Close, contentDescription = "Clear search")
                         }
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(20.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
                     keyboard?.hide()
                     vm.submit()
                 }),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    unfocusedBorderColor = LocalMeloColors.current.outlineSoft,
-                    focusedContainerColor = LocalMeloColors.current.surfaceElevated,
-                    unfocusedContainerColor = LocalMeloColors.current.surfaceElevated,
-                ),
             )
 
             LazyRow(
@@ -261,7 +254,7 @@ fun SearchScreen(
                     Column(Modifier.padding(horizontal = Spacing.screenH)) {
                         Text(
                             "Recent searches",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MeloTheme.type.titleMedium,
                             color = LocalMeloColors.current.textSecondary,
                             modifier = Modifier.padding(vertical = Spacing.sm),
                         )
@@ -280,7 +273,7 @@ fun SearchScreen(
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(Spacing.md))
-                                Text(term, style = MaterialTheme.typography.bodyLarge)
+                                Text(term, style = MeloTheme.type.bodyLarge)
                             }
                         }
                     }
@@ -294,7 +287,7 @@ fun SearchScreen(
                 loading && results.tracks.isEmpty() -> Box(
                     Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
-                ) { CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(26.dp)) }
+                ) { MeloSpinner(strokeWidth = 2.dp, modifier = Modifier.size(26.dp)) }
 
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     if (suggestions.isNotEmpty() && query.isNotBlank()) {
@@ -331,7 +324,7 @@ fun SearchScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
                                             artist.name,
-                                            style = MaterialTheme.typography.titleMedium,
+                                            style = MeloTheme.type.titleMedium,
                                             maxLines = 1,
                                             modifier = Modifier.weight(1f, fill = false),
                                         )
@@ -342,7 +335,7 @@ fun SearchScreen(
                                     }
                                     Text(
                                         if (artist.monthlyListeners > 0) "Artist · ${formatCount(artist.monthlyListeners)} monthly listeners" else "Artist",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                     )
                                 }
@@ -363,10 +356,10 @@ fun SearchScreen(
                                 MeloArt(album.artwork, Modifier.size(46.dp), corner = 10.dp)
                                 Spacer(Modifier.width(Spacing.md))
                                 Column(Modifier.weight(1f)) {
-                                    Text(album.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(album.title, style = MeloTheme.type.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(
                                         listOfNotNull(album.artist, album.year.takeIf { it.isNotBlank() }).joinToString(" · "),
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                     )
                                 }
@@ -387,10 +380,10 @@ fun SearchScreen(
                                 MeloArt(playlist.artwork, Modifier.size(46.dp), corner = 10.dp)
                                 Spacer(Modifier.width(Spacing.md))
                                 Column(Modifier.weight(1f)) {
-                                    Text(playlist.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(playlist.title, style = MeloTheme.type.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(
                                         playlist.owner.ifBlank { "Playlist" },
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                     )
                                 }
@@ -432,11 +425,11 @@ fun SearchScreen(
 private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         label,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (selected) MaterialTheme.colorScheme.onPrimary else LocalMeloColors.current.textSecondary,
+        style = MeloTheme.type.labelLarge,
+        color = if (selected) MeloTheme.scheme.onPrimary else LocalMeloColors.current.textSecondary,
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary else LocalMeloColors.current.surfaceElevated)
+            .background(if (selected) MeloTheme.scheme.primary else LocalMeloColors.current.surfaceElevated)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     )
@@ -446,7 +439,7 @@ private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun HeaderText(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleLarge,
+        style = MeloTheme.type.titleLarge,
         modifier = Modifier.padding(start = Spacing.screenH, top = Spacing.lg, bottom = Spacing.xs),
     )
 }

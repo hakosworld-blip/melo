@@ -16,10 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -44,7 +40,11 @@ import app.melo.player.ui.components.MeloTextButton
 import app.melo.player.ui.components.OverflowButton
 import app.melo.player.ui.components.TrackRow
 import app.melo.player.ui.components.formatDuration
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -104,7 +104,7 @@ fun ProviderPlaylistScreen(
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 6.dp, vertical = Spacing.sm)) {
-            IconButton(onClick = onBack) {
+            MeloIconButton(onClick = onBack) {
                 Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
             }
         }
@@ -122,7 +122,7 @@ fun ProviderPlaylistScreen(
                     Column(Modifier.weight(1f)) {
                         Text(
                             playlist?.title ?: "Playlist",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MeloTheme.type.headlineMedium,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -132,7 +132,7 @@ fun ProviderPlaylistScreen(
                                 tracks.size.takeIf { it > 0 }?.let { "$it tracks" },
                                 tracks.sumOf { it.durationMs }.takeIf { it > 0 }?.let { formatDuration(it) },
                             ).joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                         )
                     }
@@ -176,7 +176,7 @@ fun ProviderPlaylistScreen(
                         leading = {
                             Text(
                                 "${index + 1}",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MeloTheme.type.bodySmall,
                                 color = LocalMeloColors.current.textSecondary,
                             )
                         },
@@ -189,7 +189,7 @@ fun ProviderPlaylistScreen(
                 Spacer(Modifier.height(Spacing.md))
                 Text(
                     "Provider playlist. Saving a copy keeps it in your own library.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                     modifier = Modifier.padding(horizontal = Spacing.screenH),
                 )

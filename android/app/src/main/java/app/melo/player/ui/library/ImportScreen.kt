@@ -18,11 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDownload
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -45,7 +40,13 @@ import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.MeloTextButton
 import app.melo.player.ui.components.ScreenHeader
+import app.melo.player.ui.shadcn.MeloProgress
+import app.melo.player.ui.shadcn.MeloSpinner
+import app.melo.player.ui.shadcn.MeloTextField
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -130,11 +131,11 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                 Text(
                     "Paste a public Spotify playlist link. melo reads the public track list, then matches each song " +
                         "against the catalog so you can review before saving. Spotify audio is never copied or downloaded.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                 )
                 Spacer(Modifier.height(Spacing.md))
-                OutlinedTextField(
+                MeloTextField(
                     value = input,
                     onValueChange = { input = it },
                     placeholder = { Text("https://open.spotify.com/playlist/…") },
@@ -156,36 +157,36 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                    MeloSpinner(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(Spacing.sm))
-                    Text("Reading playlist…", style = MaterialTheme.typography.bodySmall)
+                    Text("Reading playlist…", style = MeloTheme.type.bodySmall)
                 }
                 is ImportStage.Matching -> Column(Modifier.padding(horizontal = Spacing.screenH)) {
                     Text(
                         "Matching ${s.done} of ${s.total} tracks…",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MeloTheme.type.bodySmall,
                         color = LocalMeloColors.current.textSecondary,
                     )
                     Spacer(Modifier.height(6.dp))
-                    LinearProgressIndicator(
+                    MeloProgress(
                         progress = { if (s.total > 0) s.done.toFloat() / s.total else 0f },
                         modifier = Modifier.fillMaxWidth().height(3.dp),
                     )
                 }
                 is ImportStage.Failed -> Text(
                     s.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    style = MeloTheme.type.bodyMedium,
+                    color = MeloTheme.scheme.error,
                     modifier = Modifier.padding(Spacing.screenH),
                 )
                 is ImportStage.Created -> Column(
                     Modifier.fillMaxWidth().padding(Spacing.screenH),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("Playlist ready", style = MaterialTheme.typography.titleLarge)
+                    Text("Playlist ready", style = MeloTheme.type.titleLarge)
                     Text(
                         "${s.added} tracks added",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MeloTheme.type.bodySmall,
                         color = LocalMeloColors.current.textSecondary,
                     )
                     Spacer(Modifier.height(Spacing.sm))
@@ -201,10 +202,10 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                         MeloArt(s.preview.artwork, Modifier.size(52.dp), corner = 12.dp)
                         Spacer(Modifier.width(Spacing.md))
                         Column(Modifier.weight(1f)) {
-                            Text(s.preview.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(s.preview.name, style = MeloTheme.type.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 "$matched matched · $unmatched not found",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MeloTheme.type.bodySmall,
                                 color = LocalMeloColors.current.textSecondary,
                             )
                         }
@@ -213,7 +214,7 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                     if (unmatched > 0) {
                         Text(
                             "Unmatched tracks are listed but skipped. Repeat the import later to retry them.",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MeloTheme.type.labelSmall,
                             color = LocalMeloColors.current.textSecondary,
                             modifier = Modifier.padding(horizontal = Spacing.screenH, vertical = 6.dp),
                         )
@@ -230,9 +231,9 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                                         .clip(RoundedCornerShape(50))
                                         .background(
                                             when {
-                                                !match.isMatched -> MaterialTheme.colorScheme.error
-                                                match.ambiguous -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                                else -> MaterialTheme.colorScheme.primary
+                                                !match.isMatched -> MeloTheme.scheme.error
+                                                match.ambiguous -> MeloTheme.scheme.primary.copy(alpha = 0.5f)
+                                                else -> MeloTheme.scheme.primary
                                             },
                                         ),
                                 )
@@ -240,13 +241,13 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         match.imported.title,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MeloTheme.type.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
                                         match.imported.artist,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                         maxLines = 1,
                                     )
@@ -254,14 +255,14 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
                                         if (match.isMatched) "matched" else "not found",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (match.isMatched) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.error,
+                                        style = MeloTheme.type.labelSmall,
+                                        color = if (match.isMatched) MeloTheme.scheme.primary
+                                        else MeloTheme.scheme.error,
                                     )
                                     if (match.ambiguous) {
                                         Text(
                                             "check",
-                                            style = MaterialTheme.typography.labelSmall,
+                                            style = MeloTheme.type.labelSmall,
                                             color = LocalMeloColors.current.textSecondary,
                                         )
                                     }
@@ -273,7 +274,7 @@ fun ImportScreen(app: AppViewModel, onBack: () -> Unit, onOpenPlaylist: (Long) -
                             Text(
                                 "Import uses Spotify's public playlist page. Private playlists and the full Web API " +
                                     "need a Spotify developer app and OAuth login, which is not configured in this build.",
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MeloTheme.type.labelSmall,
                                 color = LocalMeloColors.current.textSecondary,
                                 modifier = Modifier.padding(horizontal = Spacing.screenH),
                             )

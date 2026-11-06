@@ -17,9 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,7 +50,11 @@ import app.melo.player.ui.components.SectionHeader
 import app.melo.player.ui.components.TagChip
 import app.melo.player.ui.components.formatBytes
 import app.melo.player.ui.components.formatDuration
+import app.melo.player.ui.shadcn.MeloProgress
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -110,12 +111,12 @@ fun DownloadsScreen(
             Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.screenH)) {
                 Text(
                     "${saved.size} songs · ${formatBytes(saved.sumOf { it.bytes })}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MeloTheme.type.bodyMedium,
                     color = LocalMeloColors.current.textSecondary,
                 )
                 Text(
                     "Folder: ${folder.displayPath} — every song keeps its cover, its lyrics and its artist details",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                 )
             }
@@ -201,8 +202,8 @@ fun DownloadsScreen(
                         Spacer(Modifier.height(Spacing.md))
                         Text(
                             "Delete downloaded songs",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.error,
+                            style = MeloTheme.type.labelLarge,
+                            color = MeloTheme.scheme.error,
                             modifier = Modifier
                                 .padding(horizontal = Spacing.screenH)
                                 .clip(RoundedCornerShape(12.dp))
@@ -259,7 +260,7 @@ private fun DownloadRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     track.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MeloTheme.type.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -274,8 +275,8 @@ private fun DownloadRow(
                             "CANCELLED" -> append(" · cancelled")
                         }
                     },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (entry.status == "FAILED") MaterialTheme.colorScheme.error
+                    style = MeloTheme.type.bodySmall,
+                    color = if (entry.status == "FAILED") MeloTheme.scheme.error
                     else LocalMeloColors.current.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -294,7 +295,7 @@ private fun DownloadRow(
             if (entry.status == "DONE") {
                 Text(
                     formatDuration(track.durationMs),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                 )
             }
@@ -303,13 +304,13 @@ private fun DownloadRow(
         }
         if (entry.status == "RUNNING" && fraction != null && fraction >= 0f) {
             Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
+            MeloProgress(
                 progress = { fraction },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp)
                     .clip(RoundedCornerShape(2.dp)),
-                color = MaterialTheme.colorScheme.primary,
+                color = MeloTheme.scheme.primary,
             )
         }
     }

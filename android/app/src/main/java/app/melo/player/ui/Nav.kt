@@ -4,8 +4,8 @@ import android.net.Uri
 import app.melo.player.data.model.Album
 import app.melo.player.data.model.SearchPlaylist
 import app.melo.player.data.remote.Api
-import kotlinx.serialization.encodeToString
 import java.util.Base64
+import kotlinx.serialization.encodeToString
 
 /** Route table plus the tiny codec used to pass rich objects between screens. */
 object Routes {

@@ -19,19 +19,10 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.PlaylistPlay
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.QueueMusic
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,7 +40,16 @@ import app.melo.player.data.model.Playlist
 import app.melo.player.data.model.Track
 import app.melo.player.di.ServiceLocator
 import app.melo.player.playback.PlaybackController
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloButton
+import app.melo.player.ui.shadcn.MeloButtonVariant
+import app.melo.player.ui.shadcn.MeloDialog
+import app.melo.player.ui.shadcn.MeloSheet
+import app.melo.player.ui.shadcn.MeloTextField
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -186,11 +186,9 @@ val LocalTrackActions = staticCompositionLocalOf<TrackActionsState> {
     error("TrackActionsState not provided")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackActionsHost(state: TrackActionsState) {
     val track = state.track
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     LaunchedEffect(state) { state.attach(scope) }
 
@@ -201,11 +199,7 @@ fun TrackActionsHost(state: TrackActionsState) {
     }
 
     if (track != null) {
-        ModalBottomSheet(
-            onDismissRequest = { state.dismiss() },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ) {
+        MeloSheet(onDismissRequest = { state.dismiss() }) {
             Column(Modifier.padding(bottom = Spacing.xxl)) {
                 Row(
                     modifier = Modifier
@@ -218,13 +212,13 @@ fun TrackActionsHost(state: TrackActionsState) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             track.title,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MeloTheme.type.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             track.artist,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -277,7 +271,7 @@ private fun SheetAction(label: String, icon: ImageVector, onClick: () -> Unit) {
     ) {
         Icon(icon, contentDescription = null, tint = LocalMeloColors.current.textSecondary, modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(Spacing.lg))
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = MeloTheme.type.bodyLarge)
     }
 }
 
@@ -293,7 +287,7 @@ fun PlaylistPickerDialog(
         playlists = ServiceLocator.library.playlists.first()
     }
 
-    AlertDialog(
+    MeloDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add to playlist") },
         text = {
@@ -301,7 +295,7 @@ fun PlaylistPickerDialog(
                 if (playlists.isEmpty()) {
                     Text(
                         "You don't have any playlists yet.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MeloTheme.type.bodyMedium,
                         color = LocalMeloColors.current.textSecondary,
                     )
                 } else {
@@ -317,10 +311,10 @@ fun PlaylistPickerDialog(
                                 MeloArt(p.coverArtwork, Modifier.size(36.dp), corner = 9.dp)
                                 Spacer(Modifier.width(Spacing.md))
                                 Column {
-                                    Text(p.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                    Text(p.name, style = MeloTheme.type.titleMedium, maxLines = 1)
                                     Text(
                                         "${p.trackCount} tracks",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                     )
                                 }
@@ -336,13 +330,13 @@ fun PlaylistPickerDialog(
                         .padding(vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Add, contentDescription = null, tint = MeloTheme.scheme.primary)
                     Spacer(Modifier.width(Spacing.md))
-                    Text("New playlist", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                    Text("New playlist", color = MeloTheme.scheme.primary, style = MeloTheme.type.titleMedium)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { MeloButton("Cancel", onDismiss, variant = MeloButtonVariant.Ghost) },
     )
 }
 
@@ -354,11 +348,11 @@ fun CreatePlaylistDialog(
     onCreate: (String) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
-    AlertDialog(
+    MeloDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(
+            MeloTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Name") },
@@ -367,9 +361,9 @@ fun CreatePlaylistDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) { Text("Create") }
+            MeloButton("Create", { onCreate(name.trim()) }, enabled = name.isNotBlank())
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { MeloButton("Cancel", onDismiss, variant = MeloButtonVariant.Ghost) },
     )
 }
 
@@ -408,16 +402,13 @@ fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    MeloDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+        text = { Text(message, style = MeloTheme.type.bodyMedium) },
         confirmButton = {
-            TextButton(onClick = {
-                onConfirm()
-                onDismiss()
-            }) { Text(confirmLabel, color = MaterialTheme.colorScheme.error) }
+            MeloButton(confirmLabel, { onConfirm(); onDismiss() }, variant = MeloButtonVariant.Destructive)
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { MeloButton("Cancel", onDismiss, variant = MeloButtonVariant.Ghost) },
     )
 }

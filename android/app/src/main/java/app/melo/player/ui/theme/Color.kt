@@ -6,12 +6,12 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 
 /**
- * melo palette — Spotify-inspired dark surface language.
+ * melo palette — shadcn zinc surfaces with a user-chosen accent.
  *
- * The app sits on a near-black base (`Ink #121212`), with progressively lighter surfaces for
- * cards, sheets and overlays. The single accent is Spotify-green (`#1DB954`): compact white
- * play buttons live on it, so a play press reads instantly. Text is splashed white with a
- * soft grey secondary so artwork stays the loudest thing on screen.
+ * The structural colours are shadcn's neutral scale (`#09090B` base, `#27272A` borders), which
+ * is what makes the app read as shadcn rather than Spotify: no tinted greys, no elevation, one
+ * hairline separating every surface. The accent is still the user's, so the palette picker and
+ * the custom colour mixer keep working.
  */
 @Immutable
 data class MeloPalette(
@@ -48,21 +48,21 @@ fun accentSoftFor(accent: Color, dark: Boolean): Color =
 fun onAccentFor(accent: Color): Color =
     if (accent.luminance() > 0.5f) Color(0xFF111111) else Color.White
 
-// Spotify-style dark surface stack.
-val Ink = Color(0xFF121212)              // app background / base
-val Surface = Color(0xFF181818)         // cards, list surfaces
-val SurfaceElevated = Color(0xFF242428) // sheets / overlays / mini player
-val SurfaceTop = Color(0xFF333338)      // strongest raised surface (now-playing art scrim)
-val OutlineSoft = Color(0xFF28282D)     // dividers / inactive track holes
-val OutlineStrong = Color(0xFF44444A)   // subtle border on cards
-val TextPrimaryDark = Color(0xFFFFFFFF)
-val TextSecondaryDark = Color(0xFFB3B3B3)
+// shadcn zinc surface stack.
+val Ink = Color(0xFF09090B)              // app background / base
+val Surface = Color(0xFF09090B)          // cards sit flat on the base in shadcn
+val SurfaceElevated = Color(0xFF18181B)  // popovers / sheets / mini player
+val SurfaceTop = Color(0xFF27272A)       // strongest raised surface (now-playing art scrim)
+val OutlineSoft = Color(0xFF27272A)      // hairline borders / dividers
+val OutlineStrong = Color(0xFF3F3F46)    // inactive track, disabled edge
+val TextPrimaryDark = Color(0xFFFAFAFA)
+val TextSecondaryDark = Color(0xFFA1A1AA)
 val ScrimDark = Color(0xFF000000)
 
-// Light surface stack (rarely used; kept coherent with the dark scale).
-val Paper = Color(0xFFFAF6F0)
-val PaperSurface = Color(0xFFF2EDE5)
-val PaperElevated = Color(0xFFFCFAF6)
-val OutlineSoftLight = Color(0xFFE0D9CE)
-val TextPrimaryLight = Color(0xFF17140F)
-val TextSecondaryLight = Color(0xFF6E6961)
+// Light ramp, mirrored so the same roles work in both modes.
+val Paper = Color(0xFFFFFFFF)
+val PaperSurface = Color(0xFFF4F4F5)
+val PaperElevated = Color(0xFFFFFFFF)
+val OutlineSoftLight = Color(0xFFE4E4E7)
+val TextPrimaryLight = Color(0xFF09090B)
+val TextSecondaryLight = Color(0xFF71717A)

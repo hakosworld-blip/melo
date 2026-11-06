@@ -29,9 +29,6 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +55,10 @@ import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.OverflowButton
 import app.melo.player.ui.components.TrackRow
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.SharingStarted
@@ -114,7 +114,7 @@ fun LibraryScreen(
         Column(Modifier.fillMaxSize()) {
             Text(
                 "your library",
-                style = MaterialTheme.typography.displayMedium,
+                style = MeloTheme.type.displayMedium,
                 modifier = Modifier.padding(start = Spacing.screenH, top = Spacing.xl, bottom = Spacing.md),
             )
 
@@ -138,12 +138,12 @@ fun LibraryScreen(
                     val selected = t == tab
                     Text(
                         t.label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (selected) MaterialTheme.colorScheme.onPrimary else LocalMeloColors.current.textSecondary,
+                        style = MeloTheme.type.labelLarge,
+                        color = if (selected) MeloTheme.scheme.onPrimary else LocalMeloColors.current.textSecondary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary
+                                if (selected) MeloTheme.scheme.primary
                                 else LocalMeloColors.current.surfaceElevated,
                             )
                             .clickable { tab = t }
@@ -185,13 +185,13 @@ fun LibraryScreen(
                                     Spacer(Modifier.height(Spacing.sm))
                                     Text(
                                         playlist.name,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MeloTheme.type.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
                                         "${playlist.trackCount} tracks",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                     )
                                 }
@@ -216,14 +216,14 @@ fun LibraryScreen(
                                 ) {
                                     Text(
                                         "${favorites.size} songs",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                         modifier = Modifier.weight(1f),
                                     )
                                     Text(
                                         "Play all",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        style = MeloTheme.type.labelLarge,
+                                        color = MeloTheme.scheme.primary,
                                         modifier = Modifier.clickable { onPlayTracks(favorites, 0) },
                                     )
                                 }
@@ -261,10 +261,10 @@ fun LibraryScreen(
                                     MeloArt(artist.artwork, Modifier.size(50.dp), circular = true)
                                     Spacer(Modifier.width(Spacing.md))
                                     Column {
-                                        Text(artist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                        Text(artist.name, style = MeloTheme.type.titleMedium, maxLines = 1)
                                         Text(
                                             "Artist",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MeloTheme.type.bodySmall,
                                             color = LocalMeloColors.current.textSecondary,
                                         )
                                     }
@@ -299,9 +299,9 @@ private fun Shortcut(fraction: Float, label: String, icon: androidx.compose.ui.g
             .clickable(onClick = onClick)
             .padding(Spacing.md),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = MeloTheme.scheme.primary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(Spacing.sm))
-        Text(label, style = MaterialTheme.typography.titleMedium)
+        Text(label, style = MeloTheme.type.titleMedium)
     }
 }
 
@@ -311,13 +311,13 @@ private fun NewPlaylistButton(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .background(MeloTheme.scheme.primary.copy(alpha = 0.12f))
             .clickable(onClick = onClick)
             .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Icon(Icons.Rounded.Add, contentDescription = null, tint = MeloTheme.scheme.primary)
         Spacer(Modifier.width(Spacing.sm))
-        Text("New playlist", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+        Text("New playlist", color = MeloTheme.scheme.primary, style = MeloTheme.type.titleMedium)
     }
 }

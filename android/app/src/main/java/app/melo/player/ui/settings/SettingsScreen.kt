@@ -26,13 +26,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -68,13 +61,22 @@ import app.melo.player.ui.brand.iconVariantById
 import app.melo.player.ui.components.ConfirmDialog
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.ScreenHeader
+import app.melo.player.ui.shadcn.MeloButton
+import app.melo.player.ui.shadcn.MeloButtonVariant
+import app.melo.player.ui.shadcn.MeloCard
+import app.melo.player.ui.shadcn.MeloDialog
+import app.melo.player.ui.shadcn.MeloSlider
+import app.melo.player.ui.shadcn.MeloSwitch
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Palettes
-import app.melo.player.ui.theme.paletteById
 import app.melo.player.ui.theme.Spacing
-import kotlinx.coroutines.launch
+import app.melo.player.ui.theme.paletteById
 import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> Unit) {
@@ -166,8 +168,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         if (settings.backgroundImageUri.isNotBlank()) {
                             Text(
                                 "Custom photo in use",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MeloTheme.type.bodySmall,
+                                color = MeloTheme.scheme.primary,
                                 modifier = Modifier.clickable {
                                     app.setBackgroundImage("")
                                     app.setBackgroundStyle("gradient")
@@ -205,7 +207,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                                         .background(palette.accent)
                                         .then(
                                             if (selected) {
-                                                Modifier.border(2.dp, MaterialTheme.colorScheme.onBackground, CircleShape)
+                                                Modifier.border(2.dp, MeloTheme.scheme.onBackground, CircleShape)
                                             } else {
                                                 Modifier
                                             },
@@ -217,7 +219,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         Spacer(Modifier.height(4.dp))
                         Text(
                             if (settings.customAccent) "Custom colour" else paletteById(settings.paletteId).label,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                         )
                         Spacer(Modifier.height(Spacing.sm))
@@ -239,18 +241,18 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     iconVariantById(settings.appIconId).label,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MeloTheme.type.titleMedium,
                                 )
                                 Text(
                                     "The icon on your home screen. Pick any of the 27 styles, then let your launcher refresh.",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MeloTheme.type.bodySmall,
                                     color = LocalMeloColors.current.textSecondary,
                                 )
                             }
                             Text(
                                 "Change",
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.labelLarge,
+                                color = MeloTheme.scheme.primary,
+                                style = MeloTheme.type.labelLarge,
                                 modifier = Modifier.clickable { showIconPicker = true }.padding(8.dp),
                             )
                         }
@@ -264,18 +266,18 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     iconVariantById(settings.logoId).label,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MeloTheme.type.titleMedium,
                                 )
                                 Text(
                                     "The mark beside the greeting on your home screen. It can differ from the app icon.",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MeloTheme.type.bodySmall,
                                     color = LocalMeloColors.current.textSecondary,
                                 )
                             }
                             Text(
                                 "Change",
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.labelLarge,
+                                color = MeloTheme.scheme.primary,
+                                style = MeloTheme.type.labelLarge,
                                 modifier = Modifier.clickable { showLogoPicker = true }.padding(8.dp),
                             )
                         }
@@ -294,7 +296,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Word mode needs word-level timestamps. melo only uses them when the provider publishes them, otherwise it falls back to line sync.",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                         )
                     }
@@ -422,7 +424,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Affects which audio format is requested from the provider. The best available is chosen by default.",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                         )
                     }
@@ -434,8 +436,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         action = {
                             Text(
                                 if (extractor.busy) "Working…" else "Update",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MeloTheme.type.labelLarge,
+                                color = MeloTheme.scheme.primary,
                                 modifier = Modifier
                                     .clickable(enabled = !extractor.busy) { app.refreshExtractor() }
                                     .padding(8.dp),
@@ -477,8 +479,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         action = {
                             Text(
                                 "Manage",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MeloTheme.type.labelLarge,
+                                color = MeloTheme.scheme.primary,
                                 modifier = Modifier
                                     .clickable(onClick = onOpenStorage)
                                     .padding(8.dp),
@@ -500,8 +502,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                     SettingRow("Clear listening history", "Keeps favourites and playlists", {
                         Text(
                             "Clear",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.labelLarge,
+                            color = MeloTheme.scheme.error,
+                            style = MeloTheme.type.labelLarge,
                             modifier = Modifier.clickable { confirmClearHistory = true }.padding(8.dp),
                         )
                     })
@@ -524,8 +526,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                     SettingRow("Reset all settings", "Restore defaults, keep your library", {
                         Text(
                             "Reset",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.labelLarge,
+                            color = MeloTheme.scheme.error,
+                            style = MeloTheme.type.labelLarge,
                             modifier = Modifier.clickable { confirmReset = true }.padding(8.dp),
                         )
                     })
@@ -534,8 +536,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                     SettingRow("Delete library data", "Removes playlists, favourites, follows and history", {
                         Text(
                             "Delete",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.labelLarge,
+                            color = MeloTheme.scheme.error,
+                            style = MeloTheme.type.labelLarge,
                             modifier = Modifier.clickable { confirmClearLibrary = true }.padding(8.dp),
                         )
                     })
@@ -557,8 +559,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         action = {
                             Text(
                                 if (updates.checking) "Checking…" else "Check",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MeloTheme.type.labelLarge,
+                                color = MeloTheme.scheme.primary,
                                 modifier = Modifier
                                     .clickable(enabled = !updates.checking) { app.checkForUpdates() }
                                     .padding(8.dp),
@@ -581,8 +583,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                             action = {
                                 Text(
                                     "Get",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MeloTheme.type.labelLarge,
+                                    color = MeloTheme.scheme.primary,
                                     modifier = Modifier
                                         .clickable { openUrl(context, release.pageUrl) }
                                         .padding(8.dp),
@@ -598,8 +600,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                         action = {
                             Text(
                                 "Open",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MeloTheme.type.labelLarge,
+                                color = MeloTheme.scheme.primary,
                                 modifier = Modifier
                                     .clickable { openUrl(context, AppInfo.RepoUrl) }
                                     .padding(8.dp),
@@ -611,8 +613,8 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                     SettingRow("Open source licences", "melo is built on open source software", {
                         Text(
                             "View",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = MeloTheme.type.labelLarge,
+                            color = MeloTheme.scheme.primary,
                             modifier = Modifier.clickable { showLicenses = true }.padding(8.dp),
                         )
                     })
@@ -623,7 +625,7 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                             "melo plays music from public catalog endpoints (YouTube Music, SoundCloud) and reads " +
                                 "metadata and lyrics from iTunes, Deezer, LRCLIB and NetEase. No account required, " +
                                 "no analytics, no telemetry. Everything you create stays on this device.",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                         )
                     }
@@ -698,20 +700,19 @@ private fun IconPickerDialog(
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            shape = RoundedCornerShape(26.dp),
+        MeloCard(
             color = LocalMeloColors.current.surfaceElevated,
             modifier = Modifier.fillMaxWidth(0.94f),
         ) {
             Column(Modifier.padding(vertical = Spacing.md)) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MeloTheme.type.titleLarge,
                     modifier = Modifier.padding(horizontal = Spacing.screenH),
                 )
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                     modifier = Modifier.padding(horizontal = Spacing.screenH, vertical = 4.dp),
                 )
@@ -730,10 +731,12 @@ private fun IconPickerDialog(
                         )
                     }
                 }
-                TextButton(
-                    onClick = onDismiss,
+                MeloButton(
+                    "Close",
+                    onDismiss,
                     modifier = Modifier.align(Alignment.End).padding(end = Spacing.sm),
-                ) { Text("Close") }
+                    variant = MeloButtonVariant.Ghost,
+                )
             }
         }
     }
@@ -752,8 +755,8 @@ private fun IconChoice(variant: IconVariant, selected: Boolean, onClick: () -> U
         Spacer(Modifier.height(6.dp))
         Text(
             variant.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (selected) MaterialTheme.colorScheme.primary else LocalMeloColors.current.textSecondary,
+            style = MeloTheme.type.labelSmall,
+            color = if (selected) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -765,8 +768,8 @@ private fun IconChoice(variant: IconVariant, selected: Boolean, onClick: () -> U
 private fun GroupTitle(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.primary,
+        style = MeloTheme.type.titleLarge,
+        color = MeloTheme.scheme.primary,
         modifier = Modifier.padding(start = Spacing.screenH, top = Spacing.xl, bottom = Spacing.sm),
     )
 }
@@ -774,7 +777,7 @@ private fun GroupTitle(text: String) {
 @Composable
 private fun SettingBlock(title: String, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.screenH, vertical = Spacing.sm)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = LocalMeloColors.current.textPrimary)
+        Text(title, style = MeloTheme.type.titleMedium, color = LocalMeloColors.current.textPrimary)
         Spacer(Modifier.height(Spacing.sm))
         content()
     }
@@ -793,10 +796,10 @@ private fun SettingRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MeloTheme.type.titleMedium)
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = MeloTheme.type.bodySmall,
                 color = LocalMeloColors.current.textSecondary,
             )
         }
@@ -814,16 +817,16 @@ private fun SettingSwitch(title: String, subtitle: String, checked: Boolean, onC
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MeloTheme.type.titleMedium)
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                 )
             }
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        MeloSwitch(checked = checked, onCheckedChange = onChange)
     }
 }
 
@@ -845,10 +848,10 @@ private fun SettingSlider(
 
     Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.screenH, vertical = Spacing.xs)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Text(format(shown), style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
+            Text(title, style = MeloTheme.type.titleMedium, modifier = Modifier.weight(1f))
+            Text(format(shown), style = MeloTheme.type.bodySmall, color = LocalMeloColors.current.textSecondary)
         }
-        Slider(
+        MeloSlider(
             value = shown,
             onValueChange = {
                 dragging = it
@@ -879,15 +882,15 @@ private fun Segmented(options: List<Pair<String, String>>, selected: String, onS
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .background(if (isSelected) MeloTheme.scheme.primary else Color.Transparent)
                     .clickable { onSelect(id) }
                     .padding(vertical = 9.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else LocalMeloColors.current.textSecondary,
+                    style = MeloTheme.type.labelLarge,
+                    color = if (isSelected) MeloTheme.scheme.onPrimary else LocalMeloColors.current.textSecondary,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                 )
@@ -902,7 +905,7 @@ private fun SegmentedWithValues(options: List<Pair<String, String>>, selected: S
 
 @Composable
 private fun LicensesDialog(onDismiss: () -> Unit) {
-    AlertDialog(
+    MeloDialog(
         onDismissRequest = onDismiss,
         title = { Text("Open source licences") },
         text = {
@@ -910,7 +913,7 @@ private fun LicensesDialog(onDismiss: () -> Unit) {
                 Text(
                     "melo is derived from Riff, an open-source desktop music player released under the MIT licence. " +
                         "The original copyright notice and licence text are kept in LICENSE at the root of the repository.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                 )
                 Spacer(Modifier.height(Spacing.md))
                 listOf(
@@ -921,17 +924,17 @@ private fun LicensesDialog(onDismiss: () -> Unit) {
                     "Room — Apache License 2.0",
                     "Guava — Apache License 2.0",
                 ).forEach {
-                    Text("• $it", style = MaterialTheme.typography.bodySmall)
+                    Text("• $it", style = MeloTheme.type.bodySmall)
                 }
                 Spacer(Modifier.height(Spacing.md))
                 Text(
                     "music data: YouTube Music and SoundCloud public endpoints; metadata: iTunes and Deezer; " +
                         "lyrics: LRCLIB and NetEase. melo is not affiliated with any of these services.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { MeloButton("Close", onDismiss, variant = MeloButtonVariant.Secondary) },
     )
 }
 
@@ -965,7 +968,7 @@ private fun AccentMixer(argb: Int, onPick: (Int) -> Unit) {
         Spacer(Modifier.width(Spacing.md))
         Text(
             String.format(Locale.US, "#%06X", preview.toArgb() and 0xFFFFFF),
-            style = MaterialTheme.typography.titleMedium,
+            style = MeloTheme.type.titleMedium,
             color = LocalMeloColors.current.textPrimary,
         )
     }

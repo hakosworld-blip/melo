@@ -3,13 +3,13 @@ package app.melo.player.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import app.melo.player.ui.theme.MeloTheme
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
@@ -25,8 +25,8 @@ fun MeloBackground(
     gradient: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val bg = MaterialTheme.colorScheme.background
-    val accent = MaterialTheme.colorScheme.primary
+    val bg = MeloTheme.scheme.background
+    val accent = MeloTheme.scheme.primary
     val context = LocalContext.current
 
     val image = when (style) {

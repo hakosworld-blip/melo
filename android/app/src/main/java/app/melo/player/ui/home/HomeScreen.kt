@@ -29,10 +29,6 @@ import androidx.compose.material.icons.rounded.List
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.ShowChart
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -46,15 +42,15 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import app.melo.player.data.model.Artist
+import app.melo.player.MeloApp
 import app.melo.player.data.model.Album
+import app.melo.player.data.model.Artist
 import app.melo.player.data.model.HomeSection
 import app.melo.player.data.model.Playlist
-import app.melo.player.MeloApp
 import app.melo.player.data.model.Track
 import app.melo.player.data.model.isVerifiedArtist
-import app.melo.player.data.repo.CatalogCache
 import app.melo.player.data.prefs.Settings
+import app.melo.player.data.repo.CatalogCache
 import app.melo.player.di.ServiceLocator
 import app.melo.player.playback.PlaybackState
 import app.melo.player.ui.AppViewModel
@@ -66,7 +62,12 @@ import app.melo.player.ui.components.OfflineState
 import app.melo.player.ui.components.SectionHeader
 import app.melo.player.ui.components.VerifiedBadge
 import app.melo.player.ui.components.formatDuration
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -277,7 +278,7 @@ fun HomeScreen(
 private fun CachedCatalogNote() {
     Text(
         "Offline — showing the catalog saved from your last connection.",
-        style = MaterialTheme.typography.bodySmall,
+        style = MeloTheme.type.bodySmall,
         color = LocalMeloColors.current.textSecondary,
         modifier = Modifier.padding(horizontal = Spacing.screenH, vertical = Spacing.xs),
     )
@@ -291,23 +292,23 @@ private fun GreetingRow(settings: Settings, greeting: String, playback: Playback
             .fillMaxWidth()
             .padding(horizontal = Spacing.screenH, vertical = Spacing.md)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+            .background(MeloTheme.scheme.primary.copy(alpha = 0.14f))
             .padding(Spacing.md),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             MeloMark(variantId = settings.logoId, size = 32.dp, modifier = Modifier.padding(end = Spacing.sm))
             Spacer(Modifier.width(Spacing.xs))
-            Text("melo", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text("melo", style = MeloTheme.type.titleLarge, color = MeloTheme.scheme.primary)
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = nav.openSettings) {
+            MeloIconButton(onClick = nav.openSettings) {
                 Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = colors.textSecondary)
             }
         }
         Spacer(Modifier.height(Spacing.sm))
-        Text(greeting, style = MaterialTheme.typography.displaySmall, color = colors.textPrimary)
+        Text(greeting, style = MeloTheme.type.displaySmall, color = colors.textPrimary)
         Text(
             if (playback.current != null) "Listening to ${playback.current!!.artist}" else "Something quiet, something loud.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MeloTheme.type.bodyMedium,
             color = colors.textSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -326,7 +327,7 @@ private fun ShortcutsGrid(nav: HomeNav) {
         ShortcutItem(Icons.Rounded.Settings, "Settings", "App preferences"),
     )
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screenH, vertical = Spacing.sm)) {
-        Text("Browse all", style = MaterialTheme.typography.titleMedium, color = LocalMeloColors.current.textPrimary)
+        Text("Browse all", style = MeloTheme.type.titleMedium, color = LocalMeloColors.current.textPrimary)
         Spacer(Modifier.height(Spacing.sm))
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -360,11 +361,11 @@ private fun ShortcutTile(icon: androidx.compose.ui.graphics.vector.ImageVector, 
             .padding(Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+        Icon(icon, contentDescription = label, tint = MeloTheme.scheme.primary, modifier = Modifier.size(32.dp))
         Spacer(Modifier.height(Spacing.sm))
-        Text(label, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, style = MeloTheme.type.titleMedium, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (!sub.isNullOrBlank()) {
-            Text(sub, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(sub, style = MeloTheme.type.bodySmall, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }
@@ -392,8 +393,8 @@ private fun TrackCard(track: Track, onClick: () -> Unit) {
     ) {
         MeloArt(track.artwork, Modifier.size(132.dp), corner = 12.dp)
         Spacer(Modifier.height(Spacing.sm))
-        Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(track.artist, style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.title, style = MeloTheme.type.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.artist, style = MeloTheme.type.bodySmall, color = LocalMeloColors.current.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -420,8 +421,8 @@ private fun PlaylistCard(playlist: Playlist, onClick: () -> Unit) {
     ) {
         MeloArt(playlist.coverArtwork, modifier = Modifier.size(132.dp), corner = 12.dp)
         Spacer(Modifier.height(Spacing.sm))
-        Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text("${playlist.trackCount} tracks", style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary)
+        Text(playlist.name, style = MeloTheme.type.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("${playlist.trackCount} tracks", style = MeloTheme.type.bodySmall, color = LocalMeloColors.current.textSecondary)
     }
 }
 
@@ -455,7 +456,7 @@ private fun ArtistCard(artist: Artist, onClick: () -> Unit) {
         ) {
             Text(
                 artist.name,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MeloTheme.type.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -470,7 +471,7 @@ private fun ArtistCard(artist: Artist, onClick: () -> Unit) {
 
 @Composable
 private fun LoadingRow(label: String) {
-    Text(label, style = MaterialTheme.typography.bodyMedium, color = LocalMeloColors.current.textSecondary)
+    Text(label, style = MeloTheme.type.bodyMedium, color = LocalMeloColors.current.textSecondary)
 }
 
 @Composable
@@ -480,15 +481,15 @@ private fun EmptyState(title: String, message: String, action: @Composable (() -
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = LocalMeloColors.current.textPrimary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        Text(message, style = MaterialTheme.typography.bodySmall, color = LocalMeloColors.current.textSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(title, style = MeloTheme.type.titleMedium, color = LocalMeloColors.current.textPrimary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(message, style = MeloTheme.type.bodySmall, color = LocalMeloColors.current.textSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         if (action != null) { Spacer(Modifier.height(Spacing.xs)); action() }
     }
 }
 
 @Composable
 private fun TextButton(label: String, onClick: () -> Unit) {
-    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 9.dp))
+    Text(label, style = MeloTheme.type.labelLarge, color = MeloTheme.scheme.primary, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(MeloTheme.scheme.primary.copy(alpha = 0.12f)).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 9.dp))
 }
 
 private fun greetingForNow(): String {

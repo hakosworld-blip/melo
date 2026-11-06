@@ -23,9 +23,6 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,9 +39,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
 import app.melo.player.R
 import app.melo.player.data.repo.StorageReport
 import app.melo.player.data.repo.StorageUsage
@@ -54,9 +48,16 @@ import app.melo.player.ui.components.ConfirmDialog
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.ScreenHeader
 import app.melo.player.ui.components.formatBytes
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /**
  * Everything melo keeps on the device, in the four groups that can be cleared separately.
@@ -172,7 +173,7 @@ fun StorageScreen(
                         Text(
                             "Downloads live in the melo folder on this device, so files stay yours and " +
                                 "play without a connection. Nothing here is uploaded anywhere.",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                         )
                     }
@@ -260,9 +261,9 @@ private data class StorageSlice(
 private fun storageSlices(report: StorageReport): List<StorageSlice> {
     val colors = LocalMeloColors.current
     return listOf(
-        StorageSlice(stringResource(R.string.storage_downloads), report.downloads, MaterialTheme.colorScheme.primary),
-        StorageSlice(stringResource(R.string.storage_lyrics), report.lyrics, MaterialTheme.colorScheme.tertiary),
-        StorageSlice(stringResource(R.string.storage_cache), report.cache, MaterialTheme.colorScheme.secondary),
+        StorageSlice(stringResource(R.string.storage_downloads), report.downloads, MeloTheme.scheme.primary),
+        StorageSlice(stringResource(R.string.storage_lyrics), report.lyrics, MeloTheme.scheme.tertiary),
+        StorageSlice(stringResource(R.string.storage_cache), report.cache, MeloTheme.scheme.secondary),
         // Personal data is the smallest part on almost every device, so it gets the quiet
         // colour rather than competing with the music.
         StorageSlice(stringResource(R.string.storage_user_data), report.userData, colors.textSecondary),
@@ -291,7 +292,7 @@ private fun StorageBreakdown(report: StorageReport) {
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.storage_breakdown_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MeloTheme.type.titleMedium,
                     color = colors.textPrimary,
                 )
                 Text(
@@ -300,14 +301,14 @@ private fun StorageBreakdown(report: StorageReport) {
                     } else {
                         stringResource(R.string.storage_breakdown_empty)
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = colors.textSecondary,
                 )
             }
             if (report.freeBytes > 0L) {
                 Text(
                     stringResource(R.string.storage_breakdown_free, formatBytes(report.freeBytes)),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MeloTheme.type.labelSmall,
                     color = colors.textSecondary,
                 )
             }
@@ -365,13 +366,13 @@ private fun StorageLegendRow(slice: StorageSlice, total: Long) {
         )
         Text(
             slice.label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MeloTheme.type.bodyMedium,
             color = colors.textPrimary,
             modifier = Modifier.weight(1f),
         )
         Text(
             "${formatBytes(slice.usage.bytes)} · ${sharePercent(slice.usage.bytes, total)}",
-            style = MaterialTheme.typography.bodySmall,
+            style = MeloTheme.type.bodySmall,
             color = colors.textSecondary,
         )
     }
@@ -404,16 +405,16 @@ private fun StorageItem(
             modifier = Modifier
                 .size(38.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                .background(MeloTheme.scheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = MeloTheme.scheme.primary, modifier = Modifier.size(20.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+            Text(title, style = MeloTheme.type.titleMedium, color = colors.textPrimary)
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = MeloTheme.type.bodySmall,
                 color = colors.textSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -422,8 +423,8 @@ private fun StorageItem(
         Spacer(Modifier.width(4.dp))
         Text(
             stringResource(R.string.storage_clear_label),
-            style = MaterialTheme.typography.labelLarge,
-            color = if (enabled) MaterialTheme.colorScheme.primary else colors.textSecondary.copy(alpha = 0.5f),
+            style = MeloTheme.type.labelLarge,
+            color = if (enabled) MeloTheme.scheme.primary else colors.textSecondary.copy(alpha = 0.5f),
             modifier = Modifier
                 .clip(RoundedCornerShape(10.dp))
                 .clickable(enabled = enabled, onClick = onClear)
@@ -439,7 +440,7 @@ private fun LowSpaceBanner(message: String) {
             .fillMaxWidth()
             .padding(horizontal = Spacing.screenH, vertical = Spacing.xs)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
+            .background(MeloTheme.scheme.error.copy(alpha = 0.12f))
             .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -447,18 +448,18 @@ private fun LowSpaceBanner(message: String) {
         Icon(
             Icons.Rounded.Warning,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
+            tint = MeloTheme.scheme.error,
             modifier = Modifier.size(20.dp),
         )
         Column {
             Text(
                 stringResource(R.string.storage_low_space_title),
-                style = MaterialTheme.typography.titleSmall,
+                style = MeloTheme.type.titleSmall,
                 color = LocalMeloColors.current.textPrimary,
             )
             Text(
                 message,
-                style = MaterialTheme.typography.bodySmall,
+                style = MeloTheme.type.bodySmall,
                 color = LocalMeloColors.current.textSecondary,
             )
         }

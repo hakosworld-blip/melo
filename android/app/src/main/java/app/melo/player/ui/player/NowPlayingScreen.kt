@@ -35,11 +35,6 @@ import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,7 +58,12 @@ import app.melo.player.ui.components.CircleIconButton
 import app.melo.player.ui.components.LocalTrackActions
 import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.formatDuration
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloSlider
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.StateFlow
 
@@ -87,8 +87,8 @@ fun NowPlayingScreen(
         isFavorite = track?.let { ServiceLocator.library.isFavorite(it.key) } ?: false
     }
 
-    val accent = MaterialTheme.colorScheme.primary
-    val bg = MaterialTheme.colorScheme.background
+    val accent = MeloTheme.scheme.primary
+    val bg = MeloTheme.scheme.background
 
     Box(
         Modifier
@@ -123,12 +123,12 @@ fun NowPlayingScreen(
                 ) {
                     Text(
                         "now playing",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MeloTheme.type.labelSmall,
                         color = LocalMeloColors.current.textSecondary,
                     )
                     Text(
                         if (state.queue.isEmpty()) "" else "${state.index + 1} of ${state.queue.size}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MeloTheme.type.bodySmall,
                         color = LocalMeloColors.current.textSecondary,
                     )
                 }
@@ -160,14 +160,14 @@ fun NowPlayingScreen(
                 ) {
                     Text(
                         track?.title ?: "Nothing playing",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MeloTheme.type.headlineMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         listOfNotNull(track?.artist, track?.album?.takeIf { it.isNotBlank() }).joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MeloTheme.type.bodyMedium,
+                        color = MeloTheme.scheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -175,7 +175,7 @@ fun NowPlayingScreen(
                 CircleIconButton(
                     icon = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                     description = if (isFavorite) "Remove from favourites" else "Add to favourites",
-                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else LocalMeloColors.current.textSecondary,
+                    tint = if (isFavorite) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
                 ) {
                     track?.let {
                         actions.toggleFavorite(it)
@@ -217,7 +217,7 @@ fun NowPlayingScreen(
                     modifier = Modifier
                         .size(68.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(MeloTheme.scheme.primary)
                         .clickable { app.playback.toggle() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -268,7 +268,7 @@ fun NowPlayingScreen(
             if (track != null) {
                 Text(
                     "Tap the artist name for their page",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MeloTheme.type.labelSmall,
                     color = LocalMeloColors.current.textSecondary.copy(alpha = 0.7f),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -294,29 +294,24 @@ private fun SeekBar(
     val shown = (scrub?.times(duration)?.toLong() ?: positionMs)
         .coerceIn(0L, maxOf(duration, 1L))
 
-    Slider(
+    MeloSlider(
         value = if (duration > 0) shown.toFloat() / duration else 0f,
         onValueChange = { scrub = it },
         onValueChangeFinished = {
             if (duration > 0) scrub?.let { onSeek((it * duration).toLong()) }
             scrub = null
         },
-        colors = SliderDefaults.colors(
-            thumbColor = MaterialTheme.colorScheme.primary,
-            activeTrackColor = MaterialTheme.colorScheme.primary,
-            inactiveTrackColor = LocalMeloColors.current.outlineSoft,
-        ),
     )
     Row(Modifier.fillMaxWidth()) {
         Text(
             formatDuration(shown),
-            style = MaterialTheme.typography.labelSmall,
+            style = MeloTheme.type.labelSmall,
             color = LocalMeloColors.current.textSecondary,
         )
         Spacer(Modifier.weight(1f))
         Text(
             "-" + formatDuration((duration - shown).coerceAtLeast(0L)),
-            style = MaterialTheme.typography.labelSmall,
+            style = MeloTheme.type.labelSmall,
             color = LocalMeloColors.current.textSecondary,
         )
     }
@@ -330,7 +325,7 @@ private fun ToggleIcon(
     onClick: () -> Unit,
 ) {
     val tint by animateColorAsState(
-        if (active) MaterialTheme.colorScheme.primary else LocalMeloColors.current.textSecondary,
+        if (active) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
         label = "toggle-tint",
     )
     CircleIconButton(icon, description, tint = tint, onClick = onClick)
@@ -358,7 +353,7 @@ private fun PillAction(
         )
         Text(
             label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MeloTheme.type.labelSmall,
             color = if (enabled) LocalMeloColors.current.textSecondary else LocalMeloColors.current.outlineSoft,
         )
     }

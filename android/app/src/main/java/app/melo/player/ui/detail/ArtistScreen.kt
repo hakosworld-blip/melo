@@ -26,11 +26,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,7 +62,12 @@ import app.melo.player.ui.components.SectionHeader
 import app.melo.player.ui.components.TrackRow
 import app.melo.player.ui.components.VerifiedBadge
 import app.melo.player.ui.components.formatCount
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.MeloSpinner
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import coil.compose.AsyncImage
@@ -167,7 +167,7 @@ fun ArtistScreen(
         LazyColumn(Modifier.fillMaxSize()) {
             item {
                 Row(Modifier.padding(horizontal = 6.dp, vertical = Spacing.sm)) {
-                    IconButton(onClick = onBack) {
+                    MeloIconButton(onClick = onBack) {
                         Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 }
@@ -201,7 +201,7 @@ fun ArtistScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     p.artist.name,
-                                    style = MaterialTheme.typography.headlineLarge,
+                                    style = MeloTheme.type.headlineLarge,
                                     textAlign = TextAlign.Center,
                                 )
                                 if (p.artist.isVerifiedArtist) {
@@ -212,14 +212,14 @@ fun ArtistScreen(
                             if (p.artist.monthlyListeners > 0 && settings.showStatsSource) {
                                 Text(
                                     "${formatCount(p.artist.monthlyListeners)} monthly listeners · YouTube Music",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MeloTheme.type.bodySmall,
                                     color = LocalMeloColors.current.textSecondary,
                                     textAlign = TextAlign.Center,
                                 )
                             } else if (p.artist.isVerifiedArtist) {
                                 Text(
                                     VerifiedArtistLabel,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MeloTheme.type.bodySmall,
                                     color = LocalMeloColors.current.textSecondary,
                                 )
                             }
@@ -230,7 +230,7 @@ fun ArtistScreen(
                                         .clip(RoundedCornerShape(14.dp))
                                         .background(
                                             if (following) LocalMeloColors.current.surfaceElevated
-                                            else MaterialTheme.colorScheme.primary,
+                                            else MeloTheme.scheme.primary,
                                         )
                                         .clickable { vm.toggleFollow() }
                                         .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -240,15 +240,15 @@ fun ArtistScreen(
                                             if (following) Icons.Rounded.Check else Icons.Rounded.PersonAdd,
                                             contentDescription = null,
                                             tint = if (following) LocalMeloColors.current.textPrimary
-                                            else MaterialTheme.colorScheme.onPrimary,
+                                            else MeloTheme.scheme.onPrimary,
                                             modifier = Modifier.size(17.dp),
                                         )
                                         Spacer(Modifier.width(6.dp))
                                         Text(
                                             if (following) "Following" else "Follow",
-                                            style = MaterialTheme.typography.labelLarge,
+                                            style = MeloTheme.type.labelLarge,
                                             color = if (following) LocalMeloColors.current.textPrimary
-                                            else MaterialTheme.colorScheme.onPrimary,
+                                            else MeloTheme.scheme.onPrimary,
                                         )
                                     }
                                 }
@@ -268,15 +268,15 @@ fun ArtistScreen(
                             Column(Modifier.padding(horizontal = Spacing.screenH, vertical = Spacing.md)) {
                                 Text(
                                     p.artist.bio,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MeloTheme.type.bodyMedium,
                                     color = LocalMeloColors.current.textSecondary,
                                     maxLines = if (bioExpanded) 100 else 3,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
                                     if (bioExpanded) "Show less" else "Read more",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MeloTheme.type.labelLarge,
+                                    color = MeloTheme.scheme.primary,
                                     modifier = Modifier
                                         .padding(top = 6.dp)
                                         .clickable { bioExpanded = !bioExpanded },
@@ -295,7 +295,7 @@ fun ArtistScreen(
                                 leading = {
                                     Text(
                                         "${index + 1}",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MeloTheme.type.bodySmall,
                                         color = LocalMeloColors.current.textSecondary,
                                     )
                                 },
@@ -356,7 +356,7 @@ fun ArtistScreen(
                                         Spacer(Modifier.height(6.dp))
                                         Text(
                                             artist.name,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MeloTheme.type.bodySmall,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
@@ -383,11 +383,11 @@ private fun AlbumTile(album: Album, onClick: () -> Unit) {
     ) {
         MeloArt(album.artwork, Modifier.size(142.dp), corner = MeloTheme.radius)
         Spacer(Modifier.height(6.dp))
-        Text(album.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(album.title, style = MeloTheme.type.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             listOfNotNull(album.year.takeIf { it.isNotBlank() }, album.trackCount.takeIf { it > 0 }?.let { "$it tracks" })
                 .joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall,
+            style = MeloTheme.type.bodySmall,
             color = LocalMeloColors.current.textSecondary,
         )
     }
@@ -396,6 +396,6 @@ private fun AlbumTile(album: Album, onClick: () -> Unit) {
 @Composable
 fun CircularLoader() {
     Box(Modifier.fillMaxWidth().padding(Spacing.lg), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+        MeloSpinner(strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
     }
 }

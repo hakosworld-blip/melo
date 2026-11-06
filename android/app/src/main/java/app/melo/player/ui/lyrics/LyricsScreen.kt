@@ -35,9 +35,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -80,7 +77,10 @@ import app.melo.player.ui.components.EmptyState
 import app.melo.player.ui.components.LoadingRow
 import app.melo.player.ui.components.MeloTextButton
 import app.melo.player.ui.components.NetworkStatus
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import app.melo.player.ui.theme.lyricsFamily
 import coil.compose.AsyncImage
@@ -237,7 +237,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
     val blurDp = if (Build.VERSION.SDK_INT >= 31) (settings.backgroundBlur / 100f * 48f).dp else 0.dp
     val extraScrim = if (Build.VERSION.SDK_INT >= 31) 0f else settings.backgroundBlur / 100f * 0.25f
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(Modifier.fillMaxSize().background(MeloTheme.scheme.background)) {
         // Artwork backdrop
         if (settings.lyricsBackgroundArtwork && !backdrop.isNullOrBlank()) {
             AsyncImage(
@@ -262,7 +262,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background.copy(alpha = dim.coerceIn(0f, 0.95f))),
+                .background(MeloTheme.scheme.background.copy(alpha = dim.coerceIn(0f, 0.95f))),
         )
         if (settings.backgroundGradient) {
             Box(
@@ -297,13 +297,13 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         track?.title ?: "Lyrics",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MeloTheme.type.titleLarge,
                         color = Color.White,
                         maxLines = 1,
                     )
                     Text(
                         track?.artist.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MeloTheme.type.bodySmall,
                         color = Color.White.copy(alpha = 0.65f),
                         maxLines = 1,
                     )
@@ -329,7 +329,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
             if (doc != null && LyricsMode.fromId(settings.lyricsMode) == LyricsMode.WORD && !doc.hasWordTiming) {
                 Text(
                     "Word timings aren't published for this track — showing line sync.",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MeloTheme.type.labelSmall,
                     color = Color.White.copy(alpha = 0.6f),
                     modifier = Modifier.padding(horizontal = Spacing.screenH, vertical = 4.dp),
                 )
@@ -347,14 +347,14 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 if (track == null) "Nothing playing" else "No lyrics for this track",
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MeloTheme.type.titleMedium,
                                 color = Color.White,
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 if (track == null) "Start a song to see its lyrics."
                                 else "LRCLIB and NetEase came back empty, and melo has no lyrics file saved for this song.",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MeloTheme.type.bodySmall,
                                 color = Color.White.copy(alpha = 0.6f),
                             )
                             Spacer(Modifier.height(Spacing.md))
@@ -363,7 +363,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                     }
                     is LyricsUi.Failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(state.message, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                            Text(state.message, style = MeloTheme.type.titleMedium, color = Color.White)
                             Spacer(Modifier.height(Spacing.md))
                             MeloTextButton("Retry") { vm.retry(track) }
                         }
@@ -402,7 +402,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                 Text(
                     if (settings.lyricsOffsetMs == 0) "in sync"
                     else "${if (settings.lyricsOffsetMs > 0) "+" else ""}${settings.lyricsOffsetMs / 1000.0}s",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MeloTheme.type.labelSmall,
                     color = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.padding(horizontal = Spacing.md),
                 )
@@ -420,7 +420,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
                         "custom" -> "saved in the melo folder"
                         else -> ""
                     },
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MeloTheme.type.labelSmall,
                     color = Color.White.copy(alpha = 0.45f),
                 )
             }
@@ -432,7 +432,7 @@ fun LyricsScreen(app: AppViewModel, onClose: () -> Unit) {
 private fun ModeChip(label: String, onClick: () -> Unit) {
     Text(
         label,
-        style = MaterialTheme.typography.labelLarge,
+        style = MeloTheme.type.labelLarge,
         color = Color.White,
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
@@ -493,7 +493,7 @@ private fun PlainLyrics(
     ) {
         Text(
             text,
-            style = MaterialTheme.typography.bodyLarge.copy(
+            style = MeloTheme.type.bodyLarge.copy(
                 fontSize = fontSize,
                 lineHeight = fontSize * (1.55f + lineSpacing.value / 100f),
                 fontFamily = fontFamily,
@@ -579,7 +579,7 @@ private fun SyncedLyrics(
                     label = "line-scale",
                 )
                 val color by animateColorAsState(
-                    targetValue = if (active) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = lineAlpha),
+                    targetValue = if (active) MeloTheme.scheme.primary else Color.White.copy(alpha = lineAlpha),
                     animationSpec = tween(220),
                     label = "line-color",
                 )
@@ -601,7 +601,7 @@ private fun SyncedLyrics(
                                 val isActiveWord = wIndex == activeWord
                                 val wordColor by animateColorAsState(
                                     targetValue = when {
-                                        isActiveWord && karaoke -> MaterialTheme.colorScheme.primary
+                                        isActiveWord && karaoke -> MeloTheme.scheme.primary
                                         isActiveWord -> Color.White
                                         active -> Color.White.copy(alpha = 0.72f)
                                         else -> Color.White.copy(alpha = lineAlpha)
@@ -616,7 +616,7 @@ private fun SyncedLyrics(
                                 )
                                 Text(
                                     text = word.text,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                    style = MeloTheme.type.bodyLarge.copy(
                                         fontSize = fontSize,
                                         fontFamily = fontFamily,
                                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
@@ -643,7 +643,7 @@ private fun SyncedLyrics(
                     } else {
                         Text(
                             text = line.text,
-                            style = MaterialTheme.typography.bodyLarge.copy(
+                            style = MeloTheme.type.bodyLarge.copy(
                                 fontSize = fontSize,
                                 fontFamily = fontFamily,
                                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
@@ -663,7 +663,7 @@ private fun SyncedLyrics(
                                     .fillMaxWidth(0.35f)
                                     .height(2.dp)
                                     .clip(RoundedCornerShape(2.dp))
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                                    .background(MeloTheme.scheme.primary.copy(alpha = 0.35f))
                                     .graphicsLayer {
                                         scaleX = LyricsSync.lineProgress(line, position() + offsetMs)
                                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
@@ -689,7 +689,7 @@ private fun SyncedLyrics(
             ) {
                 Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Follow along", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                Text("Follow along", style = MeloTheme.type.labelSmall, color = Color.White)
             }
         }
     }

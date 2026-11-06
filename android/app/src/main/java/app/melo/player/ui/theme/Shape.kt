@@ -1,21 +1,18 @@
 package app.melo.player.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 /**
- * Corner radius follows Spotify's card language: small, confident radii rather than the very
- * rounded shapes the previous theme used. User-facing config still drives `MeloShapes`, but the
- * grid tiles, mini player and now-playing card read best with these Spotify-scale values.
+ * shadcn's single-radius system: one base radius drives controls, cards and overlays, with a
+ * small step either side. Material's five-size `Shapes` object is gone with the rest of M3.
  */
-val MeloShapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(6.dp),
-    medium = RoundedCornerShape(8.dp),
-    large = RoundedCornerShape(12.dp),
-    extraLarge = RoundedCornerShape(16.dp),
-)
+object Radius {
+    val sm = RoundedCornerShape(6.dp)
+    val md = RoundedCornerShape(8.dp)
+    val lg = RoundedCornerShape(12.dp)
+    val xl = RoundedCornerShape(16.dp)
+}
 
 object Spacing {
     val xs = 4.dp

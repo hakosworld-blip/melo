@@ -21,10 +21,6 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,7 +49,11 @@ import app.melo.player.ui.components.MeloTextButton
 import app.melo.player.ui.components.OverflowButton
 import app.melo.player.ui.components.TrackRow
 import app.melo.player.ui.components.formatDuration
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloIconButton
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
 import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,7 +114,7 @@ fun AlbumScreen(
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 6.dp, vertical = Spacing.sm)) {
-            IconButton(onClick = onBack) {
+            MeloIconButton(onClick = onBack) {
                 Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
             }
         }
@@ -132,15 +132,15 @@ fun AlbumScreen(
                     Column(Modifier.weight(1f)) {
                         Text(
                             resolved.title,
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MeloTheme.type.headlineMedium,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             resolved.artist,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = MeloTheme.type.bodyMedium,
+                            color = MeloTheme.scheme.primary,
                             maxLines = 1,
                             modifier = Modifier.clickable { onOpenArtist(resolved.artist) },
                         )
@@ -150,7 +150,7 @@ fun AlbumScreen(
                                 tracks.size.takeIf { it > 0 }?.let { "$it tracks" },
                                 tracks.sumOf { it.durationMs }.takeIf { it > 0 }?.let { formatDuration(it) },
                             ).joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MeloTheme.type.bodySmall,
                             color = LocalMeloColors.current.textSecondary,
                         )
                     }
@@ -197,7 +197,7 @@ fun AlbumScreen(
                         leading = {
                             Text(
                                 "${index + 1}",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MeloTheme.type.bodySmall,
                                 color = LocalMeloColors.current.textSecondary,
                             )
                         },
@@ -215,7 +215,7 @@ fun AlbumScreen(
                 Spacer(Modifier.height(Spacing.md))
                 Text(
                     "Track data comes from the provider; melo does not invent missing metadata.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MeloTheme.type.bodySmall,
                     color = LocalMeloColors.current.textSecondary,
                     modifier = Modifier.padding(horizontal = Spacing.screenH),
                 )
@@ -229,7 +229,7 @@ fun AlbumScreen(
 private fun StatPill(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.labelSmall,
+        style = MeloTheme.type.labelSmall,
         color = LocalMeloColors.current.textSecondary,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))

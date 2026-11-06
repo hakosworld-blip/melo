@@ -32,16 +32,6 @@ import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -80,8 +70,8 @@ import app.melo.player.ui.detail.PlaylistScreen
 import app.melo.player.ui.detail.ProviderPlaylistScreen
 import app.melo.player.ui.home.HomeScreen
 import app.melo.player.ui.library.DownloadsScreen
-import app.melo.player.ui.library.ImportScreen
 import app.melo.player.ui.library.HistoryScreen
+import app.melo.player.ui.library.ImportScreen
 import app.melo.player.ui.library.LibraryScreen
 import app.melo.player.ui.lyrics.LyricsScreen
 import app.melo.player.ui.player.NowPlayingScreen
@@ -89,7 +79,15 @@ import app.melo.player.ui.player.QueueScreen
 import app.melo.player.ui.search.SearchScreen
 import app.melo.player.ui.settings.SettingsScreen
 import app.melo.player.ui.settings.StorageScreen
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.MeloProgress
+import app.melo.player.ui.shadcn.MeloScaffold
+import app.melo.player.ui.shadcn.MeloToastHost
+import app.melo.player.ui.shadcn.MeloToastState
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -103,7 +101,7 @@ fun MeloRoot(
     val backStackEntry by nav.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
     val playbackState by app.playback.state.collectAsStateWithLifecycle()
-    val snackbar = remember { SnackbarHostState() }
+    val snackbar = remember { MeloToastState() }
     val scope = rememberCoroutineScope()
 
     val chromeRoutes = setOf(Routes.HOME, Routes.SEARCH, Routes.LIBRARY)
@@ -124,7 +122,7 @@ fun MeloRoot(
                     nav.navigate(Routes.artist(track.artist))
                 }
             },
-            notify = { message -> scope.launch { snackbar.showSnackbar(message) } },
+            notify = { message -> scope.launch { snackbar.show(message) } },
         )
     }
 
@@ -136,7 +134,7 @@ fun MeloRoot(
 
     LaunchedEffect(playbackState.error) {
         playbackState.error?.let {
-            snackbar.showSnackbar(it)
+            snackbar.show(it)
             app.clearError()
         }
     }
@@ -145,9 +143,9 @@ fun MeloRoot(
         LocalTrackActions provides actions,
         LocalCurrentTrack provides playbackState.current,
     ) {
-        Scaffold(
+        MeloScaffold(
             containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbar) },
+            snackbarHost = { MeloToastHost(snackbar) },
             bottomBar = {
                 if (showChrome) {
                     Column {
@@ -301,7 +299,7 @@ fun MeloRoot(
                         StorageScreen(
                             app = app,
                             onBack = { nav.popBackStack() },
-                            notify = { message -> scope.launch { snackbar.showSnackbar(message) } },
+                            notify = { message -> scope.launch { snackbar.show(message) } },
                         )
                     }
                 }
@@ -334,13 +332,10 @@ private fun MiniPlayer(
                 .clickable(onClick = onOpen)
                 .padding(8.dp),
         ) {
-            LinearProgressIndicator(
-                progress = {
-                    if (state.durationMs > 0) (positionMs.value.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
-                },
-                modifier = Modifier.fillMaxWidth().height(2.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = Color.Transparent,
+            MeloProgress(
+                progress = if (state.durationMs > 0) (positionMs.value.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f,
+                modifier = Modifier.fillMaxWidth(),
+                color = MeloTheme.scheme.primary,
             )
             Spacer(Modifier.height(4.dp))
             Row(
@@ -352,14 +347,14 @@ private fun MiniPlayer(
                 Column(Modifier.weight(1f)) {
                     Text(
                         track.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MeloTheme.type.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = colors.textPrimary,
                     )
                     Text(
                         track.artist,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MeloTheme.type.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = colors.textSecondary,
@@ -369,7 +364,7 @@ private fun MiniPlayer(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(MeloTheme.scheme.primary)
                         .clickable(onClick = onToggle),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -392,31 +387,43 @@ private fun MeloNavBar(current: String?, nav: NavHostController) {
         Triple(Routes.SEARCH, "Search", Icons.Rounded.Search),
         Triple(Routes.LIBRARY, "Library", Icons.Rounded.LibraryMusic),
     )
-    NavigationBar(
-        containerColor = Color.Transparent,
-        tonalElevation = 0.dp,
-        modifier = Modifier.navigationBarsPadding(),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEach { (route, label, icon) ->
-            NavigationBarItem(
-                selected = current == route,
-                onClick = {
-                    nav.navigate(route) {
-                        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
+            val selected = current == route
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(MeloTheme.radiusScale.md))
+                    .background(if (selected) MeloTheme.scheme.secondary else Color.Transparent)
+                    .clickable {
+                        nav.navigate(route) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
-                },
-                icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp)) },
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    unselectedIconColor = LocalMeloColors.current.textSecondary,
-                    unselectedTextColor = LocalMeloColors.current.textSecondary,
-                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                ),
-            )
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(18.dp),
+                    tint = if (selected) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
+                )
+                Text(
+                    label,
+                    style = MeloTheme.type.labelSmall,
+                    color = if (selected) MeloTheme.scheme.primary else LocalMeloColors.current.textSecondary,
+                )
+            }
         }
     }
 }

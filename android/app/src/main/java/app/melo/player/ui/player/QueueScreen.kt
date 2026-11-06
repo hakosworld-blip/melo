@@ -19,9 +19,9 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,11 +43,12 @@ import app.melo.player.ui.components.MeloArt
 import app.melo.player.ui.components.MeloBackground
 import app.melo.player.ui.components.MeloTextButton
 import app.melo.player.ui.components.ScreenHeader
+import app.melo.player.ui.shadcn.Icon
+import app.melo.player.ui.shadcn.Text
 import app.melo.player.ui.theme.LocalMeloColors
+import app.melo.player.ui.theme.MeloColors
+import app.melo.player.ui.theme.MeloTheme
 import app.melo.player.ui.theme.Spacing
-import androidx.compose.material.icons.rounded.QueueMusic
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
 
 @Composable
 fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
@@ -84,7 +85,7 @@ fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
                                 else -> "Repeat off"
                             },
                             tint = if (state.repeatMode == 0) LocalMeloColors.current.textSecondary
-                            else MaterialTheme.colorScheme.primary,
+                            else MeloTheme.scheme.primary,
                         ) { app.setRepeat((state.repeatMode + 1) % 3) }
                         if (state.queue.isNotEmpty()) {
                             MeloTextButton("Clear", { confirmClear = true })
@@ -108,7 +109,7 @@ fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
                                 .fillMaxWidth()
                                 .clickable { app.playback.playQueueIndex(index) }
                                 .background(
-                                    if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                    if (active) MeloTheme.scheme.primary.copy(alpha = 0.10f)
                                     else androidx.compose.ui.graphics.Color.Transparent,
                                 )
                                 .padding(horizontal = Spacing.screenH, vertical = 7.dp),
@@ -118,14 +119,14 @@ fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
                                 Icon(
                                     Icons.Rounded.GraphicEq,
                                     contentDescription = "Now playing",
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MeloTheme.scheme.primary,
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(Spacing.sm))
                             } else {
                                 Text(
                                     "${index + 1}",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MeloTheme.type.bodySmall,
                                     color = LocalMeloColors.current.textSecondary,
                                     modifier = Modifier.width(26.dp),
                                 )
@@ -135,14 +136,14 @@ fun QueueScreen(app: AppViewModel, onClose: () -> Unit) {
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     track.title,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MeloTheme.type.titleMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    color = if (active) MaterialTheme.colorScheme.primary else LocalMeloColors.current.textPrimary,
+                                    color = if (active) MeloTheme.scheme.primary else LocalMeloColors.current.textPrimary,
                                 )
                                 Text(
                                     track.artist,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MeloTheme.type.bodySmall,
                                     color = LocalMeloColors.current.textSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,

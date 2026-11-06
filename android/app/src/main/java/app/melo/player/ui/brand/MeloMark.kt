@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +17,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.melo.player.ui.theme.MeloTheme
 
 /**
  * The melo mark in one of the icon variants.
@@ -47,7 +47,7 @@ fun MeloMark(
             .background(Brush.linearGradient(stops))
             .then(
                 if (highlighted) {
-                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+                    Modifier.border(2.dp, MeloTheme.scheme.primary, shape)
                 } else {
                     Modifier
                 },
