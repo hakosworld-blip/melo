@@ -194,21 +194,26 @@ These names are fixed; the workflow and the Gradle file both expect them.
 
 ## 3. Releasing
 
-`.github/workflows/release.yml` is one pipeline for both platforms: it builds the APK and
- the Windows/Linux desktop installers from the same commit and publishes them in a
- single GitHub Release. It runs on:
+`.github/workflows/release.yml` is one pipeline that builds both platforms from the
+same commit, so an APK and the desktop installers always come from the same code.
+Versions and releases stay separate: Android keeps its `1.0.x` version and its own
+Release, and desktop keeps the `package.json` (`43.x`) version and its own Release. It
+runs on:
 
 - **a tag push** (`v1.0.0`, `v1.0.1`, …) → signs and verifies the APK, builds both
-  installers, and publishes one Release with the APK, the installers and a combined
-  `SHA256SUMS.txt`;
-- **manual dispatch** → the same build and verification for both platforms, published
-  as a Release (the tag defaults to `v<version>`, which is the easiest path if you only
-  have a phone);
-- **a push to `main`** → builds and verifies everything but only uploads workflow
+  installers, publishes the Android Release for the tag and the desktop Release at
+  `v<package.json version>`;
+- **manual dispatch** → the same builds and verification; pass `release_tag` to publish
+  the Android Release and/or `tag` to publish the desktop one, so a run that only wants
+  artifacts publishes nothing (this is the easiest path if you only have a phone);
+- **a push to `main`** → builds and verifies both platforms but only uploads workflow
   artifacts, so no Release is touched.
 
-Both platforms take the version from the tag (or the `version` input), so the APK, the
-installer file names and the release tag always agree.
+Each platform resolves its own version: Android from `version_name`, then the tag, then
+`1.0.0-main.<run>` on a branch build; desktop from the `version` input or
+`package.json`. The desktop release job also refuses to run when its tag would be the
+same as the Android tag, because that would silently put the APK and the installers on
+one Release.
 
 For Android the workflow:
 

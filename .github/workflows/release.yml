@@ -1,12 +1,21 @@
-name: melo release
+name: Release
 
-# One pipeline for both platforms: the APK and the desktop installers are always
-# built from the same commit and published in a single GitHub Release.
+# One run builds both platforms so the APK and the installers always come from the
+# same commit. Versions and releases stay separate, as they were before the merge:
 #
-#   * push to main            -> signed APK + installers as artifacts (no release)
-#   * push a tag like v1.0.1  -> one Release with the APK, both desktop installers
-#                                and a combined SHA256SUMS.txt
-#   * run manually            -> builds and releases both (tag defaults to v<version>)
+#   Android  - version comes from release_tag/version_name or the pushed tag
+#              (branch builds: 1.0.0-main.<run>). Its own Release.
+#   Desktop  - version comes from the `version` input or package.json (43.x).
+#              Its own Release at v<version>.
+#
+# What each trigger does:
+#
+#   * push to main        -> both builds uploaded as workflow artifacts, no releases
+#   * push a tag like v*  -> both publish, each to its own tag/Release
+#   * run manually        -> builds as artifacts; pass release_tag and/or tag to publish
+#
+# Both platforms share one trigger and one run, so they are released together whenever
+# a run is a release run. They do not share a version number or a release page.
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
 #   ANDROID_KEYSTORE_BASE64    base64 of the release .jks file
@@ -19,24 +28,34 @@ name: melo release
 
 on:
   push:
-    # Branch builds produce artifacts only. Before this, pushing code started no
-    # build at all, which is why an existing (older) release looked unchanged.
+    # A push to main builds and uploads artifacts for both platforms. It deliberately
+    # does NOT publish: the Android release step needs a non-empty release_tag, and the
+    # desktop release job is skipped for branch pushes. Only a tag or a dispatch that
+    # names a tag touches the Releases page.
     branches:
       - main
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
+      version_name:
+        description: 'Android version name (e.g. 1.0.1). Defaults to the tag, or 1.0.0-main.<run>.'
+        required: false
+        type: string
+      release_tag:
+        description: 'Optional: publish the Android Release with this tag (e.g. android-v1.0.1).'
+        required: false
+        type: string
       version:
-        description: 'Version for both apps, e.g. 1.0.1 (blank = tag, or version in package.json)'
+        description: 'Desktop version to build, e.g. 43.1.0 (blank = version in package.json)'
         required: false
         type: string
       tag:
-        description: 'Release tag, e.g. v1.0.1 (blank = v<version>)'
+        description: 'Desktop release tag, e.g. v43.1.0 (blank = v<desktop version>)'
         required: false
         type: string
       draft:
-        description: 'Publish as a draft release'
+        description: 'Publish the desktop release as a draft'
         required: false
         default: false
         type: boolean
@@ -50,73 +69,18 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
-  # Never let electron-builder publish on its own; the publish job owns that.
+  # Never let electron-builder publish on its own; the release job owns that.
   CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
 jobs:
-  # A single resolved version feeds both platforms, so the APK, the installers and
-  # the release tag can never disagree about what they contain.
-  prepare:
-    name: Resolve version
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      publish: ${{ steps.version.outputs.publish }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Resolve version, tag and whether to publish
-        id: version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-          INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            # A tag is the release: both platforms take their version from it.
-            VERSION="${GITHUB_REF_NAME#v}"
-            TAG="$GITHUB_REF_NAME"
-            PUBLISH=true
-          elif [ -n "$INPUT_TAG" ]; then
-            VERSION="${INPUT_TAG#v}"
-            TAG="$INPUT_TAG"
-            PUBLISH=true
-          elif [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
-            TAG="v$VERSION"
-            PUBLISH=true
-          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            # A manual run is a release request; default to the desktop version.
-            VERSION="$(node -p "require('./package.json').version")"
-            TAG="v$VERSION"
-            PUBLISH=true
-          else
-            # Branch build: not a release. Stamp the run number so the artifact and
-            # the About screen identify exactly which commit produced them.
-            VERSION="1.0.0-main.${GITHUB_RUN_NUMBER}"
-            TAG=""
-            PUBLISH=false
-          fi
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$'; then
-            echo "::error title=Bad version::'$VERSION' is not a valid version name (expected e.g. 1.0.1)."
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
-          echo "Resolved version $VERSION (tag '${TAG}', publish=$PUBLISH)"
-
+  # ---------------------------------------------------------------------------
+  # Android: signed APK + the Android Release
+  # ---------------------------------------------------------------------------
   android:
-    name: Build Android APK
-    needs: prepare
+    name: Build signed APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    outputs:
-      apk: ${{ steps.verify.outputs.apk }}
-      package: ${{ steps.verify.outputs.package }}
-      cert_sha256: ${{ steps.verify.outputs.cert_sha256 }}
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -155,6 +119,39 @@ jobs:
       - name: Make the Gradle wrapper executable
         run: chmod +x android/gradlew
 
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_VERSION" ]; then
+            NAME="$INPUT_VERSION"
+          elif [ "$REF_TYPE" = "tag" ]; then
+            NAME="${REF_NAME#v}"
+          else
+            # Branch builds are not releases; stamp the run number so the artifact and
+            # the About screen identify exactly which commit produced them.
+            NAME="1.0.0-main.${GITHUB_RUN_NUMBER}"
+          fi
+          if ! printf '%s' "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$'; then
+            echo "::error title=Bad version::'$NAME' is not a valid version name (expected e.g. 1.0.0)."
+            exit 1
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          if [ "$REF_TYPE" = "tag" ]; then
+            echo "release_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
+          elif [ -n "$INPUT_TAG" ]; then
+            echo "release_tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_tag=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building melo $NAME (code ${GITHUB_RUN_NUMBER})"
+
       - name: Run unit tests
         working-directory: android
         run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
@@ -163,7 +160,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-test-report
+          name: melo-test-report
           path: android/app/build/reports/tests/
           if-no-files-found: ignore
 
@@ -181,8 +178,8 @@ jobs:
           MELO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           MELO_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           MELO_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          MELO_VERSION_NAME: ${{ needs.prepare.outputs.version }}
-          MELO_VERSION_CODE: ${{ github.run_number }}
+          MELO_VERSION_NAME: ${{ steps.version.outputs.name }}
+          MELO_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
           ./gradlew assembleRelease --no-daemon --stacktrace
@@ -209,7 +206,7 @@ jobs:
         id: verify
         working-directory: android
         env:
-          VERSION_NAME: ${{ needs.prepare.outputs.version }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
@@ -254,16 +251,72 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: melo-android
+          name: melo-${{ steps.version.outputs.name }}
           path: |
-            android/melo-${{ needs.prepare.outputs.version }}.apk
-            android/melo-${{ needs.prepare.outputs.version }}.apk.sha256
+            android/melo-${{ steps.version.outputs.name }}.apk
+            android/melo-${{ steps.version.outputs.name }}.apk.sha256
           if-no-files-found: error
           retention-days: 90
 
+      - name: Publish GitHub Release
+        if: steps.version.outputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.release_tag }}
+          name: melo ${{ steps.version.outputs.name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          body: |
+            **melo ${{ steps.version.outputs.name }}** — Android music player
+
+            | | |
+            |---|---|
+            | Package | `${{ steps.verify.outputs.package }}` |
+            | Version | `${{ steps.verify.outputs.version_name }}` (code `${{ steps.verify.outputs.version_code }}`) |
+            | Minimum Android | 8.0 (API 26) |
+            | Signing cert SHA-256 | `${{ steps.verify.outputs.cert_sha256 }}` |
+
+            **Install**
+
+            1. Download the `.apk` below.
+            2. Open it on the phone and allow installing from this source when prompted.
+            3. Allow notifications so the playback controls appear on the lock screen.
+
+            **Verify the download**
+
+            ```
+            sha256sum -c melo-${{ steps.version.outputs.name }}.apk.sha256
+            ```
+
+            Builds are reproducible from source with `android/gradlew assembleRelease`.
+            Keep the same signing key for every release so updates install over older
+            versions.
+
+            melo plays public catalog streams (YouTube Music, SoundCloud) and reads
+            metadata from iTunes/Deezer and lyrics from LRCLIB/NetEase. It is not
+            affiliated with any of those services.
+          files: |
+            android/melo-${{ steps.version.outputs.name }}.apk
+            android/melo-${{ steps.version.outputs.name }}.apk.sha256
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## melo ${{ steps.version.outputs.name }}"
+            echo ""
+            echo "- APK: \`${{ steps.verify.outputs.apk }}\`"
+            echo "- Package: \`${{ steps.verify.outputs.package }}\`"
+            echo "- Signing cert SHA-256: \`${{ steps.verify.outputs.cert_sha256 }}\`"
+            echo "- Release tag: \`${{ steps.version.outputs.release_tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Desktop: Windows + Linux installers
+  # ---------------------------------------------------------------------------
   desktop:
     name: Build ${{ matrix.label }}
-    needs: prepare
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -295,15 +348,11 @@ jobs:
         run: npm test
 
       - name: Stamp version
+        if: ${{ inputs.version != '' }}
         shell: bash
-        # Both platforms report the same version; the release tag is derived from it.
         run: |
           set -euo pipefail
-          CURRENT="$(node -p "require('./package.json').version")"
-          WANTED="${{ needs.prepare.outputs.version }}"
-          if [ "$CURRENT" != "$WANTED" ]; then
-            npm version "$WANTED" --no-git-tag-version --allow-same-version >/dev/null
-          fi
+          npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version >/dev/null
           node -e "console.log('building', require('./package.json').name, require('./package.json').version)"
 
       - name: Build installers
@@ -345,23 +394,16 @@ jobs:
             dist/*.blockmap
             dist/SHA256SUMS-*.txt
 
-  publish:
-    name: Publish release
-    needs: [prepare, android, desktop]
-    # Branch pushes stop here: an artifact-only build must never touch Releases.
-    if: needs.prepare.outputs.publish == 'true'
+  desktop-release:
+    name: Publish desktop release
+    if: github.event_name != 'push' || github.ref_type == 'tag'
+    needs: desktop
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download APK
-        uses: actions/download-artifact@v4
-        with:
-          name: melo-android
-          path: artifacts
-
-      - name: Download desktop artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -374,54 +416,65 @@ jobs:
           set -euo pipefail
           cd artifacts
           ls -1
-          # Per-platform checksum files and the APK checksum become one manifest.
+          # per-platform checksum files are merged into one manifest for the release
           shopt -s nullglob
-          parts=(SHA256SUMS-*.txt *.apk.sha256)
+          parts=(SHA256SUMS-*.txt)
           if [ ${#parts[@]} -eq 0 ]; then echo "no checksum files found"; exit 1; fi
-          cat "${parts[@]}" | sort -k2 > ../SHA256SUMS.txt
+          cat "${parts[@]}" | sort -k2 > ../SHA256SUMS-all.txt
           rm -f "${parts[@]}"
           cd ..
-          mv SHA256SUMS.txt artifacts/SHA256SUMS.txt
+          if [ -s SHA256SUMS-all.txt ]; then mv SHA256SUMS-all.txt artifacts/SHA256SUMS.txt; fi
 
-      - name: Publish GitHub Release
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          tag="${{ inputs.tag }}"
+          [ -z "$tag" ] && tag="v${version}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "releasing ${tag}"
+
+      # The two platforms keep separate releases. If both would land on the same tag this
+      # run would silently merge the APK into the desktop release, so stop instead and ask
+      # for distinct tags.
+      - name: Keep the desktop release separate from the Android release
+        shell: bash
+        env:
+          DESKTOP_TAG: ${{ steps.tag.outputs.tag }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          if [ "$REF_TYPE" = "tag" ]; then
+            ANDROID_TAG="$REF_NAME"
+          else
+            ANDROID_TAG="$INPUT_TAG"
+          fi
+          if [ -n "$ANDROID_TAG" ] && [ "$ANDROID_TAG" = "$DESKTOP_TAG" ]; then
+            echo "::error title=One tag, two platforms::Desktop would publish '$DESKTOP_TAG', which this run also uses for the Android Release, so both would end up on one release. Pass a different desktop 'tag' input or a different Android 'release_tag'."
+            exit 1
+          fi
+          echo "Desktop release tag '$DESKTOP_TAG' (Android tag '${ANDROID_TAG:-none}')"
+
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.prepare.outputs.tag }}
-          name: melo ${{ needs.prepare.outputs.version }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: melo ${{ steps.tag.outputs.tag }}
           draft: ${{ inputs.draft || false }}
           generate_release_notes: true
           fail_on_unmatched_files: false
           body: |
-            **melo ${{ needs.prepare.outputs.version }}** — Android player and desktop app, built from the same commit.
+            melo desktop player ${{ steps.tag.outputs.tag }}
 
-            | Platform | File | Install |
-            |---|---|---|
-            | Android 8.0+ | `melo-${{ needs.prepare.outputs.version }}.apk` | open on the phone, allow installing from this source |
-            | Windows 10/11 x64 | `melo-*-win-x64.exe` | run the NSIS installer |
-            | Linux x64 | `melo-*-linux-x64.AppImage` | portable, `chmod +x` and run |
-            | Debian/Ubuntu | `melo-*-linux-amd64.deb` | `sudo apt install ./melo-*.deb` |
+            - **Windows 10/11** — `melo-*-win-x64.exe` (NSIS installer)
+            - **Linux** — `melo-*-linux-x64.AppImage` (portable) or `melo-*-linux-amd64.deb`
 
-            Verify downloads against `SHA256SUMS.txt` (includes the APK):
-
-            ```
-            sha256sum -c SHA256SUMS.txt
-            ```
-
-            | | |
-            |---|---|
-            | Package | `${{ needs.android.outputs.package }}` |
-            | APK signing cert SHA-256 | `${{ needs.android.outputs.cert_sha256 }}` |
-            | Build | `${{ github.sha }}` |
-
-            Allow notifications on Android so playback controls appear on the lock screen.
-            Keep the same signing key for every release so updates install over older versions.
-
-            melo plays public catalog streams (YouTube Music, SoundCloud) and reads
-            metadata from iTunes/Deezer and lyrics from LRCLIB/NetEase. It is not
-            affiliated with any of those services.
+            Verify downloads against `SHA256SUMS.txt`.
           files: |
-            artifacts/*.apk
-            artifacts/*.sha256
             artifacts/*.exe
             artifacts/*.AppImage
             artifacts/*.deb
@@ -429,16 +482,3 @@ jobs:
             artifacts/*.yml
             artifacts/*.blockmap
             artifacts/SHA256SUMS.txt
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "## melo ${{ needs.prepare.outputs.version }}"
-            echo ""
-            echo "- Tag: \`${{ needs.prepare.outputs.tag }}\`"
-            echo "- APK: \`${{ needs.android.outputs.apk }}\`"
-            echo "- Package: \`${{ needs.android.outputs.package }}\`"
-            echo "- APK signing cert SHA-256: \`${{ needs.android.outputs.cert_sha256 }}\`"
-            echo "- Desktop: Windows x64 + Linux x64 installers"
-          } >> "$GITHUB_STEP_SUMMARY"
