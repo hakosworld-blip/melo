@@ -62,6 +62,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         playback.connect()
+        // Unpack and warm the yt-dlp-nightly extractor now, not on the first press of play.
+        YtDlp.warmUp(context)
         // Pick up anything already sitting in the melo folder: songs downloaded by an
         // earlier install, or files the user copied in themselves.
         viewModelScope.launch { runCatching { ServiceLocator.downloads.scanFolder() } }

@@ -166,7 +166,31 @@ function toolsStatus() {
   };
 }
 
-async function ensureTools() {
+/** Shared so a play request and the startup install never download yt-dlp twice. */
+let installPromise = null;
+
+function ensureTools() {
+  if (installPromise) return installPromise;
+  installPromise = runEnsureTools().finally(() => { installPromise = null; });
+  return installPromise;
+}
+
+/**
+ * Waits a bounded time for yt-dlp to become available. Playback calls this when the binary is
+ * missing but an install is already running, so the first track waits for the download instead
+ * of silently falling through to a provider path that returns unusable URLs.
+ */
+function whenToolsReady(timeoutMs = 45000) {
+  if (resolveBinary('yt-dlp')) return Promise.resolve(true);
+  if (!installPromise) return Promise.resolve(false);
+  const settled = installPromise.then(() => !!resolveBinary('yt-dlp')).catch(() => false);
+  return Promise.race([
+    settled,
+    new Promise((resolve) => setTimeout(() => resolve(!!resolveBinary('yt-dlp')), timeoutMs))
+  ]);
+}
+
+async function runEnsureTools() {
   if (state.status === 'downloading') return toolsStatus();
   fs.mkdirSync(BIN_DIR, { recursive: true });
   state.status = 'downloading';
@@ -202,4 +226,4 @@ async function updateYtDlpIfManaged() {
   }
 }
 
-module.exports = { ensureTools, toolsStatus, updateYtDlpIfManaged, expectedHash, ytDlpAsset, ffmpegAsset };
+module.exports = { ensureTools, whenToolsReady, toolsStatus, updateYtDlpIfManaged, expectedHash, ytDlpAsset, ffmpegAsset };

@@ -37,8 +37,24 @@ object YtDlp {
     private const val KEY_LAST_NIGHTLY_CHECK = "last_nightly_check"
 
     /** Best audio the provider offers, versus the best one that stays frugal. */
-    private const val FORMAT_BEST = "bestaudio/best"
+    private const val FORMAT_BEST = "bestaudio[ext=m4a]/bestaudio/best"
     private const val FORMAT_FRUGAL = "bestaudio[abr<=128]/bestaudio/best"
+
+    /**
+     * One extraction attempt: how yt-dlp should present itself, and the identity the CDN will
+     * see when the URL is read back.
+     *
+     * yt-dlp's own defaults come first. Pinning `android_vr` — the previous behaviour — made
+     * extraction succeed and every returned URL answer 403, which the player could only show
+     * as "nothing plays"; the pinned clients stay afterwards as fallbacks.
+     */
+    private data class Strategy(val extractorArgs: String?, val userAgent: String)
+
+    private val STRATEGIES = listOf(
+        Strategy(null, Api.WEB_UA),
+        Strategy("youtube:player_client=android", Api.WEB_UA),
+        Strategy("youtube:player_client=android_vr", Api.ANDROID_VR_UA),
+    )
 
     private const val WATCH_URL = "https://www.youtube.com/watch?v="
 
@@ -52,6 +68,16 @@ object YtDlp {
 
     /** The last thing that went wrong, for the settings screen. */
     fun lastError(): String? = failure
+
+    /**
+     * Starts the embedded Python and the nightly refresh off the play path. Unpacking the
+     * interpreter takes seconds, and doing it on the first press of play is what made playback
+     * look dead on a fresh install.
+     */
+    fun warmUp(context: Context) {
+        if (ready) return
+        refreshScope.launch { ensureReady(context.applicationContext) }
+    }
 
     /** Version of the extractor currently installed, or null when it is not usable yet. */
     suspend fun version(context: Context): String? = withContext(Dispatchers.IO) {
@@ -88,31 +114,44 @@ object YtDlp {
         if (videoId.isBlank()) return@withContext null
         if (!ensureReady(context)) return@withContext null
 
-        val request = YoutubeDLRequest(WATCH_URL + videoId)
-        request.addOption("--no-playlist")
-        request.addOption("--no-warnings")
-        request.addOption("-f", if (highQuality) FORMAT_BEST else FORMAT_FRUGAL)
-        // The URL is signed for one client, so extraction and playback must agree on it.
-        request.addOption("--extractor-args", "youtube:player_client=android_vr")
-        // -g prints the media URL instead of downloading the file.
-        request.addOption("-g")
+        // Each attempt only counts once the CDN has actually served audio bytes for the URL
+        // it returned, with the same identity playback will use.
+        for (strategy in STRATEGIES) {
+            val request = YoutubeDLRequest(WATCH_URL + videoId)
+            request.addOption("--no-playlist")
+            request.addOption("--no-warnings")
+            request.addOption("--no-check-certificates")
+            request.addOption("--socket-timeout", "8")
+            request.addOption("-f", if (highQuality) FORMAT_BEST else FORMAT_FRUGAL)
+            strategy.extractorArgs?.let { request.addOption("--extractor-args", it) }
+            // -g prints the media URL instead of downloading the file.
+            request.addOption("-g")
 
-        val response = runCatching { YoutubeDL.execute(request) }
-            .onFailure { failure = describe(it) }
-            .getOrNull() ?: return@withContext null
+            val response = runCatching { YoutubeDL.execute(request) }
+                .onFailure { failure = describe(it) }
+                .getOrNull() ?: continue
 
-        if (response.exitCode != 0) {
-            failure = response.err.lineSequence().lastOrNull { it.isNotBlank() }?.trim()
-            return@withContext null
+            if (response.exitCode != 0) {
+                failure = response.err.lineSequence().lastOrNull { it.isNotBlank() }?.trim()
+                continue
+            }
+
+            val urls = response.out.lineSequence()
+                .map { it.trim() }
+                .filter { it.startsWith("https://") || it.startsWith("http://") }
+                .toList()
+
+            for (url in urls) {
+                if (!servesAudio(url, strategy.userAgent)) continue
+                failure = null
+                return@withContext ResolvedStream.Remote(
+                    url,
+                    hls = url.contains(".m3u8"),
+                    userAgent = strategy.userAgent,
+                )
+            }
         }
-
-        val url = response.out.lineSequence()
-            .map { it.trim() }
-            .firstOrNull { it.startsWith("https://") || it.startsWith("http://") }
-            ?: return@withContext null
-
-        if (!servesAudio(url)) return@withContext null
-        ResolvedStream.Remote(url, hls = url.contains(".m3u8"), userAgent = Api.ANDROID_VR_UA)
+        null
     }
 
     /**
@@ -166,11 +205,11 @@ object YtDlp {
             ?.takeIf { it.isNotEmpty() }
 
     /** A ranged read, so a 403 or an empty body is caught here instead of in the player. */
-    private suspend fun servesAudio(url: String): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun servesAudio(url: String, userAgent: String): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", Api.ANDROID_VR_UA)
+                .header("User-Agent", userAgent)
                 .header("Range", "bytes=0-16383")
                 .build()
             Api.streamingClient.newCall(req).execute().use { res ->

@@ -19,8 +19,8 @@ import app.melo.player.data.remote.YouTubeMusic
  * track. Metadata-only tracks (imports, third-party album pages) are matched against
  * the catalog first, exactly like the desktop app's `searchQuery` fallback.
  *
- * When InnerTube answers without a direct media URL, the yt-dlp-nightly extractor is tried
- * for the same video id before giving up, so age-gated and freshly-broken videos still play.
+ * yt-dlp-nightly resolves the media URL first, because it is the extractor that keeps up with
+ * the provider; InnerTube is the fallback for when the extractor cannot be used.
  */
 class StreamResolver(
     private val downloads: DownloadDao,
@@ -55,10 +55,11 @@ class StreamResolver(
             Source.YOUTUBE -> {
                 val id = track.id.ifBlank { YouTubeMusic.extractVideoId(track.webUrl).orEmpty() }
                 if (id.isNotBlank()) {
+                    // yt-dlp nightly is the extractor now: InnerTube keeps handing back URLs the
+                    // CDN refuses, which surfaced as a track that loaded and never made a sound.
+                    YtDlp.resolveAudio(context, id, highQuality)?.let { return it }
                     val result = YouTubeMusic.resolveAudio(id, highQuality)
                     if (result is ResolvedStream.Remote) return result
-                    // InnerTube had nothing usable for this id; the nightly extractor may.
-                    YtDlp.resolveAudio(context, id, highQuality)?.let { return it }
                 }
                 return resolveByQuery(track, highQuality)
             }
@@ -94,10 +95,10 @@ class StreamResolver(
             ?.first
             ?: hits.first()
 
+        YtDlp.resolveAudio(context, best.id, highQuality)?.let { return it }
+
         val direct = YouTubeMusic.resolveAudio(best.id, highQuality)
         if (direct is ResolvedStream.Remote) return direct
-
-        YtDlp.resolveAudio(context, best.id, highQuality)?.let { return it }
         return ResolvedStream.Failure("This track is not streamable right now.")
     }
 

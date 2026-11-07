@@ -56,7 +56,11 @@ function setupServerEnvironment() {
   mock.method(platform, 'resolveBinary', () => null);
   const tools = require('../src/server/tools');
   mock.method(tools, 'updateYtDlpIfManaged', async () => false);
-  mock.method(tools, 'ensureTools', deny('tool installation'));
+  // The server installs the extractor at startup on purpose; report the tool as absent so the
+  // test never downloads anything, without tripping the uncontrolled-side-effect assertion.
+  const toolsStatus = { ytDlp: false, ffmpeg: false, progress: { status: 'idle', tool: '', percent: 0, error: '' } };
+  mock.method(tools, 'ensureTools', async () => toolsStatus);
+  if (typeof tools.whenToolsReady === 'function') mock.method(tools, 'whenToolsReady', async () => false);
 
   after(async () => {
     try {

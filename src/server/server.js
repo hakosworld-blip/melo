@@ -205,7 +205,9 @@ function cacheSet(map, key, value, max = MAX_CACHE_ENTRIES) {
 
 let currentAppState = {};
 const sseClients = new Set();
-const YT_PLAYER_CLIENTS = ['android', 'tv', 'web_safari', 'ios', null];
+// yt-dlp's own client rotation comes first: pinning a single client is what produced URLs the
+// CDN answers with 403, which the player reported as a silent failure. The rest stay as fallbacks.
+const YT_PLAYER_CLIENTS = [null, 'android', 'web_safari', 'ios', 'tv'];
 let lastGoodYtClient = null;
 
 let _bgYtDlpActive = 0;
@@ -2233,6 +2235,43 @@ async function handleTrending(req, res) {
   res.end(JSON.stringify({ success: true, tracks: tracks || [] }));
 }
 
+const MEDIA_PROBE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+
+/**
+ * Extraction succeeding does not mean the URL works: the CDN still answers some signed URLs
+ * with 403 or an empty body, and handing one of those to the player looked like a successful
+ * resolve with no sound. Read the first bytes here so only real audio data is reported.
+ */
+function probeAudioUrl(url, minBytes = 64) {
+  const attempt = (ua) => new Promise((resolve) => {
+    let settled = false;
+    let req = null;
+    const done = (ok) => { if (!settled) { settled = true; resolve(ok); } };
+    try {
+      const parsed = new URL(url);
+      const client = parsed.protocol === 'http:' ? http : https;
+      req = client.get(parsed, {
+        headers: Object.assign({ range: 'bytes=0-4095', 'accept-encoding': 'identity' }, ua ? { 'user-agent': ua } : {})
+      }, (res) => {
+        const status = res.statusCode || 0;
+        if (status !== 200 && status !== 206) { res.resume(); return done(false); }
+        let got = 0;
+        res.on('data', (chunk) => {
+          got += chunk.length;
+          if (got >= minBytes) { done(true); try { req.destroy(); } catch (e) {} }
+        });
+        res.on('end', () => done(got >= minBytes));
+        res.on('error', () => done(got >= minBytes));
+      });
+      req.on('error', () => done(false));
+      req.setTimeout(5000, () => { try { req.destroy(); } catch (e) {} done(false); });
+    } catch (e) {
+      done(false);
+    }
+  });
+  return attempt(MEDIA_PROBE_UA).then((ok) => ok || attempt(''));
+}
+
 async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube', title = '', artist = '', duration = 0, thumbnail = '', timeoutSec = 12) {
   trackUrl = normalizeSoundCloudUrl(trackUrl);
   const parsedUrl = (req && req.url) ? url.parse(req.url, true) : { query: {} };
@@ -2301,6 +2340,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
   }
 
   let streamUrl = null;
+  let streamVerified = false;
   let resolveInflight, rejectInflight;
   const inflightPromise = new Promise((res, rej) => { resolveInflight = res; rejectInflight = rej; });
   streamInfoInflight.set(cacheKey, inflightPromise);
@@ -2311,6 +2351,13 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
     const audioFormat = (forShare || platform === 'soundcloud' || isSc)
       ? "http_mp3_128/bestaudio[ext=mp3][protocol^=http][protocol!=http_dash_segments]/bestaudio[ext=m4a][protocol^=http]/bestaudio[protocol=https]/bestaudio"
       : "bestaudio/best";
+
+    // yt-dlp is the extractor here, not a fallback. If it is still being installed, wait a
+    // bounded moment for it rather than falling through to a provider path that returns
+    // unusable URLs — that silence is what "nothing plays" looked like.
+    if (!resolveBinary('yt-dlp')) {
+      await require('./tools').whenToolsReady(45000);
+    }
 
     if (isSafeMediaUrl(trackUrl)) {
       if (isYt) {
@@ -2327,11 +2374,15 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
               "-f", (forShare ? audioFormat : "bestaudio/best/18"),
               "--", trackUrl
             ];
-            const raw = await executeYtDlp(args, 7000);
+            const raw = await executeYtDlp(args, 9000);
             const lines = raw.trim().split(String.fromCharCode(10)).map(l => l.trim()).filter(l => l.startsWith("http"));
-            if (lines.length > 0) {
-              streamUrl = lines[0];
-              lastGoodYtClient = client;
+            for (const line of lines) {
+              if (await probeAudioUrl(line)) {
+                streamUrl = line;
+                streamVerified = true;
+                lastGoodYtClient = client;
+                break;
+              }
             }
           } catch (e) {}
         }
@@ -2408,6 +2459,12 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
       }
     }
 
+    // Whatever produced the URL, it only counts if media bytes come back from it.
+    if (streamUrl && !streamVerified && !(await probeAudioUrl(streamUrl))) {
+      try { logger.log('error', `stream refused media bytes: ${String(streamUrl).slice(0, 90)}`); } catch (_) {}
+      streamUrl = null;
+    }
+
     resolveInflight(streamUrl);
   } catch (e) {
     rejectInflight(e);
@@ -2426,8 +2483,13 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
 
   if (!streamUrl) {
     try { logger.error('Stream resolve failed: ' + (title || trackUrl)); } catch (_) {}
+    let tools = { ytDlp: false };
+    try { tools = require('./tools').toolsStatus(); } catch (_) {}
+    const reason = tools.ytDlp
+      ? 'yt-dlp returned no playable audio for this track'
+      : 'yt-dlp is not installed, so no audio could be extracted';
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ success: false, error: 'could not extract audio stream' }));
+    return res.end(JSON.stringify({ success: false, error: reason, ytDlp: !!tools.ytDlp }));
   }
 
   const isHls = streamUrl.includes('.m3u8');
@@ -6955,7 +7017,11 @@ function startServer(port = PORT) {
         server.removeListener('error', onError);
         const p = server.address().port;
         console.log(`devsize internal server running on ${selectedPort === port ? '' : 'fallback port '}http://127.0.0.1:${p}`);
-        require('./tools').updateYtDlpIfManaged().catch(() => {});
+        // Install or refresh the extractor in the background the moment the server is up.
+        const tools = require('./tools');
+        tools.ensureTools()
+          .then((status) => { if (status && status.ytDlp) return tools.updateYtDlpIfManaged(); })
+          .catch(() => {});
         resolve(p);
       };
       const onError = (err) => {
