@@ -434,9 +434,47 @@ function extractYtIdFromAny(urlOrId) {
   return m ? m[1] : '';
 }
 
+// InnerTube serves the first player response of a session and then starts demanding a bot
+// check unless every call carries a visitor identity. Minting one per session is what keeps
+// a whole queue playable instead of only its first track.
+const YT_VISITOR_TTL_MS = 6 * 60 * 60 * 1000;
+let ytVisitor = { data: '', at: 0 };
+let ytVisitorInflight = null;
+
+async function getYtVisitorData() {
+  if (ytVisitor.data && Date.now() - ytVisitor.at < YT_VISITOR_TTL_MS) return ytVisitor.data;
+  if (ytVisitorInflight) return ytVisitorInflight;
+  ytVisitorInflight = (async () => {
+    try {
+      const res = await fetch('https://www.youtube.com/youtubei/v1/visitor_id?prettyPrint=false', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Format-Version': '2',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+        },
+        body: JSON.stringify({
+          context: { client: { clientName: 'WEB', clientVersion: '2.20250101.00.00', hl: 'en', gl: 'US' } }
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const fresh = (data && data.responseContext && data.responseContext.visitorData) || '';
+        if (fresh) {
+          ytVisitor = { data: fresh, at: Date.now() };
+          return fresh;
+        }
+      }
+    } catch (_) {}
+    return ytVisitor.data || '';
+  })().finally(() => { ytVisitorInflight = null; });
+  return ytVisitorInflight;
+}
+
 async function fetchDirectYoutubeStreamServer(videoId) {
   const vid = extractYtIdFromAny(videoId);
   if (!vid) return null;
+  const visitorData = await getYtVisitorData();
   const clients = [
     {
       clientName: 'ANDROID_VR',
@@ -458,12 +496,11 @@ async function fetchDirectYoutubeStreamServer(videoId) {
   ];
   for (const c of clients) {
     try {
+      const requestHeaders = { 'Content-Type': 'application/json', 'User-Agent': c.userAgent };
+      if (visitorData) requestHeaders['X-Goog-Visitor-Id'] = visitorData;
       const res = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': c.userAgent
-        },
+        headers: requestHeaders,
         body: JSON.stringify({
           videoId: vid,
           context: {
@@ -475,6 +512,7 @@ async function fetchDirectYoutubeStreamServer(videoId) {
               deviceModel: c.deviceModel,
               osName: c.osName,
               osVersion: c.osVersion,
+              ...(visitorData ? { visitorData } : {}),
               hl: 'en',
               gl: 'US'
             }
@@ -485,6 +523,15 @@ async function fetchDirectYoutubeStreamServer(videoId) {
       });
       if (!res.ok) continue;
       const data = await res.json();
+      const playStatus = data.playabilityStatus && data.playabilityStatus.status;
+      if (playStatus && playStatus !== 'OK') {
+        // A spent identity is worth replacing; an age gate will not clear by asking again.
+        if (playStatus === 'LOGIN_REQUIRED' || playStatus === 'ERROR') {
+          ytVisitor = { data: '', at: 0 };
+          ytVisitorInflight = null;
+        }
+        continue;
+      }
       const formats = [
         ...((data.streamingData && data.streamingData.adaptiveFormats) || []),
         ...((data.streamingData && data.streamingData.formats) || [])
@@ -496,6 +543,30 @@ async function fetchDirectYoutubeStreamServer(videoId) {
       if (data.streamingData && data.streamingData.hlsManifestUrl) return data.streamingData.hlsManifestUrl;
     } catch (_) {}
   }
+  return null;
+}
+
+// Signs a new media URL for a track whose old one was refused mid-queue. Signed CDN URLs
+// expire, and nothing replaced them before: the first refusal ended playback for the rest
+// of the queue, which is exactly what "it only plays one track" feels like.
+async function refreshProviderStream(expiredUrl, videoId) {
+  const id = extractYtIdFromAny(videoId) || extractYtIdFromAny(expiredUrl);
+  if (!id) return null;
+  try {
+    const fresh = await fetchDirectYoutubeStreamServer(id);
+    if (fresh && fresh !== expiredUrl) return fresh;
+  } catch (_) {}
+  try {
+    const raw = await executeYtDlp([
+      '--no-config', '-g', '--no-warnings', '--no-playlist', '--no-check-certificates',
+      '--socket-timeout', '8', '--retries', '1',
+      '--extractor-args', 'youtube:player_client=android_vr',
+      '-f', 'bestaudio/best',
+      '--', `https://www.youtube.com/watch?v=${id}`
+    ], 15000);
+    const line = raw.trim().split(String.fromCharCode(10)).map(l => l.trim()).find(l => l.startsWith('http'));
+    if (line && line !== expiredUrl) return line;
+  } catch (_) {}
   return null;
 }
 
@@ -1577,7 +1648,7 @@ async function prefetchTrack(trackUrl, trackId, platform) {
         isLocal: false,
         streamUrl: streamUrl,
         isHls: isHls,
-        proxyUrl: `http://127.0.0.1:${PORT}/api/audio-proxy?url=${encodeURIComponent(streamUrl)}`
+        proxyUrl: `http://127.0.0.1:${PORT}/api/audio-proxy?url=${encodeURIComponent(streamUrl)}&id=${encodeURIComponent(cleanId || trackId || '')}&platform=${encodeURIComponent(platform || 'youtube')}`
       };
       cacheSet(streamUrlCache, cacheKey, { timestamp: Date.now(), data });
       if (cleanId && cleanId !== cacheKey) {
@@ -2199,7 +2270,14 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
   }
 
   const cacheKey = (cleanId || trackUrl || `${artist}_${title}`).toLowerCase();
-  if (!forShare && cacheKey && (streamUrlCache.has(cacheKey) || (cleanId && streamUrlCache.has(cleanId)))) {
+  // A cached entry is a signature with an expiry behind it, and playback asks for a refresh
+  // precisely when the old URL was refused, so never hand back the URL that just failed.
+  const forceRefresh = String((parsedUrl.query && parsedUrl.query.refresh) || '') === '1';
+  if (forceRefresh) {
+    streamUrlCache.delete(cacheKey);
+    if (cleanId) streamUrlCache.delete(cleanId);
+  }
+  if (!forShare && !forceRefresh && cacheKey && (streamUrlCache.has(cacheKey) || (cleanId && streamUrlCache.has(cleanId)))) {
     const cached = streamUrlCache.get(cacheKey) || (cleanId ? streamUrlCache.get(cleanId) : null);
     if (cached && (Date.now() - cached.timestamp < 7200000)) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2212,7 +2290,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
     const inflightUrl = await streamInfoInflight.get(cacheKey).catch(() => null);
     if (inflightUrl) {
       const isHls = inflightUrl.includes('.m3u8');
-      const data = { success: true, isLocal: false, streamUrl: inflightUrl, isHls, proxyUrl: `http://127.0.0.1:${PORT}/api/audio-proxy?url=${encodeURIComponent(inflightUrl)}` };
+      const data = { success: true, isLocal: false, streamUrl: inflightUrl, isHls, proxyUrl: `http://127.0.0.1:${PORT}/api/audio-proxy?url=${encodeURIComponent(inflightUrl)}&id=${encodeURIComponent(cleanId || '')}&platform=${encodeURIComponent(platform || 'youtube')}` };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(data));
     }
@@ -2358,7 +2436,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
     isLocal: false,
     streamUrl: streamUrl,
     isHls: isHls,
-    proxyUrl: `http://127.0.0.1:${PORT}/api/audio-proxy?url=${encodeURIComponent(streamUrl)}`
+    proxyUrl: `http://127.0.0.1:${PORT}/api/audio-proxy?url=${encodeURIComponent(streamUrl)}&id=${encodeURIComponent(cleanId || trackId || '')}&platform=${encodeURIComponent(platform || 'youtube')}`
   };
 
   if (cacheKey) streamUrlCache.set(cacheKey, { timestamp: Date.now(), data });
@@ -2941,9 +3019,20 @@ async function handleAudioProxy(req, res, targetUrl) {
       res.writeHead(403);
       return res.end('Blocked target');
     }
+    // Which track this URL belongs to, so a signature that dies mid-queue can be re-minted.
+    const requestQuery = (() => {
+      try { return new URL(req.url || '/', 'http://127.0.0.1').searchParams; } catch (_) { return new URLSearchParams(); }
+    })();
+    const retryTrackId = requestQuery.get('id') || '';
     // The CDN signs its URLs against the original host, and the body is piped unmodified,
     // so the encoding is pinned instead of negotiated.
     const forwardBase = { 'accept-encoding': 'identity' };
+    // Google's CDN binds a signed media URL to the client that minted it. The renderer
+    // announces itself as Chrome, so a 403 here is often an identity mismatch rather than a
+    // dead signature: retry once as the app's own player client before resigning the URL.
+    const GOOGLE_MEDIA_UA = 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
+    let uaRetried = false;
+    let healAttempted = false;
     for (const key of ['range', 'accept', 'accept-language', 'user-agent']) {
       if (req.headers[key] !== undefined) forwardBase[key] = req.headers[key];
     }
@@ -2979,6 +3068,23 @@ async function handleAudioProxy(req, res, targetUrl) {
           try { next = new URL(location, target).toString(); } catch (e) { next = null; }
           if (next) {
             follow(next, hops + 1, status === 303 ? 'GET' : method);
+            return;
+          }
+        }
+        // Both a stale signature and a client-identity mismatch surface as 403/410. Retry
+        // under the player's identity once, then ask the provider for a new URL and follow
+        // it, so one expiring track cannot end the rest of the queue.
+        if ((status === 403 || status === 410) && !res.headersSent) {
+          proxyRes.resume();
+          if (!uaRetried) {
+            uaRetried = true;
+            forwardBase['user-agent'] = GOOGLE_MEDIA_UA;
+            send(target, hops, method);
+            return;
+          }
+          if (!healAttempted) {
+            healAttempted = true;
+            healAndRetry(target.toString(), method);
             return;
           }
         }
@@ -3025,6 +3131,15 @@ async function handleAudioProxy(req, res, targetUrl) {
       isPrivateHost(target.hostname)
         .then((priv) => (priv ? fail(403, 'Blocked target') : send(target, hops, method)))
         .catch(() => fail(403, 'Blocked target'));
+    };
+
+    const healAndRetry = async (expiredUrl, method) => {
+      const fresh = await refreshProviderStream(expiredUrl, retryTrackId);
+      if (!fresh) {
+        fail(403, 'Provider stream expired');
+        return;
+      }
+      follow(fresh, 0, method);
     };
 
     follow(targetUrl, 0, req.method);

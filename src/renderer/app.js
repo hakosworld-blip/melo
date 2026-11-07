@@ -3736,13 +3736,14 @@ async function resolveShareStreamUrl(track) {
     title: track.title || '',
     artist: track.artist || '',
     duration: String(track.duration || 0),
+    refresh: '1',
     forShare: '1'
   });
   const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/stream-info?${params.toString()}`);
   const data = await res.json();
   const remote = data && data.streamUrl;
-  if (!remote) return null;
-  return `http://127.0.0.1:${state.serverPort}/api/audio-proxy?url=${encodeURIComponent(remote)}`;
+  if (!remote || remote.includes('.m3u8')) return null;
+  return `http://127.0.0.1:${state.serverPort}/api/audio-proxy?url=${encodeURIComponent(remote)}&id=${encodeURIComponent(track.id || '')}&platform=${encodeURIComponent(track.platform || state.platform || 'youtube')}`;
 }
 
 async function playTrack(track, queueList = null, startIndex = -1, context = null) {
@@ -3986,14 +3987,27 @@ async function playTrack(track, queueList = null, startIndex = -1, context = nul
       if (!data.isLocal) {
         let retriedViaMp3 = false;
         const retryViaMp3 = async () => {
-          el.nativeAudio.removeEventListener('error', retryViaMp3);
           if (currentToken !== state.loadToken || retriedViaMp3) return;
           retriedViaMp3 = true;
+          /*
+           * Resigning must not cost the listener their place in the track: remember the
+           * position, swap in a freshly signed URL and resume once the new stream reports
+           * its metadata. Without the resume the retry restarts every song from zero.
+           */
+          const resumeAt = typeof el.nativeAudio.currentTime === 'number' ? el.nativeAudio.currentTime : 0;
           try {
             const alt = await resolveShareStreamUrl(track);
             if (!alt || currentToken !== state.loadToken) return;
+            if (resumeAt > 1) {
+              el.nativeAudio.addEventListener('loadedmetadata', () => {
+                if (currentToken !== state.loadToken) return;
+                try { el.nativeAudio.currentTime = resumeAt; } catch (_) {}
+                playSmooth();
+              }, { once: true });
+            } else {
+              playSmooth();
+            }
             el.nativeAudio.src = alt;
-            playSmooth();
           } catch (e) {}
         };
         el.nativeAudio.addEventListener('error', retryViaMp3);

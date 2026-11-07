@@ -10,6 +10,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.melo.player.data.model.Track
+import app.melo.player.data.remote.YouTubeMusic
 import app.melo.player.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -84,6 +85,9 @@ class PlaybackController(
      */
     private val pendingCommands = mutableListOf<(MediaController) -> Unit>()
 
+    /** Tracks that already spent their one resign-and-resume retry. */
+    private val healedTracks = mutableSetOf<String>()
+
     private val resumePrefs: SharedPreferences =
         context.getSharedPreferences("melo_resume", Context.MODE_PRIVATE)
 
@@ -93,6 +97,8 @@ class PlaybackController(
         }
 
         override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+            // Each track gets its own single retry.
+            healedTracks.clear()
             mediaItem?.localConfiguration?.uri?.let(TrackCodec::fromUri)?.let { track ->
                 scope.launch {
                     val settings = ServiceLocator.settings.current()
@@ -107,6 +113,24 @@ class PlaybackController(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            /*
+             * A provider URL expires mid-queue, and Google's CDN refuses individual requests
+             * while serving the next one. Neither means the track is broken, only the URL, so
+             * it is dropped, re-resolved and resumed from the same position - once per track.
+             * Without this the first refusal ended playback for the rest of the queue.
+             */
+            val failed = _state.value.current
+            val player = controller
+            val retryable = error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+            if (retryable && failed != null && player != null && healedTracks.add(failed.key)) {
+                YouTubeMusic.invalidate(failed.id)
+                val position = player.currentPosition.coerceAtLeast(0L)
+                player.prepare()
+                if (position > 1_000L) player.seekTo(position)
+                player.play()
+                return
+            }
             _state.value = _state.value.copy(
                 error = friendlyError(error),
                 isPlaying = false,

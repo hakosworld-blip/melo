@@ -7,6 +7,8 @@ import app.melo.player.data.model.SearchPlaylist
 import app.melo.player.data.model.Source
 import app.melo.player.data.model.Track
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import kotlinx.serialization.json.JsonArray
@@ -29,6 +31,57 @@ object YouTubeMusic {
     private const val SEARCH_URL = "https://music.youtube.com/youtubei/v1/search?prettyPrint=false"
     private const val BROWSE_URL = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
     private const val PLAYER_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
+    private const val VISITOR_URL = "https://www.youtube.com/youtubei/v1/visitor_id?prettyPrint=false"
+    private const val VISITOR_TTL_MS = 6 * 60 * 60 * 1000L
+
+    /*
+     * InnerTube answers the first player call of a session and then starts demanding a bot
+     * check unless every call carries a visitor identity. That is what makes a queue behave
+     * like it can only play one track, so the token is minted once, reused, and dropped the
+     * moment the provider refuses it.
+     */
+    @Volatile private var visitor: String? = null
+    @Volatile private var visitorAt = 0L
+    private val visitorLock = Mutex()
+
+    private suspend fun visitorData(): String? {
+        val cached = visitor
+        if (cached != null && System.currentTimeMillis() - visitorAt < VISITOR_TTL_MS) return cached
+        return visitorLock.withLock {
+            val known = visitor
+            if (known != null && System.currentTimeMillis() - visitorAt < VISITOR_TTL_MS) return@withLock known
+            val body = buildJsonObject {
+                putJsonObject("context") {
+                    putJsonObject("client") {
+                        put("clientName", "WEB")
+                        put("clientVersion", "2.20250101.00.00")
+                        put("hl", "en")
+                        put("gl", "US")
+                    }
+                }
+            }.toString()
+            val token = Api.postJson(VISITOR_URL, body, userAgent = Api.WEB_UA)
+                ?.at("responseContext", "visitorData")
+                ?.asText()
+            if (!token.isNullOrBlank()) {
+                visitor = token
+                visitorAt = System.currentTimeMillis()
+            }
+            token ?: visitor
+        }
+    }
+
+    private fun forgetVisitor() {
+        visitor = null
+        visitorAt = 0L
+    }
+
+    /** Drops the cached URL for [videoId]; the next resolve asks the provider for a new one. */
+    fun invalidate(videoId: String) {
+        val id = extractVideoId(videoId) ?: videoId.trim()
+        if (id.isBlank()) return
+        synchronized(streamCache) { streamCache.remove(id) }
+    }
 
     // OuterTube filter params for the "Songs", "Artists", "Albums", "Playlists" chips.
     private const val PARAM_SONGS = "EgWKAQIIAWoMEA4QChADEAQQCRAF"
@@ -454,6 +507,8 @@ object YouTubeMusic {
         }
 
         for (client in players) {
+            // Every player call needs the session identity, not just the first one.
+            val identity = visitorData()
             val body = buildJsonObject {
                 put("videoId", id)
                 putJsonObject("context") {
@@ -467,15 +522,22 @@ object YouTubeMusic {
                         put("osVersion", client.osVersion)
                         put("hl", "en")
                         put("gl", "US")
+                        if (!identity.isNullOrBlank()) put("visitorData", identity)
                     }
                 }
                 put("contentCheckOk", true)
                 put("racyCheckOk", true)
             }.toString()
 
-            val json = Api.postJson(PLAYER_URL, body, userAgent = client.ua) ?: continue
+            val headers = if (identity.isNullOrBlank()) emptyMap() else mapOf("X-Goog-Visitor-Id" to identity)
+            val json = Api.postJson(PLAYER_URL, body, headers = headers, userAgent = client.ua) ?: continue
 
             val status = json.at("playabilityStatus", "status").asText()
+            if (status == "LOGIN_REQUIRED" || status == "ERROR") {
+                // This identity is spent: drop it so the next client asks with a fresh one.
+                forgetVisitor()
+                continue
+            }
             if (status != null && status != "OK") continue
 
             val adaptive = json.at("streamingData", "adaptiveFormats").asObjects()
