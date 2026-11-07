@@ -2941,50 +2941,93 @@ async function handleAudioProxy(req, res, targetUrl) {
       res.writeHead(403);
       return res.end('Blocked target');
     }
-    const client = parsed.protocol === 'https:' ? https : http;
-
     // The CDN signs its URLs against the original host, and the body is piped unmodified,
     // so the encoding is pinned instead of negotiated.
-    const forward = { host: parsed.host, 'accept-encoding': 'identity' };
+    const forwardBase = { 'accept-encoding': 'identity' };
     for (const key of ['range', 'accept', 'accept-language', 'user-agent']) {
-      if (req.headers[key] !== undefined) forward[key] = req.headers[key];
+      if (req.headers[key] !== undefined) forwardBase[key] = req.headers[key];
     }
 
-    const proxyReq = client.request(targetUrl, {
-      method: req.method,
-      headers: forward
-    }, (proxyRes) => {
-      if (res.writableEnded) {
-        proxyRes.destroy();
+    const fail = (code, message) => {
+      if (!res.headersSent) {
+        res.writeHead(code);
+        res.end(message);
+      } else {
+        try { res.destroy(); } catch (e) {}
+      }
+    };
+
+    // CDNs answer signed media URLs with a redirect to another host. The redirect has to be
+    // followed here: handing it back would make the <audio> element fetch the target
+    // directly, outside this proxy's CORS headers, and a media element feeding the Web Audio
+    // graph is silenced when its response is not CORS-readable.
+    const MAX_PROXY_REDIRECTS = 5;
+
+    const send = (target, hops, method) => {
+      const client = target.protocol === 'https:' ? https : http;
+      const headers = Object.assign({ host: target.host }, forwardBase);
+      const proxyReq = client.request(target, { method, headers }, (proxyRes) => {
+        if (res.writableEnded) {
+          proxyRes.destroy();
+          return;
+        }
+        const status = proxyRes.statusCode || 502;
+        const location = proxyRes.headers.location;
+        if (status >= 300 && status < 400 && location && hops < MAX_PROXY_REDIRECTS) {
+          proxyRes.resume();
+          let next = null;
+          try { next = new URL(location, target).toString(); } catch (e) { next = null; }
+          if (next) {
+            follow(next, hops + 1, status === 303 ? 'GET' : method);
+            return;
+          }
+        }
+        const out = Object.assign({}, proxyRes.headers);
+        // Hop-by-hop and cookie headers belong to the upstream connection, not to us.
+        for (const key of ['set-cookie', 'connection', 'keep-alive', 'transfer-encoding',
+          'proxy-connection', 'te', 'trailer', 'upgrade', 'content-security-policy', 'location']) {
+          delete out[key];
+        }
+        res.writeHead(status, out);
+        proxyRes.on('error', () => { try { res.destroy(); } catch (e) {} });
+        proxyRes.pipe(res);
+      });
+
+      proxyReq.setTimeout(60000, () => {
+        proxyReq.destroy(new Error('Proxy timeout'));
+      });
+
+      proxyReq.on('error', () => fail(502, 'Proxy error'));
+
+      req.on('error', () => { try { proxyReq.destroy(); } catch (e) {} });
+      if (method === 'GET' || method === 'HEAD') proxyReq.end();
+      else req.pipe(proxyReq);
+    };
+
+    const follow = (url, hops, method) => {
+      let target;
+      try {
+        target = new URL(url);
+      } catch (e) {
+        fail(502, 'Proxy error');
         return;
       }
-      const headers = Object.assign({}, proxyRes.headers);
-      // Hop-by-hop and cookie headers belong to the upstream connection, not to us.
-      delete headers['set-cookie'];
-      delete headers.connection;
-      delete headers['keep-alive'];
-      delete headers['transfer-encoding'];
-      delete headers['content-security-policy'];
-      res.writeHead(proxyRes.statusCode, headers);
-      proxyRes.on('error', () => { try { res.destroy(); } catch (e) {} });
-      proxyRes.pipe(res);
-    });
-
-    proxyReq.setTimeout(60000, () => {
-      proxyReq.destroy(new Error('Proxy timeout'));
-    });
-
-    proxyReq.on('error', (e) => {
-      if (!res.headersSent) {
-        res.writeHead(502);
-        res.end('Proxy error');
-      } else {
-        try { res.destroy(); } catch (err) {}
+      if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+        fail(403, 'Blocked target');
+        return;
       }
-    });
+      if (hops === 0) {
+        send(target, hops, method);
+        return;
+      }
+      // Every hop is re-checked: a redirect must not become a way back onto the loopback
+      // network or a link-local address.
+      isPrivateHost(target.hostname)
+        .then((priv) => (priv ? fail(403, 'Blocked target') : send(target, hops, method)))
+        .catch(() => fail(403, 'Blocked target'));
+    };
 
-    req.on('error', () => { try { proxyReq.destroy(); } catch (e) {} });
-    req.pipe(proxyReq);
+    follow(targetUrl, 0, req.method);
   } catch (e) {
     if (!res.headersSent) {
       res.writeHead(500);

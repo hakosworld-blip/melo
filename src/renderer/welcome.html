@@ -1088,11 +1088,6 @@
 
     <div class="step-pane" id="step1">
       <div class="hero">
-        <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-          <filter id="iconTint" color-interpolation-filters="sRGB">
-            <feColorMatrix id="tintMatrix" type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.153  0 0 0 0 0.286  0 0 0 1 0"/>
-          </filter>
-        </svg>
         <div class="hero-stage">
           <svg class="shape" viewBox="-180 -180 360 360" aria-hidden="true">
             <g class="shape-spin"><path class="shape-path" id="shapePath" d=""/></g>
@@ -1633,7 +1628,6 @@
       themeState.s = s;
 
       syncLabels(h, b, s);
-      updateIconTint();
 
       const bg = `hsl(${h}, ${s}%, ${b}%)`;
       const isDark = b < 50;
@@ -1745,7 +1739,6 @@
       syncLabels(config.h, config.b, config.s);
 
       Object.entries(config.vars).forEach(([name, value]) => document.body.style.setProperty(name, value));
-      updateIconTint();
     }
 
     themeCards.forEach((card) => {
@@ -1762,7 +1755,6 @@
     const SHAPE_HOLD_MS = 2000;
     const SHAPE_MORPH_MS = 1250;
     const shapePathEl = document.getElementById('shapePath');
-    const tintMatrix = document.getElementById('tintMatrix');
     const shapeProfiles = [];
     let shapeFrom = 0;
     let shapeTo = 0;
@@ -1922,16 +1914,9 @@
       return [r + m, g + m, b + m];
     }
 
-    function updateIconTint() {
-      const dark = themeState.b < 50;
-      const rgb = dark ? hslToRgb(themeState.h, 70, 84) : hslToRgb(themeState.h, 30, 22);
-      const f = (n) => n.toFixed(3);
-      tintMatrix.setAttribute('values', `0 0 0 0 ${f(rgb[0])}  0 0 0 0 ${f(rgb[1])}  0 0 0 0 ${f(rgb[2])}  0 0 0 1 0`);
-    }
 
     buildProfiles();
     drawShape(shapeProfiles[0], shapeProfiles[0], 0, 1, 1);
-    updateIconTint();
 
     let introStarted = false;
 

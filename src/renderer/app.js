@@ -22045,24 +22045,6 @@ function bindCoverHoldZoom(wrapEl) {
   if (typeof m3cInit === 'function') m3cInit();
   requestAnimationFrame(() => requestAnimationFrame(() => updateNavIndicator(false)));
 
-  const heroBanner = document.querySelector('.melo-hero-banner');
-  if (heroBanner) {
-    heroBanner.addEventListener('pointermove', (e) => {
-      if (document.body.classList.contains('perf')) return;
-      const rect = heroBanner.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const px = Math.max(-1, Math.min(1, ((e.clientX - rect.left) / rect.width) * 2 - 1));
-      const py = Math.max(-1, Math.min(1, ((e.clientY - rect.top) / rect.height) * 2 - 1));
-      heroBanner.style.setProperty('--px', px);
-      heroBanner.style.setProperty('--py', py);
-    });
-    heroBanner.addEventListener('pointerleave', () => {
-      if (document.body.classList.contains('perf')) return;
-      heroBanner.style.setProperty('--px', 0);
-      heroBanner.style.setProperty('--py', 0);
-    });
-  }
-
   emitPluginEvent('ready');
 });
 
