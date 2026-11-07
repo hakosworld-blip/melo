@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  melo's logo: a light grey circle on solid black, with a serif lowercase "m" laid over
-  it. The letter is wider than the circle, so its right stem crosses the circle's right
-  boundary and runs out onto the black background — the circle reads as cut through by
-  the "m". That overlap is the point of the mark, so the stems are deliberately allowed
-  past the circle rather than clipped to it.
+  melo's logo: a light grey disc on solid black, with a bold serif lowercase "m" laid over
+  it. The letter is wider than the disc, so its right side crosses the disc's right boundary
+  and runs out onto the black background — the disc reads as cut through by the "m". That
+  overlap is the point of the mark, so the letter is deliberately allowed past the disc
+  rather than clipped to it.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -12,39 +12,27 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- The circle: centred on 54,54 with radius 33, which fills the 66x66 safe zone. -->
+    <!-- The disc: centred on 54,54 with radius 31, inside the 72x72 safe zone. -->
     <path
         android:fillColor="#DCDCDC"
-        android:pathData="M21,54 A33,33 0 1,0 87,54 A33,33 0 1,0 21,54 Z" />
+        android:pathData="M23,54 A31,31 0 1,0 85,54 A31,31 0 1,0 23,54 Z" />
 
-    <!-- Straight vertical stems, x-height 43 to baseline 67. -->
+    <!-- The letter: a square-topped stem with two arch humps dipping between them, and long
+         thin slit counters that leave only hairline joins at the stems (even-odd holes). Its
+         right side sits past the disc edge (85 at mid-height) and out onto the black. -->
     <path
         android:fillColor="#000000"
-        android:pathData="M27,43 H35 V67 H27 Z" />
-    <path
-        android:fillColor="#000000"
-        android:pathData="M55,43 H63 V67 H55 Z" />
-    <!-- Right stem sits past the circle edge (87 at mid-height) and out onto the black. -->
-    <path
-        android:fillColor="#000000"
-        android:pathData="M83,43 H91 V67 H83 Z" />
-
-    <!-- Arched shoulders springing from one stem to the next. -->
-    <path
-        android:fillColor="#000000"
-        android:pathData="M35,43 C40,40 50,40 55,43 L55,51 C50,57 40,57 35,51 Z" />
-    <path
-        android:fillColor="#000000"
-        android:pathData="M63,43 C68,40 78,40 83,43 L83,51 C78,57 68,57 63,51 Z" />
+        android:fillType="evenOdd"
+        android:pathData="M42.5,67 V43.5 C46,39 57,38 65,51.5 C73,38 84,39 87,44.5 V67 Z M52.4,53 H65.6 A1.2,1.2 0 0 1 65.6,55.4 H52.4 A1.2,1.2 0 0 1 52.4,53 Z M70.6,53 H83.6 A1.2,1.2 0 0 1 83.6,55.4 H70.6 A1.2,1.2 0 0 1 70.6,53 Z" />
 
     <!-- Serif feet at the baseline. -->
     <path
         android:fillColor="#000000"
-        android:pathData="M24,63 H38 V67 H24 Z" />
+        android:pathData="M41.5,64.5 H48 V67 H41.5 Z" />
     <path
         android:fillColor="#000000"
-        android:pathData="M52,63 H66 V67 H52 Z" />
+        android:pathData="M60,64.5 H70 V67 H60 Z" />
     <path
         android:fillColor="#000000"
-        android:pathData="M80,63 H94 V67 H80 Z" />
+        android:pathData="M84,64.5 H89 V67 H84 Z" />
 </vector>
