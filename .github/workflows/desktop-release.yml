@@ -19,6 +19,11 @@ on:
         default: false
         type: boolean
   push:
+    branches:
+      - main
+    # A push to main builds installers as artifacts only. The release job below is
+    # skipped for branch pushes, so nothing is published unless a tag (or a dispatch)
+    # asks for it. Before this, pushing code started no build at all.
     tags:
       - 'v*'
 
@@ -115,6 +120,7 @@ jobs:
 
   release:
     name: Publish release
+    if: github.event_name != 'push' || github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     steps:

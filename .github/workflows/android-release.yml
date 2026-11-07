@@ -2,6 +2,7 @@ name: Android release
 
 # Builds, signs, verifies and publishes the melo APK.
 #
+#   * push to main             -> signed APK as a workflow artifact (no release)
 #   * push a tag like v1.0.1   -> signed APK attached to a GitHub Release
 #   * run manually             -> signed APK as a workflow artifact
 #   * run manually with a tag  -> signed APK attached to a Release with that tag
@@ -19,6 +20,12 @@ on:
   push:
     tags:
       - 'v*'
+    # A push to main builds and uploads a signed APK artifact. It deliberately does NOT
+    # publish a release: the publish step below requires an explicit release_tag, so only a
+    # tag or a dispatch that names one touches the Releases page. Without this, pushing code
+    # produced no build at all, which is why an existing (older) release looked unchanged.
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version_name:
@@ -95,7 +102,9 @@ jobs:
           elif [ "$REF_TYPE" = "tag" ]; then
             NAME="${REF_NAME#v}"
           else
-            NAME="1.0.0"
+            # Branch builds are not releases; stamp the run number so the artifact and
+            # the About screen identify exactly which commit produced them.
+            NAME="1.0.0-main.${GITHUB_RUN_NUMBER}"
           fi
           if ! printf '%s' "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$'; then
             echo "::error title=Bad version::'$NAME' is not a valid version name (expected e.g. 1.0.0)."
