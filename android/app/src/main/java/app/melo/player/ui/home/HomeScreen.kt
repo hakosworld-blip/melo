@@ -357,7 +357,6 @@ private fun ShortcutTile(icon: androidx.compose.ui.graphics.vector.ImageVector, 
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(colors.surfaceElevated)
-            .clickable { }
             .padding(Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

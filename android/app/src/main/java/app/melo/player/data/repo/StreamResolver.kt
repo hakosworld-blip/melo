@@ -36,10 +36,19 @@ class StreamResolver(
             folder.ref(existing.filePath)?.let { return ResolvedStream.Local(it) }
         }
 
+        val prefs = settings.current()
+
+        // "Stream on mobile data: off means playback waits for Wi-Fi" is a promise the
+        // settings screen makes, so it is enforced here rather than left as decoration.
+        // Finished downloads returned above are files on disk and are unaffected.
+        if (track.source != Source.LOCAL && !prefs.mobileDataStreaming && !onWifiOrEthernet(context)) {
+            return ResolvedStream.Failure("Streaming on mobile data is off. Connect to Wi-Fi, or turn it on in Settings.")
+        }
+
         // Stream quality is a real preference, so it has to reach the resolver: "best" and
         // "high" take the top audio format the provider offers, while "normal" trades a
         // little fidelity for data. Without this the setting reads but never applies.
-        val highQuality = settings.current().streamQuality != StreamQuality.NORMAL.id
+        val highQuality = prefs.streamQuality != StreamQuality.NORMAL.id
 
         // 2. Direct provider resolution.
         when (track.source) {
@@ -90,6 +99,20 @@ class StreamResolver(
 
         YtDlp.resolveAudio(context, best.id, highQuality)?.let { return it }
         return ResolvedStream.Failure("This track is not streamable right now.")
+    }
+
+    /**
+     * True when the live connection is Wi-Fi, Ethernet or otherwise unmetered. Unknown
+     * network state counts as allowed: refusing to play because a capability lookup failed
+     * would look like a broken provider rather than a data-saving rule.
+     */
+    private fun onWifiOrEthernet(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return true
+        return caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) ||
+            !cm.isActiveNetworkMetered
     }
 
     private fun searchText(track: Track): String =
