@@ -273,6 +273,17 @@ def write(path, text):
 
 
 def main():
+    # The mark artwork is hand-authored now: a disc with the serif lowercase "m", see
+    # res/drawable/ic_mark_01.xml. This generator still models the retired three-bar
+    # waveform (BARS), so running it would silently revert all 27 launcher icons.
+    authored = RES / "drawable/ic_mark_01.xml"
+    if authored.exists() and "A31,31" in authored.read_text(encoding="utf-8"):
+        sys.exit(
+            'gen_brand_icons.py still draws the retired waveform mark; the disc + "m" '
+            "artwork is hand-authored. Teach mark_paths() the new geometry before "
+            "regenerating, then delete this guard."
+        )
+
     (RES / "drawable").mkdir(parents=True, exist_ok=True)
     (RES / "mipmap-anydpi-v26").mkdir(parents=True, exist_ok=True)
     BRAND.mkdir(parents=True, exist_ok=True)

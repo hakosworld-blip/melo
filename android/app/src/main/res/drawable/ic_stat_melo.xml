@@ -1,19 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Notification small icon: melo's three-bar mark, pure white. The system tints/masks
-     small icons, so they must be a flat silhouette on a transparent background. -->
+<!--
+  Notification small icon: melo's serif "m", pure white. The system tints/masks small
+  icons, so it must be a flat silhouette on a transparent background — the disc is
+  dropped for the same reason it is dropped from ic_mark_mono.xml. The group scales the
+  108-space letter down into this 24dp viewport and centres it.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M4.5,9.5 a1.5,1.5 0 0 1 3,0 V14.5 a1.5,1.5 0 0 1 -3,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M10.5,5.5 a1.5,1.5 0 0 1 3,0 V18.5 a1.5,1.5 0 0 1 -3,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M16.5,11.5 a1.5,1.5 0 0 1 3,0 V13.5 a1.5,1.5 0 0 1 -3,0 Z" />
+    <group
+        android:scaleX="0.33684"
+        android:scaleY="0.33684"
+        android:translateX="-9.98"
+        android:translateY="-5.68">
+
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M42.5,67 V43.5 C46,39 57,38 65,51.5 C73,38 84,39 87,44.5 V67 Z M52.4,53 H65.6 A1.2,1.2 0 0 1 65.6,55.4 H52.4 A1.2,1.2 0 0 1 52.4,53 Z M70.6,53 H83.6 A1.2,1.2 0 0 1 83.6,55.4 H70.6 A1.2,1.2 0 0 1 70.6,53 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M41.5,64.5 H48 V67 H41.5 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M60,64.5 H70 V67 H60 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M84,64.5 H89 V67 H84 Z" />
+    </group>
 </vector>
