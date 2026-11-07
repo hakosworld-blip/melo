@@ -213,7 +213,6 @@
     .icon-tint {
       display: grid;
       place-items: center;
-      filter: url(#iconTint);
     }
 
     .melo-icon {
@@ -227,8 +226,28 @@
       animation: heroIconAnim 1.9s cubic-bezier(0.1, 0.8, 0.15, 1) forwards;
     }
 
+    .melo-tagline {
+      margin: 12px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--hero-text);
+      opacity: 0;
+      transition: color 0.3s ease;
+    }
+
+    body.intro .melo-tagline {
+      animation: heroTaglineAnim 1.1s cubic-bezier(0.1, 0.8, 0.15, 1) 1.5s forwards;
+    }
+
+    @keyframes heroTaglineAnim {
+      0% { opacity: 0; letter-spacing: 0.4em; filter: blur(8px); }
+      100% { opacity: 0.72; letter-spacing: 0.24em; filter: blur(0px); }
+    }
+
     .melo-title {
-      font-size: 68px;
+      font-size: 56px;
       font-weight: 700;
       letter-spacing: -0.04em;
       color: var(--hero-text);
@@ -1079,12 +1098,13 @@
             <g class="shape-spin"><path class="shape-path" id="shapePath" d=""/></g>
           </svg>
           <div class="icon-tint">
-            <img class="melo-icon" src="../../assets/icon.png" alt="melo" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23ffffff\'><path d=\'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z\'/></svg>';" >
+            <img class="melo-icon" src="../../assets/melo-mark.svg" alt="melo">
           </div>
         </div>
         <h1 class="melo-title">
-          <span>R</span><span>i</span><span>f</span><span>f</span>
+          <span>m</span><span>e</span><span>l</span><span>o</span>
         </h1>
+        <p class="melo-tagline">music player</p>
       </div>
 
       <div class="stacked-group">

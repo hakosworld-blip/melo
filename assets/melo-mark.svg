@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <!-- melo's mark alone, without the black field: a light grey disc with the serif "m"
+       knocked out of it. Used inside the app (welcome screen, About) where the surface
+       behind the logo should show through instead of a black tile. -->
+  <circle cx="54" cy="54" r="31" fill="#DCDCDC"/>
+  <path fill="#000000" fill-rule="evenodd" d="M42.5,67 V43.5
+    C46,39 57,38 65,51.5
+    C73,38 84,39 87,44.5
+    V67 Z
+    M52.4,53 H65.6 A1.2,1.2 0 0 1 65.6,55.4 H52.4 A1.2,1.2 0 0 1 52.4,53 Z
+    M70.6,53 H83.6 A1.2,1.2 0 0 1 83.6,55.4 H70.6 A1.2,1.2 0 0 1 70.6,53 Z"/>
+</svg>

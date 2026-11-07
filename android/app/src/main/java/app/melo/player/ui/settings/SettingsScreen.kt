@@ -546,6 +546,28 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                 /* ---------------------------- about -------------------------- */
                 item { GroupTitle("About") }
                 item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        MeloMark(settings.appIconId, size = 64.dp)
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "melo",
+                            style = MeloTheme.type.headlineMedium,
+                            color = MeloTheme.scheme.onSurface,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "music player",
+                            style = MeloTheme.type.labelSmall,
+                            color = MeloTheme.scheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                item {
                     SettingRow(
                         "Version",
                         "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}) · ${BuildConfig.BUILD_TYPE}",
