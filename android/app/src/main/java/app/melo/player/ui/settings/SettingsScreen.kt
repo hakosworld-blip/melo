@@ -415,6 +415,15 @@ fun SettingsScreen(app: AppViewModel, onBack: () -> Unit, onOpenStorage: () -> U
                     ) { app.setPlaybackSpeed((it * 20).toInt() / 20f) }
                 }
                 item {
+                    SettingSlider(
+                        "Pitch",
+                        settings.pitchSemitones.toFloat(),
+                        -12f..12f,
+                        steps = 23,
+                        format = { if (it == 0f) "Original" else "%+.0f st".format(it) },
+                    ) { app.setPitchSemitones(it.toInt()) }
+                }
+                item {
                     SettingBlock("Streaming quality") {
                         Segmented(
                             options = qualityOptions,

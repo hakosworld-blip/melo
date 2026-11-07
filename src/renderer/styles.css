@@ -9149,3 +9149,7 @@ body.perf #sleep-timer-status.active::before {
 
 
 
+
+/* Header Play buttons on the album, playlist and artist views. */
+.album-play-btn { margin: 12px 0 4px; }
+#btn-play-artist-tracks { margin-left: auto; }

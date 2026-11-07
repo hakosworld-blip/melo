@@ -169,7 +169,12 @@ class PlaybackController(
                         2, 3 -> Player.REPEAT_MODE_ONE
                         else -> Player.REPEAT_MODE_OFF
                     }
-                    c.setPlaybackSpeed(settings.playbackSpeed)
+                    // Speed and pitch live in one PlaybackParameters value; setting the speed
+                    // alone would reset a saved pitch shift back to normal, so both are applied.
+                    c.playbackParameters = androidx.media3.common.PlaybackParameters(
+                        settings.playbackSpeed,
+                        semitonesToPitch(settings.pitchSemitones.toFloat()),
+                    )
                     publish(c)
                     if (!restoredThisProcess) {
                         restoredThisProcess = true
@@ -398,7 +403,8 @@ class PlaybackController(
 
     fun setSpeed(speed: Float) {
         withController { c ->
-            c.setPlaybackSpeed(speed)
+            // setPlaybackSpeed resets pitch to 1.0, which silently undoes a saved shift.
+            c.playbackParameters = androidx.media3.common.PlaybackParameters(speed, c.playbackParameters.pitch)
             publish(c)
         }
     }

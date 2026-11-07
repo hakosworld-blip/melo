@@ -7310,6 +7310,20 @@ async function playTrack(track, queueList = null, startIndex = -1, context = nul
     playTrack(state.queue[prevIdx]);
   }
 
+  /*
+   * The album, playlist and artist headers each carry a Play button. They click the first
+   * row instead of rebuilding a queue by hand, so the queue, history and playback context
+   * are exactly what tapping that row would have produced. Only the artist header is wired
+   * elsewhere too: a favourite-artist card plays the profile through this button.
+   */
+  const playFromFirstRow = (container) => {
+    const row = container && container.querySelector('.track-row');
+    if (row) row.click();
+  };
+  if (el.btnPlayAlbum) el.btnPlayAlbum.addEventListener('click', () => playFromFirstRow(el.albumTracksList));
+  if (el.btnPlayPlaylist) el.btnPlayPlaylist.addEventListener('click', () => playFromFirstRow(el.playlistTracksList));
+  if (el.btnPlayArtistTracks) el.btnPlayArtistTracks.addEventListener('click', () => playFromFirstRow(el.artistTracksList));
+
   if (el.nativeAudio) {
     el.nativeAudio.addEventListener('volumechange', () => {
       if (!el.nativeAudio) return;

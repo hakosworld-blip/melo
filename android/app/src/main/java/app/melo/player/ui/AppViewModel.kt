@@ -167,6 +167,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playback.setSpeed(value)
     }
 
+    fun setPitchSemitones(value: Int) {
+        apply { ServiceLocator.settings.setPitchSemitones(value) }
+        playback.setPitch(value.toFloat())
+    }
+
     fun setStreamQuality(id: String) = apply { ServiceLocator.settings.setStreamQuality(id) }
     fun setMobileData(value: Boolean) = apply { ServiceLocator.settings.setMobileDataStreaming(value) }
     fun setResumeOnStart(value: Boolean) = apply { ServiceLocator.settings.setResumeOnStart(value) }
