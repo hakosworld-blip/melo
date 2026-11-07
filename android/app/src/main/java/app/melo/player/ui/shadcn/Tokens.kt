@@ -15,112 +15,114 @@ import androidx.compose.ui.unit.sp
  * shadcn/ui's design language, ported to Compose.
  *
  * The look it encodes: a neutral zinc surface stack, one hairline border instead of any
- * elevation, a single 8dp radius, compact Geist-ish type at weight 500/600, and a sparse
+ * elevation, a single 10dp radius, compact Geist-ish type at weight 500/600, and a sparse
  * accent. Nothing here is Material 3 - these are plain data classes plus CompositionLocals, and
  * every widget in this package is drawn from Compose Foundation.
  */
 
 /**
- * The type scale. Names mirror Material's so screens could be migrated mechanically, but the
- * values are shadcn's: small, tight, weight 600 for headings rather than 700, and body copy at
- * 13-14sp so more content fits on a phone.
+ * The type scale, rescaled to what shadcn actually sets.
+ *
+ * shadcn headings are small and tight rather than large and airy: 24-30sp for a page title,
+ * 15-16sp for a section title, 14sp for body and 12sp for labels, all with negative tracking at
+ * the top of the scale. The previous scale was 15-25% larger, which is what made every screen
+ * read as a Material app wearing zinc colours.
  */
 @Immutable
 data class MeloType(
     val displayLarge: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 38.sp,
-        lineHeight = 42.sp,
-        letterSpacing = (-1.4).sp,
+        fontSize = 30.sp,
+        lineHeight = 34.sp,
+        letterSpacing = (-0.9).sp,
     ),
     val displayMedium: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 30.sp,
-        lineHeight = 34.sp,
-        letterSpacing = (-1.1).sp,
+        fontSize = 25.sp,
+        lineHeight = 30.sp,
+        letterSpacing = (-0.7).sp,
     ),
     val displaySmall: TextStyle = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 30.sp,
-        letterSpacing = (-0.8).sp,
-    ),
-    val headlineLarge: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 21.sp,
         lineHeight = 26.sp,
         letterSpacing = (-0.5).sp,
     ),
-    val headlineMedium: TextStyle = TextStyle(
+    val headlineLarge: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp,
-        lineHeight = 24.sp,
-        letterSpacing = (-0.4).sp,
+        lineHeight = 23.sp,
+        letterSpacing = (-0.35).sp,
+    ),
+    val headlineMedium: TextStyle = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 21.sp,
+        letterSpacing = (-0.25).sp,
     ),
     val titleLarge: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
-        letterSpacing = (-0.3).sp,
+        fontSize = 15.sp,
+        lineHeight = 20.sp,
+        letterSpacing = (-0.15).sp,
     ),
     val titleMedium: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = (-0.15).sp,
+        lineHeight = 19.sp,
+        letterSpacing = (-0.1).sp,
     ),
     val titleSmall: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
         lineHeight = 18.sp,
-        letterSpacing = (-0.1).sp,
+        letterSpacing = 0.sp,
     ),
     val bodyLarge: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 21.sp,
+        lineHeight = 20.sp,
     ),
     val bodyMedium: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
-        lineHeight = 19.sp,
+        lineHeight = 18.sp,
     ),
     val bodySmall: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        lineHeight = 17.sp,
+        lineHeight = 16.sp,
     ),
+    /** shadcn labels: 12sp, weight 500, no tracking and no uppercase transform. */
     val labelLarge: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
+        fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.1.sp,
     ),
     val labelMedium: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 14.sp,
-        letterSpacing = 0.2.sp,
     ),
     val labelSmall: TextStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
-        letterSpacing = 0.3.sp,
+        fontSize = 10.sp,
+        lineHeight = 13.sp,
+        letterSpacing = 0.1.sp,
     ),
 )
 
@@ -166,17 +168,23 @@ val LocalMeloScheme = staticCompositionLocalOf<MeloScheme> {
     error("MeloTheme is missing: wrap the content in MeloTheme { }")
 }
 
-/** Radius scale around the user's chosen base radius, mirroring shadcn's `--radius`. */
+/**
+ * Radius scale around the user's chosen base radius, mirroring shadcn's `--radius`.
+ *
+ * shadcn's steps are small: controls sit at the base radius and cards add 2dp, surfaces add 6dp.
+ * The previous +4/+8 steps rounded cards into pills, which is the single most Material-looking
+ * thing the app did.
+ */
 @Immutable
 data class MeloRadius(val base: androidx.compose.ui.unit.Dp) {
     val sm: androidx.compose.ui.unit.Dp get() = (base - 2.dp).coerceAtLeast(2.dp)
     val md: androidx.compose.ui.unit.Dp get() = base
-    val lg: androidx.compose.ui.unit.Dp get() = base + 4.dp
-    val xl: androidx.compose.ui.unit.Dp get() = base + 8.dp
+    val lg: androidx.compose.ui.unit.Dp get() = base + 2.dp
+    val xl: androidx.compose.ui.unit.Dp get() = base + 6.dp
 
     val shapeMd: Shape get() = RoundedCornerShape(md)
     val shapeLg: Shape get() = RoundedCornerShape(lg)
     val shapeXl: Shape get() = RoundedCornerShape(xl)
 }
 
-val LocalMeloRadius = staticCompositionLocalOf { MeloRadius(8.dp) }
+val LocalMeloRadius = staticCompositionLocalOf { MeloRadius(10.dp) }

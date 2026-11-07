@@ -3724,7 +3724,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  async function playTrack(track, queueList = null, startIndex = -1, context = null) {
+  /*
+ * Resolves a share-quality (mp3) stream URL for a track. Used as the fallback when the
+ * provider-specific URL fails to decode, and it keeps the same loopback-proxy contract.
+ */
+async function resolveShareStreamUrl(track) {
+  const params = new URLSearchParams({
+    url: track.url || '',
+    id: track.id || '',
+    platform: (track && track.platform) || state.platform || 'youtube',
+    title: track.title || '',
+    artist: track.artist || '',
+    duration: String(track.duration || 0),
+    forShare: '1'
+  });
+  const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/stream-info?${params.toString()}`);
+  const data = await res.json();
+  const remote = data && data.streamUrl;
+  if (!remote) return null;
+  return `http://127.0.0.1:${state.serverPort}/api/audio-proxy?url=${encodeURIComponent(remote)}`;
+}
+
+async function playTrack(track, queueList = null, startIndex = -1, context = null) {
     if (syncState && syncState.active) {
       const overlay = document.getElementById('sync-mode-overlay');
       if (!overlay || overlay.classList.contains('hidden') || !overlay.classList.contains('visible')) {
@@ -3927,6 +3948,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       el.nativeAudio.preload = 'auto';
 
+      /*
+       * Play through the loopback proxy rather than the CDN URL. The element feeds the Web
+       * Audio graph (EQ/HQ chain), and that graph silences a cross-origin source unless the
+       * response is CORS-readable. Provider URLs also expire within hours, so the proxy is
+       * the only source that stays valid for the life of a queue.
+       */
+      const playbackUrl = data.isLocal ? data.streamUrl : (data.proxyUrl || data.streamUrl);
+      // CORS mode has to be requested before src is assigned; afterwards it is ignored.
+      try { el.nativeAudio.crossOrigin = data.isLocal ? null : 'anonymous'; } catch (e) {}
+
       if (data.isHls && window.Hls && Hls.isSupported()) {
         hlsInstance = new Hls({ enableWorker: true, lowLatencyMode: true, maxBufferLength: 30, maxMaxBufferLength: 60, maxBufferSize: 30 * 1000 * 1000 });
         hlsInstance.on(Hls.Events.ERROR, (_, errData) => {
@@ -3935,7 +3966,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             else if (errData.type === Hls.ErrorTypes.MEDIA_ERROR) hlsInstance.recoverMediaError();
           }
         });
-        hlsInstance.loadSource(data.streamUrl);
+        hlsInstance.loadSource(playbackUrl);
         hlsInstance.attachMedia(el.nativeAudio);
         hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
           if (currentToken === state.loadToken) {
@@ -3943,8 +3974,29 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         });
       } else {
-        el.nativeAudio.src = data.streamUrl;
+        el.nativeAudio.src = playbackUrl;
         playSmooth();
+      }
+
+      /*
+       * Last resort: a provider URL can start failing mid-queue (expired signature, format the
+       * renderer cannot decode). Ask the server for an mp3 variant and swap the source once
+       * instead of leaving a silent playbar behind.
+       */
+      if (!data.isLocal) {
+        let retriedViaMp3 = false;
+        const retryViaMp3 = async () => {
+          el.nativeAudio.removeEventListener('error', retryViaMp3);
+          if (currentToken !== state.loadToken || retriedViaMp3) return;
+          retriedViaMp3 = true;
+          try {
+            const alt = await resolveShareStreamUrl(track);
+            if (!alt || currentToken !== state.loadToken) return;
+            el.nativeAudio.src = alt;
+            playSmooth();
+          } catch (e) {}
+        };
+        el.nativeAudio.addEventListener('error', retryViaMp3);
       }
 
       applyAudioSettings();

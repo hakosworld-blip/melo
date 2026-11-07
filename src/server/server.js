@@ -91,6 +91,19 @@ async function isPrivateHost(hostname) {
   }
 }
 
+/* The renderer feeds the <audio> element into a Web Audio graph. A media element that feeds
+ * such a graph is silenced unless its response is CORS-readable, and every endpoint that
+ * serves audio here is loopback-only, so a permissive header costs nothing. */
+function allowMediaCors(res) {
+  try {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range');
+    res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range, Content-Type');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  } catch (e) {}
+}
+
 function streamFileToResponse(stream, res) {
   stream.on('error', () => {
     if (!res.headersSent) {
@@ -2730,6 +2743,7 @@ async function fetchArtistInfo(artistName) {
 }
 
 async function handleLocalTrack(req, res, trackId) {
+  allowMediaCors(res);
   const cleanId = cleanTrackId(trackId);
   const filePath = await findCachedFile(cleanId);
 
@@ -2799,6 +2813,7 @@ const LIBRARY_MIME_TYPES = {
 };
 
 async function handleLibraryFile(req, res, trackId) {
+  allowMediaCors(res);
   const item = libraryIndex[trackId];
   if (!item || !item.file) {
     res.writeHead(404);
@@ -2848,6 +2863,7 @@ async function handleLibraryFile(req, res, trackId) {
 }
 
 async function handleDownloadedTrack(req, res, name) {
+  allowMediaCors(res);
   const safeName = path.basename(String(name || ''));
   const ext = path.extname(safeName).toLowerCase();
   const dir = getDownloadsDir();
@@ -2899,6 +2915,11 @@ async function handleDownloadedTrack(req, res, name) {
 }
 
 async function handleAudioProxy(req, res, targetUrl) {
+  allowMediaCors(res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    return res.end();
+  }
   if (!targetUrl) {
     res.writeHead(400);
     return res.end('Missing url');
@@ -2922,7 +2943,9 @@ async function handleAudioProxy(req, res, targetUrl) {
     }
     const client = parsed.protocol === 'https:' ? https : http;
 
-    const forward = { host: parsed.host };
+    // The CDN signs its URLs against the original host, and the body is piped unmodified,
+    // so the encoding is pinned instead of negotiated.
+    const forward = { host: parsed.host, 'accept-encoding': 'identity' };
     for (const key of ['range', 'accept', 'accept-language', 'user-agent']) {
       if (req.headers[key] !== undefined) forward[key] = req.headers[key];
     }
@@ -2935,7 +2958,14 @@ async function handleAudioProxy(req, res, targetUrl) {
         proxyRes.destroy();
         return;
       }
-      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      const headers = Object.assign({}, proxyRes.headers);
+      // Hop-by-hop and cookie headers belong to the upstream connection, not to us.
+      delete headers['set-cookie'];
+      delete headers.connection;
+      delete headers['keep-alive'];
+      delete headers['transfer-encoding'];
+      delete headers['content-security-policy'];
+      res.writeHead(proxyRes.statusCode, headers);
       proxyRes.on('error', () => { try { res.destroy(); } catch (e) {} });
       proxyRes.pipe(res);
     });

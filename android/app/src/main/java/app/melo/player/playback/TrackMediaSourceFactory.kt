@@ -159,15 +159,20 @@ internal fun progressiveDataSourceFactory(
     track: Track,
     resolve: suspend (Track) -> ResolvedStream,
 ): DataSource.Factory = ResolvingDataSource.Factory(upstream) { dataSpec ->
+    var userAgent: String? = null
     val uri = when (val stream = runBlocking { resolve(track) }) {
         is ResolvedStream.Remote -> {
             if (stream.isHls) throw IOException("This stream changed to HLS. Prepare the track again.")
+            userAgent = stream.userAgent
             Uri.parse(stream.url)
         }
         is ResolvedStream.Local -> stream.localUri()
         is ResolvedStream.Failure -> throw IOException(stream.message)
     }
-    dataSpec.withUri(uri).buildUpon().setKey(track.key).build()
+    val built = dataSpec.withUri(uri).buildUpon().setKey(track.key)
+    // Google's CDN rejects a URL fetched with a different client identity than it was issued to.
+    userAgent?.let { built.setHttpRequestHeaders(mapOf("User-Agent" to it)) }
+    built.build()
 }
 
 /**

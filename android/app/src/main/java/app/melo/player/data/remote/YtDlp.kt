@@ -3,6 +3,10 @@ package app.melo.player.data.remote
 import android.content.Context
 import app.melo.player.data.model.ResolvedStream
 import com.yausername.youtubedl_android.YoutubeDL
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import okhttp3.Request
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -39,6 +43,9 @@ object YtDlp {
     private const val WATCH_URL = "https://www.youtube.com/watch?v="
 
     private val initLock = Mutex()
+
+    /** Background refreshes never hold up a play request. */
+    private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile private var ready = false
     @Volatile private var failure: String? = null
@@ -85,6 +92,8 @@ object YtDlp {
         request.addOption("--no-playlist")
         request.addOption("--no-warnings")
         request.addOption("-f", if (highQuality) FORMAT_BEST else FORMAT_FRUGAL)
+        // The URL is signed for one client, so extraction and playback must agree on it.
+        request.addOption("--extractor-args", "youtube:player_client=android_vr")
         // -g prints the media URL instead of downloading the file.
         request.addOption("-g")
 
@@ -102,7 +111,8 @@ object YtDlp {
             .firstOrNull { it.startsWith("https://") || it.startsWith("http://") }
             ?: return@withContext null
 
-        ResolvedStream.Remote(url, hls = url.contains(".m3u8"))
+        if (!servesAudio(url)) return@withContext null
+        ResolvedStream.Remote(url, hls = url.contains(".m3u8"), userAgent = Api.ANDROID_VR_UA)
     }
 
     /**
@@ -122,8 +132,12 @@ object YtDlp {
                 // re-downloaded the whole nightly build — tens of megabytes, timed exactly when
                 // the user pressed play on the one track the fast path could not resolve.
                 if (System.currentTimeMillis() - lastNightlyCheck(app) > NIGHTLY_TTL_MS) {
-                    runCatching { YoutubeDL.updateYoutubeDL(app, YoutubeDL.UpdateChannel.NIGHTLY) }
+                    // Stamp first and refresh in the background: downloading a nightly build
+                    // while the user waits on a play button is what made playback look dead.
                     stampNightlyCheck(app)
+                    refreshScope.launch {
+                        runCatching { YoutubeDL.updateYoutubeDL(app, YoutubeDL.UpdateChannel.NIGHTLY) }
+                    }
                 }
                 ready = true
                 failure = null
@@ -150,6 +164,23 @@ object YtDlp {
             ?.firstOrNull { it.isNotBlank() }
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
+
+    /** A ranged read, so a 403 or an empty body is caught here instead of in the player. */
+    private suspend fun servesAudio(url: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", Api.ANDROID_VR_UA)
+                .header("Range", "bytes=0-16383")
+                .build()
+            Api.streamingClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful && res.code != 206) return@use false
+                val body = res.body ?: return@use false
+                val buffer = ByteArray(2048)
+                body.byteStream().read(buffer) >= 512
+            }
+        }.getOrDefault(false)
+    }
 
     private fun describe(error: Throwable): String =
         error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName

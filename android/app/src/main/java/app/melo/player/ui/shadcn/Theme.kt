@@ -26,11 +26,12 @@ data class MeloTokens(
  * the same set of roles with the values flipped, so a screen never has to branch on the mode.
  */
 private val ZincDarkBackground = Color(0xFF09090B)
-private val ZincDarkCard = Color(0xFF09090B)
+// A card has to be a step above the page or a bordered card reads as an empty outline.
+private val ZincDarkCard = Color(0xFF101012)
 private val ZincDarkRaised = Color(0xFF18181B)
-private val ZincDarkMuted = Color(0xFF27272A)
-private val ZincDarkBorder = Color(0xFF27272A)
-private val ZincDarkInput = Color(0xFF27272A)
+private val ZincDarkMuted = Color(0xFF1C1C20)
+private val ZincDarkBorder = Color(0xFF26262B)
+private val ZincDarkInput = Color(0xFF2A2A30)
 private val ZincDarkFg = Color(0xFFFAFAFA)
 private val ZincDarkMutedFg = Color(0xFFA1A1AA)
 private val ZincDarkSubtle = Color(0xFF3F3F46)
@@ -54,7 +55,7 @@ fun meloScheme(dark: Boolean, accent: Color): MeloScheme {
         MeloScheme(
             primary = accent,
             onPrimary = onAccent,
-            secondary = ZincDarkMuted,
+            secondary = ZincDarkRaised,
             onSecondary = ZincDarkFg,
             tertiary = accent,
             onTertiary = onAccent,
@@ -62,7 +63,7 @@ fun meloScheme(dark: Boolean, accent: Color): MeloScheme {
             onBackground = ZincDarkFg,
             surface = ZincDarkCard,
             onSurface = ZincDarkFg,
-            surfaceVariant = ZincDarkRaised,
+            surfaceVariant = ZincDarkMuted,
             onSurfaceVariant = ZincDarkMutedFg,
             surfaceContainerHigh = ZincDarkRaised,
             popover = ZincDarkRaised,
@@ -111,7 +112,7 @@ fun meloScheme(dark: Boolean, accent: Color): MeloScheme {
 val DefaultMeloTokens = MeloTokens(
     scheme = meloScheme(dark = true, accent = Palettes.first().accent),
     type = MeloType(),
-    radius = MeloRadius(8.dp),
+    radius = MeloRadius(10.dp),
     dark = true,
 )
 

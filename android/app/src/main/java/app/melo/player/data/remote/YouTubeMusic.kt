@@ -6,6 +6,9 @@ import app.melo.player.data.model.ResolvedStream
 import app.melo.player.data.model.SearchPlaylist
 import app.melo.player.data.model.Source
 import app.melo.player.data.model.Track
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Request
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -392,8 +395,33 @@ object YouTubeMusic {
     /** Top of the "normal" tier: the highest audio bitrate still counted as frugal. */
     private const val NORMAL_MAX_BITRATE = 128_000L
 
-    private val streamCache = object : LinkedHashMap<String, Pair<String, Long>>(8, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<String, Long>>?) = size > 12
+    private data class CachedStream(val url: String, val userAgent: String?, val at: Long)
+
+    private val streamCache = object : LinkedHashMap<String, CachedStream>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedStream>?) = size > 12
+    }
+
+    /**
+     * Proves a resolved URL really serves audio before it reaches the player.
+     *
+     * InnerTube happily returns a URL that answers 403 to the client asking for it, and the
+     * player then fails after the play button has already turned into a spinner. One ranged
+     * read costs a few kilobytes and turns that into a fallback to the next client.
+     */
+    private suspend fun hasAudioBytes(url: String, userAgent: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", userAgent)
+                .header("Range", "bytes=0-16383")
+                .build()
+            Api.streamingClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful && res.code != 206) return@use false
+                val body = res.body ?: return@use false
+                val buffer = ByteArray(2048)
+                body.byteStream().read(buffer) >= 512
+            }
+        }.getOrDefault(false)
     }
 
     /**
@@ -418,9 +446,9 @@ object YouTubeMusic {
     suspend fun resolveAudio(videoId: String, highQuality: Boolean = true): ResolvedStream {
         val id = extractVideoId(videoId) ?: return ResolvedStream.Failure("Unknown video id")
         synchronized(streamCache) {
-            streamCache[id]?.let { (url, ts) ->
-                if (System.currentTimeMillis() - ts < 45 * 60 * 1000L && (highQuality || isLowBitrate(url))) {
-                    return ResolvedStream.Remote(url, hls = url.contains(".m3u8"))
+            streamCache[id]?.let { hit ->
+                if (System.currentTimeMillis() - hit.at < 45 * 60 * 1000L && (highQuality || isLowBitrate(hit.url))) {
+                    return ResolvedStream.Remote(hit.url, hls = hit.url.contains(".m3u8"), userAgent = hit.userAgent)
                 }
             }
         }
@@ -471,13 +499,20 @@ object YouTubeMusic {
 
             chosen?.str("url")?.let { url ->
                 val fixed = if (url.contains("range=")) url else "$url&range=0-"
-                synchronized(streamCache) { streamCache[id] = fixed to System.currentTimeMillis() }
-                return ResolvedStream.Remote(fixed)
+                // Only a URL that hands back real bytes is worth caching: a 403 here means the
+                // next player client should be tried instead.
+                if (!hasAudioBytes(fixed, client.ua)) return@let
+                synchronized(streamCache) {
+                    streamCache[id] = CachedStream(fixed, client.ua, System.currentTimeMillis())
+                }
+                return ResolvedStream.Remote(fixed, userAgent = client.ua)
             }
 
             json.at("streamingData", "hlsManifestUrl").asText()?.let { hls ->
-                synchronized(streamCache) { streamCache[id] = hls to System.currentTimeMillis() }
-                return ResolvedStream.Remote(hls, hls = true)
+                synchronized(streamCache) {
+                    streamCache[id] = CachedStream(hls, client.ua, System.currentTimeMillis())
+                }
+                return ResolvedStream.Remote(hls, hls = true, userAgent = client.ua)
             }
         }
         return ResolvedStream.Failure("This track is not available to stream right now.")

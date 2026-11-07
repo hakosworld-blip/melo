@@ -25,7 +25,7 @@ import app.melo.player.ui.theme.MeloTheme
 data class MeloThemeConfig(
     val themeMode: String = "dark", // dark | light | system
     val paletteId: String = "spotify",
-    val cornerRadius: Int = 8,
+    val cornerRadius: Int = 10,
     val compact: Boolean = false,
     /** A colour the user mixed in Customization; it takes over from the preset palette. */
     val customAccent: Color? = null,

@@ -126,7 +126,16 @@ data class HomeSection(
 
 /** Result of resolving a playable URL for [Track]. */
 sealed interface ResolvedStream {
-    data class Remote(val url: String, val hls: Boolean = false) : ResolvedStream {
+    data class Remote(
+        val url: String,
+        val hls: Boolean = false,
+        /**
+         * The client identity the URL was issued to. Google's CDN signs a URL for one
+         * User-Agent; playing it as a different client is answered with 403, which used to
+         * surface as "the track does not play".
+         */
+        val userAgent: String? = null,
+    ) : ResolvedStream {
         val isHls: Boolean
             get() = hls || runCatching {
                 java.net.URI(url).path.orEmpty().endsWith(".m3u8", ignoreCase = true)

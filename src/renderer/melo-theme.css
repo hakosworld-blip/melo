@@ -16,8 +16,12 @@
      - the content column gets real width and a max-width so 4K does not stretch
      - hover affordances + a visible keyboard focus ring (the app disables focus
        outlines globally, desktop needs them for keyboard use)
-     - 32px controls and 13px labels: pointer-density, not thumb-density
-     - below 960px the phone layout comes back untouched
+     - 32px rows and 13px labels: pointer-density, not thumb-density
+     - below 861px the phone layout comes back untouched
+
+   Motion follows the same rules as the mobile kit: 110-280ms, decelerating
+   curves only (never bounce or elastic), transform/opacity for anything that
+   moves, and every animation cancelled under prefers-reduced-motion.
 --------------------------------------------------------------------------- */
 
 /* ================================================================= tokens = */
@@ -32,16 +36,16 @@
   --md-sys-color-surface-dim: color-mix(in srgb, #09090b var(--ui-alpha, 100%), transparent) !important;
   --md-sys-color-surface-bright-solid: #3f3f46 !important;
   --md-sys-color-surface-bright: color-mix(in srgb, #3f3f46 var(--ui-alpha, 100%), transparent) !important;
-  --md-sys-color-surface-container-lowest-solid: #000000 !important;
-  --md-sys-color-surface-container-lowest: color-mix(in srgb, #000000 var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-lowest-solid: #050506 !important;
+  --md-sys-color-surface-container-lowest: color-mix(in srgb, #050506 var(--ui-alpha, 100%), transparent) !important;
   --md-sys-color-surface-container-low-solid: #101012 !important;
   --md-sys-color-surface-container-low: color-mix(in srgb, #101012 var(--ui-alpha, 100%), transparent) !important;
   --md-sys-color-surface-container-solid: #18181b !important;
   --md-sys-color-surface-container: color-mix(in srgb, #18181b var(--ui-alpha, 100%), transparent) !important;
-  --md-sys-color-surface-container-high-solid: #27272a !important;
-  --md-sys-color-surface-container-high: color-mix(in srgb, #27272a var(--ui-alpha, 100%), transparent) !important;
-  --md-sys-color-surface-container-highest-solid: #34343a !important;
-  --md-sys-color-surface-container-highest: color-mix(in srgb, #34343a var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-high-solid: #1f1f23 !important;
+  --md-sys-color-surface-container-high: color-mix(in srgb, #1f1f23 var(--ui-alpha, 100%), transparent) !important;
+  --md-sys-color-surface-container-highest-solid: #27272a !important;
+  --md-sys-color-surface-container-highest: color-mix(in srgb, #27272a var(--ui-alpha, 100%), transparent) !important;
 
   /* text */
   --md-sys-color-on-surface-solid: #fafafa !important;
@@ -51,35 +55,43 @@
 
   /* only hairlines: zinc-800 on dark, the way shadcn draws every border */
   --md-sys-color-outline: #52525b !important;
-  --md-sys-color-outline-variant: #27272a !important;
+  --md-sys-color-outline-variant: #26262b !important;
 
   /* supporting containers drop their Material tints */
-  --md-sys-color-secondary-container: #27272a !important;
+  --md-sys-color-secondary-container: #1f1f23 !important;
   --md-sys-color-on-secondary-container: #e4e4e7 !important;
-  --md-sys-color-tertiary-container: #27272a !important;
+  --md-sys-color-tertiary-container: #1f1f23 !important;
   --md-sys-color-error: #f87171 !important;
   --md-sys-color-on-error: #180a0a !important;
 
-  /* one radius scale */
+  /* one radius scale, shadcn steps: 6 / 8 / 10 / 12 */
   --md-shape-corner-xs: 4px !important;
   --md-shape-corner-s: 6px !important;
   --md-shape-corner-m: 8px !important;
   --md-shape-corner-l: 10px !important;
   --md-shape-corner-xl: 12px !important;
 
-  /* short, decelerating motion -- never springy */
-  --transition-fast: 120ms cubic-bezier(0.2, 0, 0, 1) !important;
-  --transition-normal: 160ms cubic-bezier(0.2, 0, 0, 1) !important;
-  --transition-m3: 200ms cubic-bezier(0.2, 0, 0, 1) !important;
-  --transition-emphasized: 200ms cubic-bezier(0.2, 0, 0, 1) !important;
-  --transition-jelly: 200ms cubic-bezier(0.2, 0, 0, 1) !important;
+  /* motion: short and decelerating. --melo-ease is ease-out-quart. */
+  --melo-ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --melo-ease-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: 110ms var(--melo-ease) !important;
+  --transition-normal: 160ms var(--melo-ease) !important;
+  --transition-m3: 200ms var(--melo-ease) !important;
+  --transition-emphasized: 220ms var(--melo-ease) !important;
+  --transition-jelly: 200ms var(--melo-ease) !important;
 
   --font-family: 'Inter', 'Inter Variable', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Noto Sans', sans-serif !important;
 
-  --melo-sidebar-w: 216px;
+  --melo-sidebar-w: 224px;
   --melo-gap: 12px;
+  --melo-radius: 10px;
+  --melo-radius-sm: 6px;
   --melo-hairline: 1px solid var(--md-sys-color-outline-variant);
+  --melo-surface: #101012;
+  --melo-surface-raised: #18181b;
+  --melo-hover: color-mix(in srgb, #ffffff 5%, transparent);
+  --melo-hover-strong: color-mix(in srgb, #ffffff 8%, transparent);
 }
 
 html,
@@ -117,9 +129,11 @@ body {
 button:focus-visible,
 .nav-item:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--md-sys-color-primary) 70%, transparent) !important;
   outline-offset: 2px !important;
+  transition: outline-offset 110ms var(--melo-ease);
 }
 
 /* ============================================================ desktop == */
@@ -145,11 +159,12 @@ select:focus-visible {
     min-width: var(--melo-sidebar-w) !important;
     align-items: stretch !important;
     padding: 8px !important;
-    gap: 8px !important;
-    border-radius: 10px !important;
-    background: var(--md-sys-color-surface-container-low-solid) !important;
+    gap: 4px !important;
+    border-radius: var(--melo-radius) !important;
+    background: var(--melo-surface) !important;
     border: var(--melo-hairline) !important;
     box-shadow: none !important;
+    transition: width 200ms var(--melo-ease);
   }
 
   .sidebar-nav {
@@ -162,7 +177,7 @@ select:focus-visible {
     width: 100% !important;
     height: 32px !important;
     min-height: 32px !important;
-    border-radius: 6px !important;
+    border-radius: var(--melo-radius-sm) !important;
     margin: 0 !important;
     padding: 0 8px !important;
     display: flex !important;
@@ -171,7 +186,7 @@ select:focus-visible {
     gap: 10px;
     background: transparent !important;
     color: var(--md-sys-color-on-surface-variant-solid) !important;
-    transition: background-color 120ms ease, color 120ms ease;
+    transition: background-color 110ms var(--melo-ease), color 110ms var(--melo-ease);
   }
 
   /* labels come from the button's own title so no markup had to change */
@@ -180,6 +195,7 @@ select:focus-visible {
     order: 1;
     font-size: 13px;
     font-weight: 500;
+    letter-spacing: -0.01em;
     line-height: 1;
     white-space: nowrap;
     overflow: hidden;
@@ -187,35 +203,66 @@ select:focus-visible {
   }
 
   #sidebar .sidebar-nav .nav-item:hover:not(.active) {
-    background: color-mix(in srgb, #ffffff 6%, transparent) !important;
+    background: var(--melo-hover) !important;
     color: var(--md-sys-color-on-surface-solid) !important;
   }
 
   #sidebar .sidebar-nav .nav-item.active {
-    background: color-mix(in srgb, #ffffff 9%, transparent) !important;
+    background: var(--melo-hover-strong) !important;
     box-shadow: inset 2px 0 0 var(--md-sys-color-primary);
     color: var(--md-sys-color-on-surface-solid) !important;
   }
 
-  #sidebar .nav-item.active .nav-indicator,
-  #sidebar .nav-item.active svg {
+  /* the accent bar is the one moving thing in the sidebar */
+  #sidebar .sidebar-nav .nav-item::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 2px;
+    height: 0;
+    border-radius: 2px;
+    background: var(--md-sys-color-primary);
+    transform: translateY(-50%);
+    transition: height 160ms var(--melo-ease-quint);
+  }
+
+  #sidebar .sidebar-nav .nav-item.active::after {
+    height: 16px;
+  }
+
+  #sidebar .sidebar-nav .nav-item.active .nav-indicator,
+  #sidebar .sidebar-nav .nav-item.active svg {
     color: inherit !important;
   }
 
-  #sidebar .sidebar-nav .nav-indicator {
+  /* styles.css gives the glyph a filled circle with its own ID-free !important rule, so these
+     two selectors are spelled out far enough to win: no pill, no fill, just the icon. */
+  #sidebar .nav-item .nav-indicator {
     width: 20px !important;
     height: 20px !important;
+    min-width: 20px !important;
     border-radius: 0 !important;
     background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
     flex-shrink: 0;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
-  #sidebar .nav-indicator svg,
+  #sidebar .nav-item .nav-indicator svg,
   #sidebar .nav-item svg {
     width: 18px !important;
     height: 18px !important;
     min-width: 18px !important;
     min-height: 18px !important;
+    transition: transform 110ms var(--melo-ease);
+  }
+
+  #sidebar .nav-item:active svg {
+    transform: scale(0.94);
   }
 
   /* the sliding accent pill belongs to the phone bar; rows mark the active item instead */
@@ -225,11 +272,73 @@ select:focus-visible {
 
   /* the home nav uses the colourful app icon as its glyph; the phone build draws it at
      40px, which swallows a 32px desktop row */
-  #sidebar .nav-home-app-icon {
+  /* the home glyph is an <img id="nav-home-app-icon"> sized by an ID rule in styles.css, so this
+     one is spelled out to beat it (and capped, in case a user theme re-sizes it) */
+  #sidebar .nav-indicator img#nav-home-app-icon {
     width: 20px !important;
     height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
     border-radius: 5px !important;
     object-fit: cover;
+    transform: none !important;
+  }
+
+  /* the two drawer shortcuts are unlabelled 48px squares on the phone; here they join the
+     nav list as ordinary labelled rows so the sidebar reads as one column */
+  #sidebar .rail-divider {
+    height: 1px !important;
+    margin: 6px 4px !important;
+    background: var(--md-sys-color-outline-variant) !important;
+    border: none !important;
+  }
+
+  #sidebar .rail-action-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    width: 100% !important;
+  }
+
+  #sidebar .rail-icon-btn {
+    width: 100% !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    border-radius: var(--melo-radius-sm) !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 0 8px !important;
+    color: var(--md-sys-color-on-surface-variant-solid) !important;
+    transition: background-color 110ms var(--melo-ease), color 110ms var(--melo-ease);
+  }
+
+  #sidebar .rail-icon-btn::before {
+    content: attr(title);
+    order: 1;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  #sidebar .rail-icon-btn svg {
+    order: 0;
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0;
+  }
+
+  #sidebar .rail-icon-btn:hover {
+    background: var(--melo-hover) !important;
+    color: var(--md-sys-color-on-surface-solid) !important;
   }
 
   /* counts sit at the end of the row instead of after the icon */
@@ -239,19 +348,23 @@ select:focus-visible {
     top: 50%;
     transform: translateY(-50%);
     margin: 0;
+    min-width: 18px;
     font-size: 10px;
-    font-weight: 600;
-    padding: 1px 6px;
-    background: color-mix(in srgb, #ffffff 10%, transparent);
-    color: var(--md-sys-color-on-surface-solid);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    padding: 1px 5px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, #ffffff 8%, transparent);
+    color: var(--md-sys-color-on-surface-variant-solid);
   }
 
   /* ------------------------------------------------------ main content --- */
 
   .main-content {
-    border-radius: 10px !important;
+    border-radius: var(--melo-radius) !important;
     border: var(--melo-hairline);
-    background: var(--md-sys-color-surface-container-low-solid) !important;
+    background: var(--melo-surface) !important;
     padding: 20px 24px 120px !important;
     min-width: 0;
   }
@@ -261,11 +374,16 @@ select:focus-visible {
     margin-inline: auto;
   }
 
+  /* content swaps get a 6px rise + fade instead of a hard cut */
+  .content-view.active {
+    animation: melo-view-in 180ms var(--melo-ease) both;
+  }
+
   h1,
   .page-title {
     font-size: 20px !important;
     font-weight: 600 !important;
-    letter-spacing: -0.011em !important;
+    letter-spacing: -0.02em !important;
   }
 
   h2,
@@ -278,26 +396,40 @@ select:focus-visible {
 
   /* rows read as a list with hairlines, not as floating pills */
   .track-row {
-    border-radius: 6px !important;
+    border-radius: var(--melo-radius-sm) !important;
     min-height: 52px;
-    transition: background-color 100ms ease;
+    transition: background-color 110ms var(--melo-ease);
   }
 
   .track-row:hover {
-    background: color-mix(in srgb, #ffffff 5%, transparent) !important;
+    background: var(--melo-hover) !important;
   }
 
   .track-row.is-playing,
   .track-row.selected {
-    background: color-mix(in srgb, #ffffff 7%, transparent) !important;
+    background: var(--melo-hover-strong) !important;
+  }
+
+  /* artwork lifts a hair on hover -- 1px, enough to feel alive, not enough to jump */
+  .album-card,
+  .playlist-card,
+  .mix-card {
+    transition: transform 160ms var(--melo-ease), border-color 160ms var(--melo-ease);
+  }
+
+  .album-card:hover,
+  .playlist-card:hover,
+  .mix-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--md-sys-color-outline-variant);
   }
 
   /* --------------------------------------------------------- right rail --- */
 
   .right-panel {
-    border-radius: 10px !important;
+    border-radius: var(--melo-radius) !important;
     border: var(--melo-hairline);
-    background: var(--md-sys-color-surface-container-low-solid) !important;
+    background: var(--melo-surface) !important;
     padding: 18px !important;
     gap: 16px !important;
     box-shadow: none !important;
@@ -306,12 +438,37 @@ select:focus-visible {
   /* ------------------------------------------------------------- playbar --- */
 
   #playbar {
-    border-radius: 10px !important;
+    border-radius: var(--melo-radius) !important;
     border: var(--melo-hairline) !important;
     background: color-mix(in srgb, #101012 92%, transparent) !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow: none !important;
+  }
+
+  #playbar .play-btn,
+  #playbar .btn-play,
+  #playbar .btn-icon-pill.play {
+    transition: transform 110ms var(--melo-ease), background-color 110ms var(--melo-ease);
+  }
+
+  #playbar .play-btn:hover,
+  #playbar .btn-play:hover,
+  #playbar .btn-icon-pill.play:hover {
+    transform: scale(1.04);
+  }
+
+  #playbar .play-btn:active,
+  #playbar .btn-play:active,
+  #playbar .btn-icon-pill.play:active {
+    transform: scale(0.96);
+  }
+
+  /* the progress fill eases instead of stepping between scrub updates */
+  #playbar .progress-fill,
+  #playbar .progress-bar-fill,
+  #playbar .seek-fill {
+    transition: width 90ms linear;
   }
 
   /* ------------------------------------------------- controls and inputs --- */
@@ -321,11 +478,22 @@ select:focus-visible {
   .btn-primary,
   .btn-ghost,
   .btn-icon-pill,
-  .rail-icon-btn {
-    border-radius: 6px !important;
+  .rail-icon-btn,
+  button.pill {
+    border-radius: var(--melo-radius-sm) !important;
     box-shadow: none !important;
     font-weight: 500 !important;
     letter-spacing: 0 !important;
+    transition: background-color 110ms var(--melo-ease), border-color 110ms var(--melo-ease),
+      color 110ms var(--melo-ease), transform 110ms var(--melo-ease);
+  }
+
+  .btn-pill-primary:active,
+  .btn-primary:active,
+  .btn-outline-pill:active,
+  .btn-icon-pill:active,
+  .rail-icon-btn:active {
+    transform: scale(0.97);
   }
 
   .btn-outline-pill,
@@ -336,7 +504,7 @@ select:focus-visible {
 
   .btn-outline-pill:hover,
   .btn-icon-pill:hover {
-    background: color-mix(in srgb, #ffffff 6%, transparent) !important;
+    background: var(--melo-hover) !important;
     border-color: var(--md-sys-color-outline) !important;
   }
 
@@ -346,30 +514,88 @@ select:focus-visible {
   textarea,
   select,
   .search-box-wrapper {
-    background: var(--md-sys-color-surface-container-lowest-solid) !important;
+    background: #0c0c0e !important;
     border: var(--melo-hairline) !important;
-    border-radius: 6px !important;
+    border-radius: var(--md-shape-corner-m) !important;
     box-shadow: none !important;
+    transition: border-color 110ms var(--melo-ease), box-shadow 110ms var(--melo-ease),
+      background-color 110ms var(--melo-ease);
+  }
+
+  .search-box-wrapper:hover {
+    background: #0f0f11 !important;
   }
 
   input:focus-visible,
   textarea:focus-visible,
-  select:focus-visible {
-    border-color: var(--md-sys-color-primary) !important;
-    box-shadow: 0 0 0 1px var(--md-sys-color-primary) !important;
+  select:focus-visible,
+  .search-box-wrapper:focus-within {
+    border-color: color-mix(in srgb, var(--md-sys-color-primary) 60%, transparent) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent) !important;
   }
 
   /* cards and panels: hairline + flat, like a shadcn Card */
   .card,
   .panel,
-  .settings-group,
-  .album-card,
-  .playlist-card,
-  .mix-card {
-    background: var(--md-sys-color-surface-container-solid) !important;
+  .settings-group {
+    background: var(--melo-surface-raised) !important;
     border: var(--melo-hairline) !important;
-    border-radius: 10px !important;
+    border-radius: var(--melo-radius) !important;
     box-shadow: none !important;
+  }
+
+  /* segmented controls (source switch, tabs) become one bordered track */
+  .platform-switch,
+  .segmented,
+  .tabs {
+    background: #0c0c0e !important;
+    border: var(--melo-hairline) !important;
+    border-radius: 9999px !important;
+    padding: 3px !important;
+  }
+
+  .platform-switch .platform-btn,
+  .segmented .segment,
+  .tabs .tab {
+    border-radius: 9999px !important;
+    transition: background-color 110ms var(--melo-ease), color 110ms var(--melo-ease);
+  }
+
+  /* dialogs and sheets arrive instead of appearing */
+  .modal,
+  .dialog,
+  [role='dialog'] {
+    animation: melo-pop-in 160ms var(--melo-ease) both;
+  }
+
+  .modal-backdrop,
+  .dialog-backdrop,
+  .overlay-backdrop {
+    animation: melo-fade-in 140ms var(--melo-ease) both;
+  }
+
+  .toast,
+  .snackbar {
+    animation: melo-toast-in 200ms var(--melo-ease) both;
+  }
+
+  /* loading placeholders get one slow shimmer rather than a pulse */
+  .skeleton,
+  .skeleton-line,
+  .shimmer {
+    background-image: linear-gradient(
+      90deg,
+      #131316 0%,
+      #1b1b1f 40%,
+      #131316 80%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: melo-shimmer 1.4s linear infinite;
+  }
+
+  .spinner,
+  .loader-ring {
+    animation: melo-spin 800ms linear infinite;
   }
 
   /* thin neutral scrollbars -- Chromium's default reads as "web page" */
@@ -395,10 +621,69 @@ select:focus-visible {
   }
 }
 
+/* ============================================================== keyframes = */
+
+@keyframes melo-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes melo-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes melo-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes melo-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes melo-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes melo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Very wide windows: keep the reading column from stretching across the display. */
 @media (min-width: 1600px) {
   :root {
-    --melo-sidebar-w: 240px;
+    --melo-sidebar-w: 248px;
   }
   .content-view {
     max-width: 1280px;
@@ -410,7 +695,8 @@ select:focus-visible {
   :root {
     --melo-sidebar-w: 64px;
   }
-  #sidebar .sidebar-nav .nav-item::before {
+  #sidebar .sidebar-nav .nav-item::before,
+  #sidebar .sidebar-nav .nav-item::after {
     display: none;
   }
   #sidebar .sidebar-nav .nav-item {
@@ -426,7 +712,7 @@ select:focus-visible {
     top: -4px;
     right: -8px;
     margin: 0;
-    order: 0;
+    min-width: 0;
     font-size: 9px;
     padding: 0 3px;
   }
