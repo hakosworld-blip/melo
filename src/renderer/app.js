@@ -13459,26 +13459,27 @@ function bindCoverHoldZoom(wrapEl) {
     });
   }
 
+  /*
+   * The riff app shipped a dozen illustrated logos; melo has one mark, so the built-in list is
+   * a single entry and everything else is a custom image the user picks. A saved id from the
+   * old set (or a deleted file) falls back to the mark instead of rendering a broken image.
+   */
   const MELO_APP_ICONS = [
-    { id: '01-default.svg', label: 'Default' },
-    { id: '02-editor.svg', label: 'Editor' },
-    { id: '03-orbit.svg', label: 'Orbit' },
-    { id: '04-vinyl.svg', label: 'Vinyl' },
-    { id: '06-cosmos.svg', label: 'Cosmos' },
-    { id: '07-aurora.svg', label: 'Aurora' },
-    { id: '08-sunset.svg', label: 'Sunset' },
-    { id: '09-amethyst.svg', label: 'Amethyst' },
-    { id: '10-y2k-disc.svg', label: 'Y2K Disc' },
-    { id: '11-cassette.svg', label: 'Cassette' },
-    { id: '12-invincible.svg', label: 'Invincible' }
+    { id: 'melo-icon.svg', label: 'Melo' }
   ];
+  const MELO_DEFAULT_ICON = 'melo-icon.svg';
+  function isRemoteIcon(val) {
+    return Boolean(val) && (val.startsWith('file:') || val.startsWith('http') || val.startsWith('data:'));
+  }
   function resolveAppIconSrc(val) {
-    if (!val) return '../../assets/02-editor.svg';
-    if (val.startsWith('file:') || val.startsWith('http') || val.startsWith('data:')) return val;
-    return '../../assets/' + val.replace(/^.*assets\//, '');
+    if (!val) return '../../assets/' + MELO_DEFAULT_ICON;
+    if (isRemoteIcon(val)) return val;
+    const name = val.replace(/^.*assets\//, '');
+    if (!MELO_APP_ICONS.some(item => item.id === name)) return '../../assets/' + MELO_DEFAULT_ICON;
+    return '../../assets/' + name;
   }
   function applyHomeAppIcon(val) {
-    const chosen = val || localStorage.getItem('melo_app_icon') || '02-editor.svg';
+    const chosen = val || localStorage.getItem('melo_app_icon') || MELO_DEFAULT_ICON;
     localStorage.setItem('melo_app_icon', chosen);
     const homeImg = document.getElementById('nav-home-app-icon');
     if (homeImg) homeImg.src = resolveAppIconSrc(chosen);
@@ -13491,7 +13492,12 @@ function bindCoverHoldZoom(wrapEl) {
   }
   function initAppIconPicker() {
     const grid = document.getElementById('app-icon-picker-grid');
-    const saved = localStorage.getItem('melo_app_icon') || '02-editor.svg';
+    const stored = localStorage.getItem('melo_app_icon');
+    const saved = stored || MELO_DEFAULT_ICON;
+    // a riff-era id (01-default.svg, 02-editor.svg, ...) no longer exists: rewrite it once
+    if (stored && !isRemoteIcon(stored) && !MELO_APP_ICONS.some(item => item.id === stored.replace(/^.*assets\//, ''))) {
+      localStorage.setItem('melo_app_icon', MELO_DEFAULT_ICON);
+    }
     if (grid) {
       grid.innerHTML = '';
       MELO_APP_ICONS.forEach(item => {
