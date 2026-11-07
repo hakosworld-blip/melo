@@ -5,13 +5,13 @@ on:
     paths:
       - 'android/scripts/**'
       - '.gitattributes'
-      - '.github/workflows/android-release.yml'
+      - '.github/workflows/release.yml'
       - '.github/workflows/android-signing-scripts.yml'
   push:
     paths:
       - 'android/scripts/**'
       - '.gitattributes'
-      - '.github/workflows/android-release.yml'
+      - '.github/workflows/release.yml'
       - '.github/workflows/android-signing-scripts.yml'
   workflow_dispatch:
 

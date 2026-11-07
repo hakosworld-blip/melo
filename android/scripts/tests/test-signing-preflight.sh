@@ -7,7 +7,7 @@ set -uo pipefail
 
 HERE=$(cd -- "$(dirname -- "$0")" && pwd)
 SCRIPT="$HERE/../android-signing-preflight.sh"
-WORKFLOW="$HERE/../../../.github/workflows/android-release.yml"
+WORKFLOW="$HERE/../../../.github/workflows/release.yml"
 ROOT=$(mktemp -d)
 trap 'rm -rf -- "$ROOT"' EXIT
 
