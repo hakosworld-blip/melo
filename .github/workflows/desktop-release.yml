@@ -95,7 +95,7 @@ jobs:
               console.log(`${f}  ${mb} MiB`);
               return `${h}  ${f}`;
             });
-            fs.writeFileSync("SHA256SUMS.txt", lines.join("\n") + "\n");
+            fs.writeFileSync("SHA256SUMS-${{ matrix.platform }}.txt", lines.join("\n") + "\n");
           '
 
       - name: Upload artifacts
@@ -111,7 +111,7 @@ jobs:
             dist/*.zip
             dist/*.yml
             dist/*.blockmap
-            dist/SHA256SUMS.txt
+            dist/SHA256SUMS-*.txt
 
   release:
     name: Publish release
@@ -134,9 +134,12 @@ jobs:
           set -euo pipefail
           cd artifacts
           ls -1
-          # per-platform SHA256SUMS files are merged into one combined manifest
-          cat SHA256SUMS.txt > ../SHA256SUMS-all.txt 2>/dev/null || true
-          rm -f SHA256SUMS.txt
+          # per-platform checksum files are merged into one manifest for the release
+          shopt -s nullglob
+          parts=(SHA256SUMS-*.txt)
+          if [ ${#parts[@]} -eq 0 ]; then echo "no checksum files found"; exit 1; fi
+          cat "${parts[@]}" | sort -k2 > ../SHA256SUMS-all.txt
+          rm -f "${parts[@]}"
           cd ..
           if [ -s SHA256SUMS-all.txt ]; then mv SHA256SUMS-all.txt artifacts/SHA256SUMS.txt; fi
 
