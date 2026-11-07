@@ -245,8 +245,13 @@ because keytool reports the same error for a wrong password and for a corrupted 
 incomplete keystore. Passwords, the Base64 payload, raw keystore data and raw keytool
 output are never printed.
 
-Version code is `github.run_number`, so every build is installable over the previous
-one. Bump the version name by tagging, e.g.:
+The version code is minutes since 2020-01-01, not `github.run_number`. Android refuses
+to install a version code lower than the installed one, and a run counter restarts
+whenever the workflow file is recreated — the merged pipeline did that and shipped code
+`3` after `16` and `17`, so every APK was rejected as a downgrade and the phone kept the
+old app. A clock-derived code only ever rises, so each build installs over the last one.
+
+Bump the version name by tagging, e.g.:
 
 ```bash
 git tag v1.0.1 && git push origin v1.0.1

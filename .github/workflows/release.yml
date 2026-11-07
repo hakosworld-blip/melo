@@ -141,8 +141,18 @@ jobs:
             echo "::error title=Bad version::'$NAME' is not a valid version name (expected e.g. 1.0.0)."
             exit 1
           fi
+          # Android refuses to install a versionCode lower than the installed one, so this
+          # number must rise forever. github.run_number does not: it restarts whenever the
+          # workflow file is recreated, and the merged pipeline did exactly that, dropping
+          # to 3 while 16 and 17 had already shipped - every new APK was rejected as a
+          # downgrade. Minutes since 2020-01-01 only ever goes up and still fits int32.
+          CODE=$(( ( $(date -u +%s) - 1577836800 ) / 60 ))
+          if [ "$CODE" -le 0 ] || [ "$CODE" -gt 2100000000 ]; then
+            echo "::error title=Bad version code::Computed versionCode $CODE is outside the 1..2100000000 range Android accepts."
+            exit 1
+          fi
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
           if [ "$REF_TYPE" = "tag" ]; then
             echo "release_tag=$REF_NAME" >> "$GITHUB_OUTPUT"
           elif [ -n "$INPUT_TAG" ]; then
@@ -150,7 +160,7 @@ jobs:
           else
             echo "release_tag=" >> "$GITHUB_OUTPUT"
           fi
-          echo "Building melo $NAME (code ${GITHUB_RUN_NUMBER})"
+          echo "Building melo $NAME (code ${CODE})"
 
       - name: Run unit tests
         working-directory: android
@@ -207,6 +217,7 @@ jobs:
         working-directory: android
         env:
           VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
@@ -237,6 +248,10 @@ jobs:
           fi
           if [ "$VNAME" != "$VERSION_NAME" ]; then
             echo "::error title=Wrong version::APK says $VNAME but the build asked for $VERSION_NAME."
+            exit 1
+          fi
+          if [ "$VCODE" != "$VERSION_CODE" ]; then
+            echo "::error title=Wrong version code::APK says $VCODE but the build asked for $VERSION_CODE; it would not install over the current app."
             exit 1
           fi
           echo "package=$PKG" >> "$GITHUB_OUTPUT"
@@ -275,6 +290,7 @@ jobs:
             | Package | `${{ steps.verify.outputs.package }}` |
             | Version | `${{ steps.verify.outputs.version_name }}` (code `${{ steps.verify.outputs.version_code }}`) |
             | Minimum Android | 8.0 (API 26) |
+            | Commit | `${{ github.sha }}` |
             | Signing cert SHA-256 | `${{ steps.verify.outputs.cert_sha256 }}` |
 
             **Install**

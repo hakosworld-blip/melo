@@ -13,6 +13,7 @@ function writeIgnored(file, version) {
   try { fs.writeFileSync(file, JSON.stringify({ version })); } catch (e) {}
 }
 
+/** Compare dotted versions numerically so `1.10.0` beats `1.9.9`. */
 function isNewer(latest, current) {
   const p1 = String(latest || '').split('.').map(n => parseInt(n, 10) || 0);
   const p2 = String(current || '').split('.').map(n => parseInt(n, 10) || 0);
@@ -25,13 +26,27 @@ function isNewer(latest, current) {
   return false;
 }
 
+/** Newest published release that ships an APK, falling back to any release. */
+async function fetchRelevantRelease(repo) {
+  const url = `https://api.github.com/repos/${repo}/releases?per_page=30`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'melo-Player' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  const releases = Array.isArray(json) ? json : [];
+  const relevant = releases.filter(r => r.draft !== true && r.prerelease !== true);
+  const withApk = relevant.filter(r => r.assets.some(a => /\.apk$/i.test(a.name)));
+  const sorted = (arr) => arr.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  const newest = sorted(withApk)[0] || sorted(relevant)[0] || null;
+  return newest;
+}
+
 function initUpdater(getWindow) {
   const ignoreFile = path.join(app.getPath('userData'), 'ignored-update.json');
   const pkg = require('../../package.json');
   if (pkg.version) {
     app.setVersion(pkg.version);
   }
-  const releasesUrl = `${pkg.homepage || 'https://github.com/rootscripts/melo'}/releases`;
+  const repo = 'hakosworld-blip/melo';
   let manualCheck = false;
   let installNow = false;
   let current = null;
@@ -50,12 +65,9 @@ function initUpdater(getWindow) {
 
   const fallbackFetchGitHub = async () => {
     try {
-      const res = await fetch('https://api.github.com/repos/rootscripts/melo/releases/latest', {
-        headers: { 'User-Agent': 'melo-Player' }
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      const latestVersion = (json.tag_name || '').replace(/^v/i, '');
+      const release = await fetchRelevantRelease(repo);
+      if (!release) return;
+      const latestVersion = (release.tag_name || '').replace(/^v/i, '');
       const currentVersion = pkg.version || app.getVersion();
       if (isNewer(latestVersion, currentVersion)) {
         current = { version: latestVersion };
@@ -64,10 +76,10 @@ function initUpdater(getWindow) {
         manualCheck = false;
         send('update-available', {
           version: latestVersion,
-          releaseNotes: json.body,
-          htmlUrl: json.html_url,
+          releaseNotes: release.body,
+          htmlUrl: release.html_url,
           canInstall: false,
-          url: json.html_url || `${releasesUrl}/tag/v${latestVersion}`
+          url: release.html_url || `${release.html_url}/tag/v${latestVersion}`
         });
       } else {
         if (manualCheck) {
@@ -94,36 +106,33 @@ function initUpdater(getWindow) {
       autoUpdater.autoInstallOnAppQuit = false;
 
       autoUpdater.on('update-available', (info) => {
-        current = info;
-        const ignored = readIgnored(ignoreFile) === info.version;
-        if (ignored && !manualCheck) return;
-        manualCheck = false;
         send('update-available', {
           version: info.version,
-          canInstall,
-          url: `${releasesUrl}/tag/v${info.version}`,
-          releaseNotes: info.releaseNotes || info.releaseName || '',
-          htmlUrl: `${releasesUrl}/tag/v${info.version}`
+          releaseNotes: info.releaseNotes,
+          htmlUrl: info.releaseName,
+          canInstall: true,
+          url: info.releaseName
         });
       });
 
       autoUpdater.on('update-not-available', () => {
-        if (manualCheck) send('update-not-available', { version: app.getVersion() });
-        manualCheck = false;
+        send('update-not-available', { version: app.getVersion() });
       });
 
-      autoUpdater.on('download-progress', (p) => send('update-progress', { percent: Math.round(p.percent) }));
+      autoUpdater.on('download-progress', (p) => {
+        send('update-progress', { percent: Math.round(p.percent) });
+      });
 
       autoUpdater.on('update-downloaded', () => {
         if (installNow) autoUpdater.quitAndInstall();
-        else send('update-ready', { version: current && current.version });
       });
 
       autoUpdater.on('error', () => {
-        fallbackFetchGitHub();
+        send('update-error', { message: 'Update check failed' });
       });
-    } catch (_) {
-      autoUpdater = null;
+
+    } catch (err) {
+      // Fall back to the manual fetch when the built-in updater cannot start.
     }
   }
 
@@ -135,33 +144,4 @@ function initUpdater(getWindow) {
       return fallbackFetchGitHub();
     });
   };
-
-  try { ipcMain.removeHandler('update-check'); } catch (_) {}
-  ipcMain.handle('update-check', () => {
-    manualCheck = true;
-    check();
-    return { ok: true };
-  });
-
-  try { ipcMain.removeAllListeners('update-action'); } catch (_) {}
-  ipcMain.on('update-action', (event, action) => {
-    if (action === 'ignore') {
-      if (current) writeIgnored(ignoreFile, current.version);
-      return;
-    }
-    if (!canInstall || !autoUpdater) return;
-    if (action === 'now') {
-      installNow = true;
-      autoUpdater.downloadUpdate().catch(() => {});
-    } else if (action === 'later') {
-      installNow = false;
-      autoUpdater.autoInstallOnAppQuit = true;
-      autoUpdater.downloadUpdate().catch(() => {});
-    }
-  });
-
-  setTimeout(check, CHECK_DELAY_MS);
-  setInterval(check, CHECK_EVERY_MS).unref();
-}
-
-module.exports = { initUpdater };
+};
