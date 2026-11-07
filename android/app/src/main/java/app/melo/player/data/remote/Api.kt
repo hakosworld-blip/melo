@@ -32,6 +32,10 @@ object Api {
     const val WEB_UA =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
+    /** Identity matching yt-dlp's `android` player client, for URLs signed by that client. */
+    const val ANDROID_UA =
+        "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip"
+
     /** Client identity that InnerTube will hand out audio URLs for. */
     const val ANDROID_VR_UA =
         "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"

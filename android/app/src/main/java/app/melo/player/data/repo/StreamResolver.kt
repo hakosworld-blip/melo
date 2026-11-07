@@ -93,7 +93,12 @@ class StreamResolver(
             .filter { it.second > 0.45 }
             .maxByOrNull { it.second }
             ?.first
-            ?: hits.first()
+            // Metadata-only tracks (imports, third-party pages) have no id to resolve and no
+            // better answer than the catalog's top hit. A track that carries a real id, though,
+            // must never quietly substitute a different recording while the UI keeps showing
+            // the original title — that is a wrong-song playback, not a resolution.
+            ?: if (track.id.isBlank() && track.webUrl.isBlank()) hits.first()
+            else return ResolvedStream.Failure("Couldn't find a close match for this track.")
 
         YtDlp.resolveAudio(context, best.id, highQuality)?.let { return it }
 

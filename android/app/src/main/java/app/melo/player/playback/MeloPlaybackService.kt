@@ -111,12 +111,13 @@ class MeloPlaybackService : MediaSessionService() {
         }
 
         val router = buildHostRoutingDataSourceFactory()
-        val dataSources = buildCachedDataSourceFactory(router)
+        buildAudioCache()
+        val dataSources = cachedAudioFactory().setUpstreamDataSourceFactory(router)
         val resolve = ServiceLocator.resolver::resolve
         val mediaSourceFactory = TrackMediaSourceFactory(
             DefaultMediaSourceFactory(dataSources),
             progressiveFactory = { track ->
-                DefaultMediaSourceFactory(progressiveDataSourceFactory(dataSources, track, resolve))
+                DefaultMediaSourceFactory(progressiveDataSourceFactory(cachedAudioFactory(), router, track, resolve))
             },
             // Live HLS playlists change behind an unchanged URL, so they must not
             // reuse the persistent progressive-audio cache.
@@ -287,8 +288,11 @@ class MeloPlaybackService : MediaSessionService() {
      * client identities, and local downloads stay plain files.
      */
     private fun buildHostRoutingDataSourceFactory(): DataSource.Factory {
+        // Default identity for requests that carry no per-DataSpec override — chiefly HLS
+        // manifests and segments, which are signed for web/IOS clients by the extractors.
+        // The old android_vr default answered URLs minted for other clients with 403.
         val googleHttp = OkHttpDataSource.Factory(Api.streamingClient)
-            .setDefaultRequestProperties(mapOf("User-Agent" to Api.ANDROID_VR_UA))
+            .setDefaultRequestProperties(mapOf("User-Agent" to Api.WEB_UA))
         val otherHttp = OkHttpDataSource.Factory(Api.streamingClient)
             .setDefaultRequestProperties(mapOf("User-Agent" to Api.WEB_UA))
         val fileFactory = DefaultDataSource.Factory(this)
@@ -300,7 +304,7 @@ class MeloPlaybackService : MediaSessionService() {
      * Cache -> HTTP/File for progressive audio and local files. HLS deliberately
      * uses the uncached router so playlist refreshes always reach the provider.
      */
-    private fun buildCachedDataSourceFactory(router: DataSource.Factory): DataSource.Factory {
+    private fun buildAudioCache(): SimpleCache {
         val cacheDir = File(cacheDir, "audio")
         val limitMb = runCatching { runBlocking { ServiceLocator.settings.current().cacheLimitMb } }
             .getOrDefault(512)
@@ -310,12 +314,18 @@ class MeloPlaybackService : MediaSessionService() {
             StandaloneDatabaseProvider(this),
         )
         audioCache = cache
-
-        return CacheDataSource.Factory()
-            .setCache(cache)
-            .setUpstreamDataSourceFactory(router)
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        return cache
     }
+
+    /**
+     * A fresh [CacheDataSource.Factory] over the shared [audioCache]. Factory instances carry
+     * mutable upstream settings, so every progressive source configures its own instead of
+     * reusing one shared instance.
+     */
+    private fun cachedAudioFactory(): CacheDataSource.Factory =
+        CacheDataSource.Factory()
+            .setCache(checkNotNull(audioCache))
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 }
 
 

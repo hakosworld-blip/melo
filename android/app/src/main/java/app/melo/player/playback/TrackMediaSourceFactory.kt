@@ -155,25 +155,36 @@ private class TrackMediaSource(
 }
 
 internal fun progressiveDataSourceFactory(
-    upstream: DataSource.Factory,
+    cacheFactory: androidx.media3.datasource.cache.CacheDataSource.Factory,
+    network: DataSource.Factory,
     track: Track,
     resolve: suspend (Track) -> ResolvedStream,
-): DataSource.Factory = ResolvingDataSource.Factory(upstream) { dataSpec ->
-    var userAgent: String? = null
-    val uri = when (val stream = runBlocking { resolve(track) }) {
-        is ResolvedStream.Remote -> {
-            if (stream.isHls) throw IOException("This stream changed to HLS. Prepare the track again.")
-            userAgent = stream.userAgent
-            Uri.parse(stream.url)
+): DataSource.Factory =
+    // The resolver sits BELOW the byte cache, not above it. Cached ranges are then served
+    // without any network work, so fully cached audio keeps playing when the provider is
+    // unreachable and seeks inside cached data never wait on a re-resolve — previously the
+    // resolver ran before the cache was consulted on every open, which stalled seeks for
+    // seconds and made cached tracks unplayable whenever a resolve failed. Real network
+    // opens still mint a fresh URL, so an expired signature keeps refreshing on the next
+    // read exactly as before.
+    cacheFactory.setUpstreamDataSourceFactory(
+        ResolvingDataSource.Factory(network) { dataSpec ->
+            var userAgent: String? = null
+            val uri = when (val stream = runBlocking { resolve(track) }) {
+                is ResolvedStream.Remote -> {
+                    if (stream.isHls) throw IOException("This stream changed to HLS. Prepare the track again.")
+                    userAgent = stream.userAgent
+                    Uri.parse(stream.url)
+                }
+                is ResolvedStream.Local -> stream.localUri()
+                is ResolvedStream.Failure -> throw IOException(stream.message)
+            }
+            val built = dataSpec.withUri(uri).buildUpon().setKey(track.key)
+            // Google's CDN rejects a URL fetched with a different client identity than it was issued to.
+            userAgent?.let { built.setHttpRequestHeaders(mapOf("User-Agent" to it)) }
+            built.build()
         }
-        is ResolvedStream.Local -> stream.localUri()
-        is ResolvedStream.Failure -> throw IOException(stream.message)
-    }
-    val built = dataSpec.withUri(uri).buildUpon().setKey(track.key)
-    // Google's CDN rejects a URL fetched with a different client identity than it was issued to.
-    userAgent?.let { built.setHttpRequestHeaders(mapOf("User-Agent" to it)) }
-    built.build()
-}
+    )
 
 /**
  * A download is a plain path below Android 10 and a `content://` URI above it, so both

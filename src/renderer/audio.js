@@ -804,7 +804,9 @@
         }
       };
 
-      writeString(0, 'MELO');
+      // 'RIFF' is the container magic every player requires; anything else makes the
+      // exported file unplayable outside this app.
+      writeString(0, 'RIFF');
       view.setUint32(4, totalSize - 8, true);
       writeString(8, 'WAVE');
 

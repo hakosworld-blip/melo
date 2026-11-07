@@ -194,6 +194,8 @@ const ytArtistCache = new Map();
 const downloadingSet = new Set();
 const prefetchingSet = new Set();
 const downloadInFlight = new Map();
+// How many self-heal retries each failed disk download has left (per track id).
+const downloadRetryCounts = new Map();
 
 const MAX_CACHE_ENTRIES = 500;
 function cacheSet(map, key, value, max = MAX_CACHE_ENTRIES) {
@@ -238,6 +240,14 @@ function broadcastSSE(data) {
 
 function cleanTrackId(id) {
   return (id || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+// A real YouTube video id is exactly 11 characters from the id alphabet. Search candidates
+// (cand_*), import placeholders (it-*) and empty strings must never become watch?v= URLs:
+// every doomed yt-dlp call burns rate-limit budget that real resolutions need, and that
+// burst is what trips the provider bot-wall that makes playback fail for minutes at a time.
+function isRealYouTubeId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{11}$/.test(id);
 }
 
 async function findCachedFile(trackId) {
@@ -556,13 +566,17 @@ async function refreshProviderStream(expiredUrl, videoId) {
   if (!id) return null;
   try {
     const fresh = await fetchDirectYoutubeStreamServer(id);
-    if (fresh && fresh !== expiredUrl) return fresh;
+    // A re-signed URL only helps if it actually serves media; returning another dead one
+    // just moves the same silent failure a few seconds later.
+    if (fresh && fresh !== expiredUrl && await probeAudioUrl(fresh)) return fresh;
   } catch (_) {}
   try {
     const raw = await executeYtDlp([
       '--no-config', '-g', '--no-warnings', '--no-playlist', '--no-check-certificates',
       '--socket-timeout', '8', '--retries', '1',
-      '--extractor-args', 'youtube:player_client=android_vr',
+      // android_vr's signed URLs answer 403 (the reason it was dropped from the main
+      // ladder); use the client the disk downloads prove works.
+      '--extractor-args', 'youtube:player_client=android',
       '-f', 'bestaudio/best',
       '--', `https://www.youtube.com/watch?v=${id}`
     ], 15000);
@@ -1519,6 +1533,14 @@ async function cacheThumbnailToDisk(cleanId, thumbnailUrl) {
 async function downloadTrackToDisk(trackUrl, trackId, platform, meta = {}) {
   const cleanId = cleanTrackId(trackId);
   if (downloadingSet.has(cleanId) || await findCachedFile(cleanId)) return;
+  // Only a real URL or a real YouTube id can name a downloadable track. Candidate ids from
+  // search-forwarding and empty strings used to reach yt-dlp as watch?v=cand_x or '',
+  // producing "This video is unavailable" / "'' is not a valid URL" noise and burning
+  // rate-limit budget on every retry.
+  if (!isSafeMediaUrl(trackUrl) && isRealYouTubeId(cleanId) && (!platform || platform === 'youtube' || platform === 'ytmusic')) {
+    trackUrl = `https://www.youtube.com/watch?v=${cleanId}`;
+  }
+  if (!isSafeMediaUrl(trackUrl)) return;
   downloadingSet.add(cleanId);
 
   const tempBase = path.join(CACHE_DIR, `${cleanId}.temp`);
@@ -1562,6 +1584,7 @@ async function downloadTrackToDisk(trackUrl, trackId, platform, meta = {}) {
       downloadingSet.delete(cleanId);
       if (code !== 0 && downloadStderr) console.error('download failed:', downloadStderr.slice(0, 500));
       if (code === 0) {
+        downloadRetryCounts.delete(cleanId);
         try {
           const files = await fs.promises.readdir(CACHE_DIR);
           const tempFile = files.map(f => path.join(CACHE_DIR, f)).find(f => f.startsWith(tempBase + '.') && !f.endsWith('.part'));
@@ -1595,6 +1618,18 @@ async function downloadTrackToDisk(trackUrl, trackId, platform, meta = {}) {
             }
           }
         } catch (e) {}
+        // The provider bot-wall makes single attempts fail in bursts and lifts within
+        // minutes. Retry the same download a few times with breathing room, so a track the
+        // listener just tried heals itself instead of staying unplayable until they happen
+        // to click it again.
+        if (!(await findCachedFile(cleanId)) && (downloadRetryCounts.get(cleanId) || 0) < 3) {
+          const tries = (downloadRetryCounts.get(cleanId) || 0) + 1;
+          downloadRetryCounts.set(cleanId, tries);
+          setTimeout(() => {
+            downloadRetryCounts.delete(cleanId);
+            downloadTrackToDisk(trackUrl, cleanId, platform, meta).catch(() => {});
+          }, 60000 * tries);
+        }
       }
       done();
     });
@@ -1620,7 +1655,7 @@ async function prefetchTrack(trackUrl, trackId, platform) {
   prefetchingSet.add(cacheKey);
 
   try {
-    if (platform === 'youtube' && (!trackUrl || !trackUrl.startsWith('http')) && cleanId) {
+    if (platform === 'youtube' && (!trackUrl || !trackUrl.startsWith('http')) && isRealYouTubeId(cleanId)) {
       trackUrl = `https://www.youtube.com/watch?v=${cleanId}`;
     }
     if (!isSafeMediaUrl(trackUrl)) return;
@@ -2320,7 +2355,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
     const cached = streamUrlCache.get(cacheKey) || (cleanId ? streamUrlCache.get(cleanId) : null);
     if (cached && (Date.now() - cached.timestamp < 7200000)) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      if (cleanId) setTimeout(() => downloadTrackToDisk(trackUrl, cleanId, platform, meta), 20000);
+      if (cleanId) setTimeout(() => downloadTrackToDisk(trackUrl, cleanId, platform, meta), 2000);
       return res.end(JSON.stringify(cached.data));
     }
   }
@@ -2335,7 +2370,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
     }
   }
 
-  if (platform === 'youtube' && (!trackUrl || !trackUrl.startsWith('http')) && cleanId) {
+  if (platform === 'youtube' && (!trackUrl || !trackUrl.startsWith('http')) && isRealYouTubeId(cleanId)) {
     trackUrl = `https://www.youtube.com/watch?v=${cleanId}`;
   }
 
@@ -2384,7 +2419,11 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
                 break;
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            // A dead video succeeds under no player client: stop spending the rest of the
+            // ladder's time (and rate-limit budget) on it.
+            if (/this video is unavailable|video unavailable/i.test(String(e && e.message))) break;
+          }
         }
       } else {
         try {
@@ -2483,6 +2522,11 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
 
   if (!streamUrl) {
     try { logger.error('Stream resolve failed: ' + (title || trackUrl)); } catch (_) {}
+    // Nothing resolved this time — usually the provider bot-wall, which lifts within minutes
+    // while the disk download keeps retrying on its own. Queue the download now so the
+    // renderer's automatic retry (or the listener's next tap) finds the track cached instead
+    // of facing the same dead end again.
+    if (cleanId || trackUrl) downloadTrackToDisk(trackUrl, cleanId, platform, meta);
     let tools = { ytDlp: false };
     try { tools = require('./tools').toolsStatus(); } catch (_) {}
     const reason = tools.ytDlp
@@ -2503,7 +2547,9 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
 
   if (cacheKey) streamUrlCache.set(cacheKey, { timestamp: Date.now(), data });
   if (cleanId && cleanId !== cacheKey) streamUrlCache.set(cleanId, { timestamp: Date.now(), data });
-  if (cleanId) setTimeout(() => downloadTrackToDisk(trackUrl, cleanId, platform, meta), 20000);
+  // Start the disk copy right away rather than 20 s in: the download is what the automatic
+  // retry falls back on, and every saved second shortens the "buffering forever" window.
+  if (cleanId) setTimeout(() => downloadTrackToDisk(trackUrl, cleanId, platform, meta), 2000);
 
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));

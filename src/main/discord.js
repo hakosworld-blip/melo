@@ -10,6 +10,7 @@ let isEnabled = true;
 let lastTrackInfo = null;
 let reconnectTimer = null;
 let isDestroying = false;
+let reconnectAttempts = 0;
 
 function initRPC() {
   if (rpcClient || isDestroying) return;
@@ -18,6 +19,7 @@ function initRPC() {
 
   rpcClient.on('ready', () => {
     isConnected = true;
+    reconnectAttempts = 0;
     console.log('[Discord RPC] Connected as', rpcClient.user?.username || 'unknown');
     if (lastTrackInfo && isEnabled) {
       _setActivity(lastTrackInfo);
@@ -41,12 +43,16 @@ function initRPC() {
 
 function scheduleReconnect() {
   if (reconnectTimer || isDestroying || !isEnabled) return;
+  // Back off exponentially (15 s → 5 min cap). Without this, an absent Discord client
+  // turns every state update into another failed login attempt flooding the console.
+  const delay = Math.min(RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts), 300000);
+  reconnectAttempts++;
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     if (isEnabled && !isDestroying) {
       initRPC();
     }
-  }, RECONNECT_DELAY_MS);
+  }, delay);
 }
 
 function _setActivity(trackInfo) {

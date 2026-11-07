@@ -6,6 +6,9 @@ import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Request
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
@@ -41,18 +44,26 @@ object YtDlp {
     private const val FORMAT_FRUGAL = "bestaudio[abr<=128]/bestaudio/best"
 
     /**
+     * Wall clock limit for one extraction. `--socket-timeout` bounds individual socket ops
+     * only; without a process timeout a hung extraction holds a play request open for
+     * minutes, which is the "stuck loading" look.
+     */
+    private const val PROCESS_TIMEOUT_MS = 15_000L
+
+    /**
      * One extraction attempt: how yt-dlp should present itself, and the identity the CDN will
      * see when the URL is read back.
      *
      * yt-dlp's own defaults come first. Pinning `android_vr` — the previous behaviour — made
      * extraction succeed and every returned URL answer 403, which the player could only show
-     * as "nothing plays"; the pinned clients stay afterwards as fallbacks.
+     * as "nothing plays"; the pinned clients stay afterwards as fallbacks, each verified and
+     * played back with the identity it was signed for.
      */
     private data class Strategy(val extractorArgs: String?, val userAgent: String)
 
     private val STRATEGIES = listOf(
         Strategy(null, Api.WEB_UA),
-        Strategy("youtube:player_client=android", Api.WEB_UA),
+        Strategy("youtube:player_client=android", Api.ANDROID_UA),
         Strategy("youtube:player_client=android_vr", Api.ANDROID_VR_UA),
     )
 
@@ -127,8 +138,19 @@ object YtDlp {
             // -g prints the media URL instead of downloading the file.
             request.addOption("-g")
 
-            val response = runCatching { YoutubeDL.execute(request) }
-                .onFailure { failure = describe(it) }
+            val response = runCatching {
+                // This library version has no process-timeout parameter, so bound the blocking
+                // wait with an interruptible run: on timeout the caller stops waiting (the
+                // strategy counts as failed) instead of holding the play request open for
+                // minutes; the read-only -g process then exits on its own.
+                withTimeoutOrNull(PROCESS_TIMEOUT_MS) {
+                    runInterruptible { YoutubeDL.execute(request) }
+                }
+            }
+                .onFailure {
+                    if (it is CancellationException) throw it
+                    failure = describe(it)
+                }
                 .getOrNull() ?: continue
 
             if (response.exitCode != 0) {
@@ -176,6 +198,14 @@ object YtDlp {
                     stampNightlyCheck(app)
                     refreshScope.launch {
                         runCatching { YoutubeDL.updateYoutubeDL(app, YoutubeDL.UpdateChannel.NIGHTLY) }
+                            .onFailure {
+                                // A failed refresh must not keep the extractor a day behind the
+                                // provider: the nightly channel exists to pick up playback
+                                // fixes within hours. Clear the stamp so the next session
+                                // retries instead of waiting out the full TTL.
+                                app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                                    .remove(KEY_LAST_NIGHTLY_CHECK).apply()
+                            }
                     }
                 }
                 ready = true

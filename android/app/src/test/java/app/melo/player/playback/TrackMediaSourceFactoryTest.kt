@@ -160,12 +160,12 @@ class TrackMediaSourceFactoryTest {
         }
         val database = StandaloneDatabaseProvider(ApplicationProvider.getApplicationContext())
         val cache = SimpleCache(temporaryFolder.newFolder("cache"), NoOpCacheEvictor(), database)
-        val cached = CacheDataSource.Factory().setCache(cache).setUpstreamDataSourceFactory(upstream)
+        val cached = CacheDataSource.Factory().setCache(cache)
         val resolve: suspend (Track) -> ResolvedStream = {
             resolutions++
             ResolvedStream.Remote(if (expired) nextUrl else firstUrl)
         }
-        val progressive = progressiveDataSourceFactory(cached, checkNotNull(TrackCodec.fromUri(item.localConfiguration!!.uri)), resolve)
+        val progressive = progressiveDataSourceFactory(cached, upstream, checkNotNull(TrackCodec.fromUri(item.localConfiguration!!.uri)), resolve)
         val defaultFactory = DefaultMediaSourceFactory(cached)
         var selected: MediaItem? = null
         val recording = object : MediaSource.Factory by defaultFactory {
@@ -189,9 +189,11 @@ class TrackMediaSourceFactoryTest {
             assertEquals(listOf(0L, 4L), opened.map { it.position })
             assertEquals(setOf(item.mediaId), cache.keys)
             assertEquals(3, resolutions)
+            // The re-read of the cached range no longer resolves: the resolver sits below
+            // the byte cache now, so cache hits need no network and no extraction.
             assertEquals("abcd", String(read(progressive, base)))
             assertEquals(2, opened.size)
-            assertEquals(4, resolutions)
+            assertEquals(3, resolutions)
             assertEquals(item, source.mediaItem)
         } finally {
             source.releaseSource(caller)
@@ -268,12 +270,23 @@ class TrackMediaSourceFactoryTest {
             }
         }
         val track = checkNotNull(TrackCodec.fromUri(item.localConfiguration!!.uri))
-        val dataSources = progressiveDataSourceFactory(upstream, track) {
+        val database = StandaloneDatabaseProvider(ApplicationProvider.getApplicationContext())
+        val cache = SimpleCache(temporaryFolder.newFolder("refuse-cache"), NoOpCacheEvictor(), database)
+        val dataSources = progressiveDataSourceFactory(
+            CacheDataSource.Factory().setCache(cache),
+            upstream,
+            track,
+        ) {
             ResolvedStream.Remote("https://fixture.invalid/manifest", hls = true)
         }
-        val error = runCatching { read(dataSources, DataSpec.Builder().setUri("https://fixture.invalid/old.m4a").build()) }.exceptionOrNull()
-        assertTrue(error is IOException)
-        assertFalse(opened)
+        try {
+            val error = runCatching { read(dataSources, DataSpec.Builder().setUri("https://fixture.invalid/old.m4a").build()) }.exceptionOrNull()
+            assertTrue(error is IOException)
+            assertFalse(opened)
+        } finally {
+            cache.release()
+            database.close()
+        }
     }
 
     @Test

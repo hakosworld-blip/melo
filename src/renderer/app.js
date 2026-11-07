@@ -3919,18 +3919,51 @@ async function playTrack(track, queueList = null, startIndex = -1, context = nul
       }
 
       const streamInfoUrl = `http://127.0.0.1:${state.serverPort}/api/stream-info?url=${encodeURIComponent(resolvedUrl || '')}&id=${encodeURIComponent(resolvedId || '')}&platform=${track.platform || state.platform}&title=${encodeURIComponent(track.title || '')}&artist=${encodeURIComponent(track.artist || '')}&duration=${encodeURIComponent(track.duration || 0)}&thumbnail=${encodeURIComponent(track.thumbnail || '')}`;
-      let res;
-      try {
-        res = await fetch(streamInfoUrl, { signal });
-      } catch (fetchErr) {
-        if (fetchErr instanceof TypeError) {
-          await new Promise(r => setTimeout(r, 600));
-          res = await fetch(streamInfoUrl, { signal });
-        } else {
-          throw fetchErr;
+      /*
+       * First attempt gets ~20 s like before. If it is cut off, the server is still working —
+       * the provider bot-wall makes yt-dlp slow rather than dead, and it queues a disk
+       * download that a quieter second attempt (fresh URL, forced refresh) can pick up.
+       * Two bounded attempts, then a real error message instead of a frozen spinner.
+       */
+      let data = null;
+      for (let attempt = 0; attempt < 2 && !data; attempt++) {
+        if (currentToken !== state.loadToken) return;
+        if (attempt > 0) {
+          if (el.trackLoadingSub) el.trackLoadingSub.textContent = 'taking longer than usual…';
+          await new Promise(r => setTimeout(r, 6000));
+          if (currentToken !== state.loadToken) return;
         }
+        state.currentAbortController = new AbortController();
+        const attemptSignal = state.currentAbortController.signal;
+        const attemptTimer = setTimeout(() => {
+          try { state.currentAbortController?.abort(); } catch (_) {}
+        }, attempt === 0 ? 20000 : 24000);
+        try {
+          let res;
+          try {
+            res = await fetch(streamInfoUrl + (attempt > 0 ? '&refresh=1' : ''), { signal: attemptSignal });
+          } catch (fetchErr) {
+            if (fetchErr instanceof TypeError) {
+              await new Promise(r => setTimeout(r, 600));
+              res = await fetch(streamInfoUrl + (attempt > 0 ? '&refresh=1' : ''), { signal: attemptSignal });
+            } else {
+              throw fetchErr;
+            }
+          }
+          data = await res.json();
+        } catch (attemptErr) {
+          if (attempt === 0 && attemptErr.name === 'AbortError') {
+            data = null;
+          } else {
+            throw attemptErr;
+          }
+        } finally {
+          clearTimeout(attemptTimer);
+        }
+        // Offline is a hard answer, not a slow one: no retry will mint a URL without a
+        // network, so fall straight through to the offline message.
+        if (data && data.success === false && !navigator.onLine) break;
       }
-      const data = await res.json();
 
       if (currentToken !== state.loadToken) return;
 
@@ -3959,12 +3992,63 @@ async function playTrack(track, queueList = null, startIndex = -1, context = nul
       // CORS mode has to be requested before src is assigned; afterwards it is ignored.
       try { el.nativeAudio.crossOrigin = data.isLocal ? null : 'anonymous'; } catch (e) {}
 
+      /*
+       * Last resort: a provider URL can start failing mid-queue (expired signature, format
+       * the renderer cannot decode, unrecoverable HLS). Ask the server for an mp3 variant
+       * and swap the source once instead of leaving a silent playbar behind. Declared before
+       * the source is attached so both the element error listener and the HLS fatal path
+       * can reach it.
+       */
+      let retriedViaMp3 = false;
+      const retryViaMp3 = async () => {
+        if (currentToken !== state.loadToken || retriedViaMp3) return;
+        retriedViaMp3 = true;
+        /*
+         * Resigning must not cost the listener their place in the track: remember the
+         * position, swap in a freshly signed URL and resume once the new stream reports
+         * its metadata. Without the resume the retry restarts every song from zero.
+         */
+        if (hlsInstance) {
+          // hls.js owns the element while attached; unless it lets go, its own recovery
+          // can re-attach a blob: URL over the swapped-in src and the fallback never plays.
+          try { hlsInstance.destroy(); } catch (e) {}
+          hlsInstance = null;
+        }
+        const resumeAt = typeof el.nativeAudio.currentTime === 'number' ? el.nativeAudio.currentTime : 0;
+        try {
+          const alt = await resolveShareStreamUrl(track);
+          if (!alt || currentToken !== state.loadToken) return;
+          if (resumeAt > 1) {
+            el.nativeAudio.addEventListener('loadedmetadata', () => {
+              if (currentToken !== state.loadToken) return;
+              try { el.nativeAudio.currentTime = resumeAt; } catch (_) {}
+              playSmooth();
+            }, { once: true });
+          } else {
+            playSmooth();
+          }
+          el.nativeAudio.src = alt;
+        } catch (e) {}
+      };
+
       if (data.isHls && window.Hls && Hls.isSupported()) {
+        let hlsRecoveries = 0;
         hlsInstance = new Hls({ enableWorker: true, lowLatencyMode: true, maxBufferLength: 30, maxMaxBufferLength: 60, maxBufferSize: 30 * 1000 * 1000 });
         hlsInstance.on(Hls.Events.ERROR, (_, errData) => {
-          if (errData && errData.fatal) {
-            if (errData.type === Hls.ErrorTypes.NETWORK_ERROR) hlsInstance.startLoad();
-            else if (errData.type === Hls.ErrorTypes.MEDIA_ERROR) hlsInstance.recoverMediaError();
+          if (!errData || !errData.fatal) return;
+          if (errData.type === Hls.ErrorTypes.NETWORK_ERROR && hlsRecoveries < 3) {
+            hlsRecoveries++;
+            hlsInstance.startLoad();
+          } else if (errData.type === Hls.ErrorTypes.MEDIA_ERROR && hlsRecoveries < 3) {
+            hlsRecoveries++;
+            hlsInstance.recoverMediaError();
+          } else {
+            // Dead manifest, parser error or retries exhausted: hand the track to the
+            // progressive fallback instead of buffering forever.
+            try { hlsInstance.destroy(); } catch (e) {}
+            hlsInstance = null;
+            try { el.nativeAudio.removeAttribute('src'); el.nativeAudio.load(); } catch (e) {}
+            retryViaMp3();
           }
         });
         hlsInstance.loadSource(playbackUrl);
@@ -3979,43 +4063,29 @@ async function playTrack(track, queueList = null, startIndex = -1, context = nul
         playSmooth();
       }
 
-      /*
-       * Last resort: a provider URL can start failing mid-queue (expired signature, format the
-       * renderer cannot decode). Ask the server for an mp3 variant and swap the source once
-       * instead of leaving a silent playbar behind.
-       */
       if (!data.isLocal) {
-        let retriedViaMp3 = false;
-        const retryViaMp3 = async () => {
-          if (currentToken !== state.loadToken || retriedViaMp3) return;
-          retriedViaMp3 = true;
-          /*
-           * Resigning must not cost the listener their place in the track: remember the
-           * position, swap in a freshly signed URL and resume once the new stream reports
-           * its metadata. Without the resume the retry restarts every song from zero.
-           */
-          const resumeAt = typeof el.nativeAudio.currentTime === 'number' ? el.nativeAudio.currentTime : 0;
-          try {
-            const alt = await resolveShareStreamUrl(track);
-            if (!alt || currentToken !== state.loadToken) return;
-            if (resumeAt > 1) {
-              el.nativeAudio.addEventListener('loadedmetadata', () => {
-                if (currentToken !== state.loadToken) return;
-                try { el.nativeAudio.currentTime = resumeAt; } catch (_) {}
-                playSmooth();
-              }, { once: true });
-            } else {
-              playSmooth();
-            }
-            el.nativeAudio.src = alt;
-          } catch (e) {}
-        };
+        // One retry handler at a time: the element outlives tracks, so stale listeners from
+        // previous plays would otherwise pile up for the element's lifetime.
+        if (el.nativeAudio._meloRetryFn) {
+          el.nativeAudio.removeEventListener('error', el.nativeAudio._meloRetryFn);
+        }
+        el.nativeAudio._meloRetryFn = retryViaMp3;
         el.nativeAudio.addEventListener('error', retryViaMp3);
       }
 
       applyAudioSettings();
     } catch (err) {
-      if (err.name === 'AbortError') return;
+      if (err.name === 'AbortError') {
+        // Both resolve attempts hit their bound. Never leave the listener on a frozen
+        // "buffering stream" overlay: say what happened, restore the controls, and let the
+        // server's background download make the next try succeed.
+        if (currentToken === state.loadToken) {
+          if (el.trackLoadingOverlay) el.trackLoadingOverlay.classList.add('hidden');
+          updatePlayPauseButton(false, false);
+          showToast('Track is taking too long to load. Try again in a moment.', 'error');
+        }
+        return;
+      }
       if (currentToken === state.loadToken) {
         console.warn('Track playback notice:', err);
         updatePlayPauseButton(false, false);
@@ -19636,7 +19706,7 @@ function bindCoverHoldZoom(wrapEl) {
       const res = await fetch('http://127.0.0.1:' + port + '/api/vibe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: state.platform || 'ytmusic', seeds: taste.seeds || [], topArtists: taste.topArtists || [], avoid: mergedAvoid, count: 12 })
+        body: JSON.stringify({ platform: state.platform || 'ytmusic', seeds: taste.seeds || [], topArtists: taste.topArtists || [], avoid: mergedAvoid, limit: 12 })
       });
       const data = await res.json();
       const incoming = Array.isArray(data && data.tracks) ? data.tracks : [];

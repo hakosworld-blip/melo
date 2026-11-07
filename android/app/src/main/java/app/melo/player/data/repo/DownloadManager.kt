@@ -115,7 +115,7 @@ class DownloadManager(
         val target = folder.createAudio(audioName, MeloNames.mimeFor(extension), track)
 
         try {
-            val written = withContext(Dispatchers.IO) { transfer(resolved.url, target, key) }
+            val written = withContext(Dispatchers.IO) { transfer(resolved.url, resolved.userAgent, target, key) }
             if (written < MIN_AUDIO_BYTES) throw IllegalStateException("Downloaded file looks invalid")
             target.finish()
             setProgress(key, 0.97f)
@@ -137,10 +137,12 @@ class DownloadManager(
     }
 
     /** Streams the provider's bytes straight into the folder file. */
-    private fun transfer(url: String, target: MeloFolder.Target, key: String): Long {
+    private fun transfer(url: String, userAgent: String?, target: MeloFolder.Target, key: String): Long {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", if (url.contains("googlevideo")) Api.ANDROID_VR_UA else Api.WEB_UA)
+            // Fetch with the identity the URL was signed for: googlevideo answers 403 when a
+            // URL minted for one client is read with another's.
+            .header("User-Agent", userAgent ?: if (url.contains("googlevideo")) Api.ANDROID_VR_UA else Api.WEB_UA)
             .build()
 
         val response = Api.streamingClient.newCall(request).execute()

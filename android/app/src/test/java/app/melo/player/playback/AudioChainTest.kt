@@ -48,14 +48,26 @@ class AudioChainTest {
             .create()
             .get()
 
-        // The chain the player opens for a progressive track: host routing, then
-        // just-in-time resolution of the melo:// item onto a fetchable URL. The audio cache
-        // layer is left out because onCreate already holds the process-wide SimpleCache.
+        // The chain the player opens for a progressive track: byte cache on top, then
+        // host routing, then just-in-time resolution of the melo:// item onto a fetchable
+        // URL. The resolver sits below the cache, so cached ranges never resolve — the
+        // cache itself comes from onCreate, which holds the process-wide SimpleCache.
         val router = MeloPlaybackService::class.java
             .getDeclaredMethod("buildHostRoutingDataSourceFactory")
             .apply { isAccessible = true }
             .invoke(service) as DataSource.Factory
-        dataSourceFactory = progressiveDataSourceFactory(router, track(), ServiceLocator.resolver::resolve)
+        val cache = MeloPlaybackService::class.java
+            .getDeclaredField("audioCache")
+            .apply { isAccessible = true }
+            .get(service) as androidx.media3.datasource.cache.SimpleCache
+        dataSourceFactory = progressiveDataSourceFactory(
+            androidx.media3.datasource.cache.CacheDataSource.Factory()
+                .setCache(cache)
+                .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR),
+            router,
+            track(),
+            ServiceLocator.resolver::resolve,
+        )
     }
 
     @After

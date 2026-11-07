@@ -144,4 +144,11 @@ function initUpdater(getWindow) {
       return fallbackFetchGitHub();
     });
   };
+
+  return { check };
 };
+
+// main.js calls require('./updater').initUpdater(...); without these exports the call
+// threw "initUpdater is not a function" as an unhandled rejection and the desktop
+// auto-updater never ran.
+module.exports = { initUpdater };
