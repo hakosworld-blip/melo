@@ -46,6 +46,37 @@ async function ensureRuntimeDirectory() {
   return target;
 }
 
+function portFilePath() {
+  return path.join(app.getPath('userData'), 'port.json');
+}
+
+function readSavedPort() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(portFilePath(), 'utf8'));
+    return Number(saved.port) || null;
+  } catch {
+    return null;
+  }
+}
+
+function savePort(port) {
+  try {
+    fs.mkdirSync(path.dirname(portFilePath()), { recursive: true });
+    fs.writeFileSync(portFilePath(), JSON.stringify({ port }));
+  } catch {
+    /* A fixed port is a convenience; a fresh one still works. */
+  }
+}
+
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.unref();
+    probe.once('error', () => resolve(false));
+    probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true)));
+  });
+}
+
 function findFreePort() {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
@@ -61,6 +92,19 @@ function findFreePort() {
       probe.close(() => resolve(port));
     });
   });
+}
+
+/**
+ * Keep the same origin between launches. The web build keeps playlists,
+ * downloads and settings in origin-scoped storage, so a random port each run
+ * would hand the user an empty app every time.
+ */
+async function resolveStablePort() {
+  const saved = readSavedPort();
+  if (saved && (await isPortFree(saved))) return saved;
+  const port = await findFreePort();
+  savePort(port);
+  return port;
 }
 
 function startServer(directory, port) {
@@ -162,7 +206,7 @@ function createWindow() {
 async function boot() {
   nativeTheme.themeSource = 'dark';
   const directory = await ensureRuntimeDirectory();
-  const port = await findFreePort();
+  const port = await resolveStablePort();
   serverOrigin = `http://127.0.0.1:${port}`;
   startServer(directory, port);
   await waitForServer(serverOrigin);
