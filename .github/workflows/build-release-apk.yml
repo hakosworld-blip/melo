@@ -7,23 +7,18 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.2.0)"
+        description: "Release tag (e.g. v1.2.0) — GitHub Release only, no Play Store"
         required: true
         type: string
       version:
-        description: "Version number (e.g. 1.2.0) — written to mobile/app.json"
+        description: "Version number (e.g. 1.2.0), written to mobile/app.json"
         required: true
         type: string
       build_number:
-        description: "Android versionCode (e.g. 3)"
-        required: false
+        description: "Android versionCode (must always increment). No Play Store ever runs from this workflow."
+        required: true
         default: "1"
         type: string
-      prerelease:
-        description: "Mark this release as a pre-release"
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write   # needed to create GitHub Releases
@@ -83,7 +78,12 @@ jobs:
 
       - name: Stamp version into app.json
         run: |
+          - name: Stamp version into app.json
+        run: |
           node -e "const fs=require('fs'); const p='app.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.expo.version=process.env.VERSION_NAME; j.expo.android.versionCode=Number(process.env.VERSION_CODE); fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');"
+        env:
+          VERSION_NAME: ${{ inputs.version }}
+          VERSION_CODE: ${{ inputs.build_number }}
         env:
           VERSION_NAME: ${{ inputs.version }}
           VERSION_CODE: ${{ inputs.build_number }}
