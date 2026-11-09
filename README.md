@@ -74,12 +74,15 @@ app/
   settings/                Appearance, backgrounds, player, lyrics, source, storage
   api/
     home | search | track | artist | album     provider-backed JSON
+    import/spotify | import/match              playlist import + song matching
     stream/[provider]/[id]                     ranged audio proxy (Node http)
     image                                      artwork proxy with host allowlist
     lyrics                                     LRCLIB lookup + manual search
     providers                                  live source availability check
 lib/
   provider/audius.ts       Audius provider — keyless, full-length, real metadata
+  spotify.ts               Public Spotify playlist reader (name + tracks, no key)
+  match-import.ts          Scores an imported song against catalogue search results
   provider/youtube.ts      YouTube Music provider — yt-dlp (metadata + streaming only)
   lyrics.ts                LRC parsing, matching, caching (LRCLIB)
   player-engine.ts         HTMLAudioElement, Media Session, artwork metadata
@@ -128,6 +131,14 @@ The UI's **Settings → Music source → Test sources** performs a real search *
 
 LRCLIB is queried exact-first, then by a scored search (title/artist/duration). Only real timestamps are treated as synced; unsynchronised lyrics are labelled "Not time-synced". Synced lyrics highlight the current line, auto-scroll, support tap-to-seek, and respect font size, alignment, highlight style and auto-scroll preferences. If nothing matches, **Search lyrics** lets you pick the correct LRCLIB record and attach it; attached and downloaded lyrics are cached in IndexedDB and work offline.
 
+### Importing a playlist
+
+Library → Playlists → **Import** takes a public Spotify playlist link (`open.spotify.com/playlist/…`, the embed link, or a `spotify:playlist:` URI), reads its name and songs without an account or API key, finds each song in the music catalogue, and saves a local playlist with the same name. Re-importing a playlist whose name already exists adds the missing songs to that playlist instead of creating a duplicate.
+
+Matching is deterministic and explainable (`lib/match-import.ts`): normalised title, artist overlap and duration agreement are scored, and a candidate must clear 55/100. Songs that are not in the catalogue are reported by name rather than silently replaced with a wrong track.
+
+Spotify's public page only exposes the first 100 songs of a playlist, so longer playlists import their first 100 — the app says so in the result. Nothing is posted to Spotify and no Spotify credentials are used.
+
 ### Downloads and offline
 
 Each download stores, per track: audio blob, artwork blob (deduped by URL hash), lyrics with timestamps, and a metadata snapshot (track, artist, collaborators, source, download permission). Records live in `localStorage`, blobs in IndexedDB with exact byte sizes. Downloads resume from a queue with retry; interrupted downloads are marked failed instead of silently disappearing. Deleting a track removes its audio/lyrics/metadata and only removes artwork no other download references. The service worker caches the app shell and artwork so the library, playlists, settings and downloaded music open with no network.
@@ -144,6 +155,7 @@ No account, no analytics, no telemetry, no third-party requests from the client 
 - **YouTube Music cannot stream from this cloud host** because YouTube bot-checks datacenter IPs. The provider is complete; it needs cookies or a residential IP. This is reported in-app rather than silently hidden.
 - **Downloads are source-dependent.** Tracks the source marks as downloadable get a real "Download" (permanent offline copy). Other streamable tracks can be saved as a clearly labelled *private offline copy*; melo never claims the artist authorised a download, and nothing from YouTube is downloaded.
 - **LRCLIB coverage is community-sourced.** Many independent tracks have no lyrics; the manual search exists for exactly that reason.
+- **Spotify import is best-effort matching, not a mirror.** Only public playlists can be read, Spotify's public page exposes at most their first 100 songs, and a song is imported only when the catalogue has a confident match. Mainstream major-label catalogues are mostly absent from Audius, so those imports come back as "not found" instead of importing covers or remixes.
 - Audius does not expose an album catalogue for every artist, so some profiles show no albums — melo shows nothing rather than inventing releases.
 
 ## Testing performed
@@ -159,6 +171,7 @@ Exercised in a real browser against the live catalogue, not just rendered:
 - **Storage** — panel reported 8.8 MB in melo (audio/metadata split). Deleting one download confirmed first, then removed the record and *all* its IndexedDB assets, returning storage to 0 B.
 - **Customisation** — accent and light/dark theme applied instantly and persisted across reload.
 - **Search** — live query returned real tracks, artists and result counts.
+- **Spotify import** — reading `open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M` returned the real playlist name and 50 songs in 0.29 s; a batch of 12 mainstream songs correctly matched nothing (they are not in Audius), while 8 of 8 catalogue songs re-imported at score 100, so the matcher is neither guessing nor over-rejecting.
 - **HTTP** — stream proxy served `206` byte ranges and full downloads (`audio/mpeg`, 9.26 MB); artwork proxy serves Audius creator-node hosts with private/loopback and bare-IP targets refused.
 - **Build** — `npx tsc --noEmit` and `npm run build` both pass; first-load JS ~125 kB.
 

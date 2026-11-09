@@ -1,5 +1,6 @@
 "use client";
 
+import { ImportPlaylistSheet } from "@/components/import-playlist-sheet";
 import LyricsView from "@/components/lyrics-view";
 import QueueView from "@/components/queue-view";
 import TrackMenu from "@/components/track-menu";
@@ -42,6 +43,15 @@ export default function GlobalSheets() {
 
       <Sheet open={sheet?.type === "createPlaylist"} onClose={close} title="New playlist">
         {sheet?.type === "createPlaylist" && <CreatePlaylistSheet track={sheet.track} />}
+      </Sheet>
+
+      <Sheet
+        open={sheet?.type === "importPlaylist"}
+        onClose={close}
+        title="Import a playlist"
+        description="Paste a Spotify link — songs are matched to the catalogue"
+      >
+        {sheet?.type === "importPlaylist" && <ImportPlaylistSheet />}
       </Sheet>
 
       <Sheet open={sheet?.type === "editPlaylist"} onClose={close} title="Edit playlist">

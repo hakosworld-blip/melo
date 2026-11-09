@@ -9,6 +9,7 @@ export type SheetState =
   | { type: "addToPlaylist"; track: Track }
   | { type: "trackMenu"; track: Track }
   | { type: "createPlaylist"; track?: Track }
+  | { type: "importPlaylist" }
   | { type: "editPlaylist"; playlistId: string }
   | {
       type: "confirm";

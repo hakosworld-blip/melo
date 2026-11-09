@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Download, HardDrive, ListMusic, Music4, Plus, Users } from "lucide-react";
+import { Download, HardDrive, Link2, ListMusic, Music4, Plus, Users } from "lucide-react";
 import AppBar from "@/components/app-bar";
 import { Artwork } from "@/components/artwork";
 import DownloadList, { totalDownloadBytes } from "@/components/download-list";
@@ -81,9 +81,14 @@ export default function LibraryPage() {
                 title="Playlists"
                 subtitle="Private to this device"
                 action={
-                  <Button size="sm" variant="surface" onClick={() => openSheet({ type: "createPlaylist" })}>
-                    <Plus size={14} /> New
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="surface" onClick={() => openSheet({ type: "importPlaylist" })}>
+                      <Link2 size={14} /> Import
+                    </Button>
+                    <Button size="sm" variant="surface" onClick={() => openSheet({ type: "createPlaylist" })}>
+                      <Plus size={14} /> New
+                    </Button>
+                  </div>
                 }
               />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -103,7 +108,12 @@ export default function LibraryPage() {
                   compact
                   icon={<ListMusic size={20} />}
                   title="No playlists yet"
-                  description="Build one from any song's menu. No account, no syncing — it stays here."
+                  description="Build one from any song's menu, or paste a Spotify playlist link to import it. No account, no syncing — it stays here."
+                  action={
+                    <Button variant="surface" size="sm" onClick={() => openSheet({ type: "importPlaylist" })}>
+                      <Link2 size={14} /> Import from Spotify
+                    </Button>
+                  }
                 />
               )}
             </section>
