@@ -11,11 +11,15 @@ npm run android:release
 
 ## Design and lyrics
 
-The app follows the same system as the web build: bone canvas, white surfaces, hairline rules, Newsreader for headings (bundled via `@expo-google-fonts/newsreader`), Manrope for UI text and the platform mono for labels. There are no card shadows and no pill buttons.
+The app follows the same system as the web build: a near-black listening room (`#0A0A0B`), raised charcoal surfaces, hairline rules, Manrope for everything and tight display tracking. Colour only ever comes from artwork; there are no gradients, shadows or decorative borders.
 
-Now Playing is a dark stage: the track's artwork is drawn full-screen with `blurRadius` behind a warm-charcoal scrim, so any artwork stays readable under bone text.
+Now Playing is the dark stage from the phone mock it was designed against: the artwork is drawn full-screen with `blurRadius` behind a scrim, with a large rounded cover, title and `artist · album`, a **Pin** star, a `…` sheet, elapsed/total time, transport, a volume slider and a dock (Lyrics, Repeat, Up next). **Up next** lists the next 15 songs in order, with save-as-playlist and a confirmed clear.
 
-**Lyrics** come from LRCLIB (`src/lyrics.ts`) and are reachable two ways — the Lyrics button on Now Playing, or a long press on any track row. Synced lines follow playback — the sheet keeps the current line in view, pauses following for a few seconds while you scroll, and seeks when a line is tapped; unsynced records are labelled, and a failed or empty lookup offers a retry. Nothing is cached offline yet.
+**Lyrics** come from LRCLIB (`src/lyrics.ts`) and are reachable two ways — the bubble on Now Playing, or a long press on any track row. The sheet keeps the sung line crisp while neighbours and the screen edges step back (React Native can't blur text without a native module, so the focus band is per-line opacity plus stacked scrims rather than a Gaussian blur). Synced lines follow playback, pause following for a few seconds while you scroll, and seek when tapped. The credit at the end names the LRCLIB record that was matched, so a mis-matched attachment is never disguised as the playing song. Nothing is cached offline yet.
+
+## Home and recommendations
+
+Home is built in `src/feed.ts` from the plays this phone has recorded (the only history melo keeps). The recent artists and genres seed the **daily mix**; a date-seeded shuffle means the same day returns the same order and tomorrow returns a different one. Genres are real Audius genres with real covers, and each opens a genre screen. **Pinned** songs sit at the top of Home for one-tap playback, and Settings can forget the listening history that seeds it all.
 
 ## Playlists and importing
 

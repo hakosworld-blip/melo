@@ -135,3 +135,36 @@ export function addToQueue(track: Track) {
   usePlayer.getState().setQueue(queue);
   playlist.add(streamUrl(track));
 }
+
+/** Repeat cycles none → all → one, and says what it landed on for the button. */
+export type RepeatMode = 'none' | 'all' | 'single';
+
+export function cycleRepeat(): RepeatMode {
+  const next: RepeatMode = playlist.loop === 'none' ? 'all' : playlist.loop === 'all' ? 'single' : 'none';
+  playlist.loop = next;
+  return next;
+}
+
+export function currentRepeat(): RepeatMode {
+  return playlist.loop;
+}
+
+/** Player volume, 0–1. Hardware volume still works on top of this. */
+export function setVolume(value: number) {
+  playlist.volume = Math.min(1, Math.max(0, value));
+}
+
+export function currentVolume() {
+  return playlist.volume;
+}
+
+/** Empties the queue and stops playback; the songs themselves are untouched. */
+export function clearQueue() {
+  try {
+    playlist.pause();
+    playlist.clear();
+  } catch {
+    /* An empty playlist has nothing to stop. */
+  }
+  usePlayer.getState().setQueue([]);
+}

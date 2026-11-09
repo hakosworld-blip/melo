@@ -9,30 +9,31 @@ import { useUi } from './ui';
 import type { Track } from './types';
 
 /**
- * Warm monochrome, editorial: bone paper, white surfaces, hairline rules,
- * a serif for headings and one charcoal fill for actions. Colour only shows up
- * as a muted pastel on status chips.
+ * A listening room, not a document: near-black canvas, raised charcoal
+ * surfaces, hairline rules and one white accent. Display type is the same tight
+ * grotesque as the web build, and colour only ever comes from artwork.
  */
 
 export const colors = {
-  bg: '#F7F6F3',
-  surface: '#FFFFFF',
-  surfaceRaised: '#F1EFE9',
-  line: '#E5E2DB',
-  text: '#141312',
-  muted: '#78746C',
-  accent: '#141312',
-  accentInk: '#FBFAF7',
-  danger: '#9F2F2D',
-  paleRed: '#FDEBEC',
-  paleBlue: '#E1F3FE',
-  paleGreen: '#EDF3EC',
-  paleYellow: '#FBF3DB',
+  bg: '#0A0A0B',
+  surface: '#131315',
+  surfaceRaised: '#1C1C1F',
+  line: '#27272B',
+  text: '#F4F4F5',
+  muted: '#9C9CA4',
+  accent: '#FFFFFF',
+  accentInk: '#0A0A0B',
+  danger: '#FF8A86',
+  paleRed: '#2A1516',
+  paleBlue: '#101B26',
+  paleGreen: '#10201A',
+  paleYellow: '#241D0F',
+  stage: '#121114',
 };
 
 export const fonts = {
-  serif: 'Newsreader_500Medium',
-  serifSemi: 'Newsreader_600SemiBold',
+  serif: 'Manrope_700Bold',
+  serifSemi: 'Manrope_700Bold',
   sans: 'Manrope_400Regular',
   sansMedium: 'Manrope_500Medium',
   sansBold: 'Manrope_700Bold',
@@ -135,11 +136,14 @@ export function TrackRow({
   context,
   index,
   onRemove,
+  compact = false,
 }: {
   track: Track;
   context?: Track[];
   index?: number;
   onRemove?: () => void;
+  /** Queue rows only need transport: no add-to-queue or playlist buttons. */
+  compact?: boolean;
 }) {
   const queue = usePlayer((s) => s.queue);
   const status = useAudioPlaylistStatus(playlist);
@@ -166,22 +170,26 @@ export function TrackRow({
         </View>
       </Pressable>
       <Text style={styles.duration}>{formatTime(track.duration)}</Text>
-      <Pressable
-        style={styles.iconButton}
-        onPress={() => addToQueue(track)}
-        accessibilityRole="button"
-        accessibilityLabel={`Add ${track.title} to queue`}
-      >
-        <Plus size={17} color={colors.muted} />
-      </Pressable>
-      <Pressable
-        style={styles.iconButton}
-        onPress={() => useUi.getState().openAddToPlaylist(track)}
-        accessibilityRole="button"
-        accessibilityLabel={`Add ${track.title} to a playlist`}
-      >
-        <ListPlus size={17} color={colors.muted} />
-      </Pressable>
+      {compact ? null : (
+        <>
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => addToQueue(track)}
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${track.title} to queue`}
+          >
+            <Plus size={17} color={colors.muted} />
+          </Pressable>
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => useUi.getState().openAddToPlaylist(track)}
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${track.title} to a playlist`}
+          >
+            <ListPlus size={17} color={colors.muted} />
+          </Pressable>
+        </>
+      )}
       {onRemove ? (
         <Pressable
           style={styles.iconButton}
@@ -381,6 +389,14 @@ export function MiniPlayer() {
   const queue = usePlayer((s) => s.queue);
   const status = useAudioPlaylistStatus(playlist);
   const track = queue[status.currentIndex];
+  const trackId = track?.id;
+
+  // Every song that reaches the mini player is a play: that is the only
+  // listening history melo keeps, and what Home seeds the daily mix from.
+  useEffect(() => {
+    if (track) useLibrary.getState().recordPlay(track);
+  }, [trackId]);
+
   if (!track) return null;
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
   return (
@@ -433,9 +449,9 @@ export const styles = StyleSheet.create({
   },
   sectionHeader: { marginTop: 30, marginBottom: 10, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 },
   sectionHeading: { flex: 1, minWidth: 0 },
-  sectionTitle: { color: colors.text, fontFamily: fonts.serif, fontSize: 23, letterSpacing: -0.4 },
-  sectionSubtitle: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 },
-  errorBanner: { backgroundColor: colors.paleRed, borderColor: '#F2D6D7', borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 14 },
+  sectionTitle: { color: colors.text, fontFamily: fonts.sansBold, fontSize: 21, letterSpacing: -0.5 },
+  sectionSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  errorBanner: { backgroundColor: colors.paleRed, borderColor: 'rgba(255,138,134,0.28)', borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 14 },
   errorText: { color: colors.danger, fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 18 },
   emptyState: { paddingVertical: 26, paddingHorizontal: 6 },
   emptyText: { color: colors.muted, fontFamily: fonts.sans, fontSize: 13.5, lineHeight: 21 },
@@ -444,14 +460,14 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 9,
-    borderBottomWidth: 1,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
   trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 11 },
   trackText: { flex: 1, minWidth: 0 },
   trackTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 14.5 },
-  currentTrack: { color: colors.text },
+  currentTrack: { color: '#FFFFFF' },
   trackSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5, marginTop: 2 },
   duration: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10.5 },
   iconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
@@ -461,7 +477,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 8,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -471,7 +487,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: colors.accent,
-    borderRadius: 8,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -481,7 +497,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 8,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
@@ -492,32 +508,32 @@ export const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   miniPlayer: {
     position: 'absolute',
-    left: 10,
-    right: 10,
-    bottom: 88,
+    left: 12,
+    right: 12,
+    bottom: 92,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
+    backgroundColor: colors.surfaceRaised,
+    borderColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
   },
   miniText: { flex: 1, minWidth: 0 },
   miniTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13 },
   miniSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11, marginTop: 1 },
   miniPlay: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  progressTrack: { height: 2, backgroundColor: colors.line, marginTop: 7, overflow: 'hidden' },
-  progressFill: { height: 2, backgroundColor: colors.text },
+  progressTrack: { height: 2, backgroundColor: 'rgba(255,255,255,0.14)', marginTop: 6, overflow: 'hidden', borderRadius: 2 },
+  progressFill: { height: 2, backgroundColor: colors.text, borderRadius: 2 },
   input: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
@@ -529,7 +545,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
-  backdrop: { flex: 1, backgroundColor: '#141312AA', alignItems: 'center', justifyContent: 'center', padding: 22 },
+  backdrop: { flex: 1, backgroundColor: '#000000B3', alignItems: 'center', justifyContent: 'center', padding: 22 },
   dialog: {
     width: '100%',
     maxWidth: 420,
@@ -540,21 +556,21 @@ export const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
   },
-  dialogTitle: { color: colors.text, fontFamily: fonts.serif, fontSize: 21, letterSpacing: -0.3 },
+  dialogTitle: { color: colors.text, fontFamily: fonts.sansBold, fontSize: 21, letterSpacing: -0.4 },
   dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 2 },
-  sheetBackdrop: { flex: 1, backgroundColor: '#14131299', justifyContent: 'flex-end' },
+  sheetBackdrop: { flex: 1, backgroundColor: '#00000099', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    borderColor: colors.line,
+    backgroundColor: colors.surfaceRaised,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
     padding: 18,
     paddingBottom: 26,
     gap: 8,
     maxHeight: '76%',
   },
-  sheetSubtitle: { color: colors.text, fontFamily: fonts.serif, fontSize: 19, marginBottom: 4 },
+  sheetSubtitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 15, marginBottom: 4 },
   sheetList: { marginTop: 4 },
   sheetEmpty: { color: colors.muted, fontFamily: fonts.sans, fontSize: 12.5, paddingVertical: 10 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 8 },

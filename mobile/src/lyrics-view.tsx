@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Quote, X } from 'lucide-react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ChevronDown, MessageCircle, RefreshCw } from 'lucide-react-native';
 import { useAudioPlaylistStatus } from 'expo-audio';
-import { colors, fonts } from './components';
+import { fonts } from './components';
 import { playlist, seekTo, usePlayer } from './player';
 import { useUi } from './ui';
 import { loadLyrics, type Lyrics } from './lyrics';
 
 /**
- * Lyrics for any song, from the row's long press or the player's Lyrics button.
- * Synced lines highlight with playback and jump the player when tapped; records
- * without timestamps are labelled instead of pretending to follow along.
+ * Lyrics for any song, from the row's long press or the player's bubble.
+ *
+ * The requested look is a focus band: the line being sung is crisp and white,
+ * neighbours step back, and the edges of the screen fall away. React Native
+ * can't Gaussian-blur a run of text without a native module, so the band is
+ * built from per-line opacity plus stacked scrim strips. It reads the same way
+ * in motion — the eye lands on one line — and it keeps the app dependency-free.
  */
 
 /** Active line sits above centre so the next lines stay readable. */
-const FOCUS_OFFSET = 150;
+const FOCUS_OFFSET = 168;
 
 function activeLine(lyrics: Lyrics | null, time: number) {
   if (!lyrics?.synced || !lyrics.lines.length) return -1;
@@ -24,6 +28,14 @@ function activeLine(lyrics: Lyrics | null, time: number) {
     else break;
   }
   return index;
+}
+
+/** Distance from the sung line decides how far a line steps back. */
+function lineStyle(distance: number) {
+  if (distance === 0) return styles.lineActive;
+  if (distance === 1) return styles.lineNear;
+  if (distance === 2) return styles.lineMid;
+  return styles.lineFar;
 }
 
 export function LyricsSheet() {
@@ -42,6 +54,7 @@ export function LyricsSheet() {
 
   const current = queue[status.currentIndex];
   const isCurrent = Boolean(track && current && current.id === track.id);
+  const art = track?.artwork || track?.artworkSmall;
 
   useEffect(() => {
     if (!track) return;
@@ -88,43 +101,47 @@ export function LyricsSheet() {
   }, [active]);
 
   return (
-    <Modal visible={Boolean(track)} animationType="slide" onRequestClose={close}>
+    <Modal visible={Boolean(track)} animationType="slide" onRequestClose={close} statusBarTranslucent>
       <View style={styles.screen}>
-        <View style={styles.header}>
-          <Text style={styles.label}>Lyrics</Text>
-          <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel="Close lyrics">
-            <X size={18} color={colors.text} />
-          </Pressable>
-        </View>
+        {art ? <Image source={{ uri: art }} style={StyleSheet.absoluteFill} blurRadius={52} resizeMode="cover" /> : null}
+        <View style={[StyleSheet.absoluteFill, styles.stageScrim]} />
 
-        {track ? (
-          <View style={styles.titleBlock}>
-            <Text style={styles.title} numberOfLines={2}>
-              {track.title}
+        <View style={styles.header}>
+          <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel="Close lyrics">
+            <ChevronDown size={24} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {track?.title ?? 'Lyrics'}
             </Text>
-            <Text style={styles.artist} numberOfLines={1}>
-              {track.artist}
+            <Text style={styles.headerArtist} numberOfLines={1}>
+              {track?.artist ?? ''}
             </Text>
           </View>
-        ) : null}
+          <View style={styles.close} />
+        </View>
 
         {state === 'loading' ? (
           <View style={styles.center}>
-            <ActivityIndicator color={colors.text} />
+            <ActivityIndicator color="#FFFFFF" />
             <Text style={styles.muted}>Looking for lyrics…</Text>
           </View>
         ) : state === 'error' ? (
           <View style={styles.center}>
-            <Text style={styles.muted}>LRCLIB could not be reached.</Text>
+            <Text style={styles.muted}>LRCLIB could not be reached. Nothing is cached offline yet.</Text>
             <Pressable style={styles.retry} onPress={() => setAttempt((n) => n + 1)} accessibilityRole="button">
+              <RefreshCw size={15} color="#FFFFFF" />
               <Text style={styles.retryText}>Try again</Text>
             </Pressable>
           </View>
         ) : !lyrics || (!lyrics.lines.length && !lyrics.instrumental) ? (
           <View style={styles.center}>
-            <Quote size={22} color={colors.muted} />
-            <Text style={styles.muted}>No lyrics for this song yet. LRCLIB is community-sourced and doesn&rsquo;t cover everything.</Text>
+            <MessageCircle size={26} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.muted}>
+              No lyrics found for this song. LRCLIB is community-sourced and doesn&rsquo;t cover everything.
+            </Text>
             <Pressable style={styles.retry} onPress={() => setAttempt((n) => n + 1)} accessibilityRole="button">
+              <RefreshCw size={15} color="#FFFFFF" />
               <Text style={styles.retryText}>Search again</Text>
             </Pressable>
           </View>
@@ -133,40 +150,67 @@ export function LyricsSheet() {
             <Text style={styles.muted}>LRCLIB marks this track as instrumental.</Text>
           </View>
         ) : (
-          <ScrollView
-            ref={scrollRef}
-            contentContainerStyle={styles.lines}
-            showsVerticalScrollIndicator={false}
-            onScrollBeginDrag={() => {
-              pausedUntil.current = Date.now() + 4000;
-            }}
-          >
-            {!lyrics.synced ? <Text style={styles.unsynced}>Not time-synced</Text> : null}
-            {lyrics.lines.map((line, index) => {
-              const isActive = index === active;
-              return (
-                <Pressable
-                  key={`${index}-${line.text}`}
-                  onLayout={(event) => {
-                    offsets.current[index] = event.nativeEvent.layout.y;
-                    // First paint of an already-playing song: land on the line, don't glide from 0.
-                    if (!positioned.current && index === active && Date.now() >= pausedUntil.current) {
-                      reveal(index, false);
-                    }
-                  }}
-                  onPress={() => {
-                    if (lyrics.synced && isCurrent) seekTo(line.time);
-                  }}
-                  disabled={!lyrics.synced || !isCurrent}
-                  accessibilityRole="button"
-                  accessibilityLabel={line.text}
-                >
-                  <Text style={[styles.line, isActive && styles.lineActive]}>{line.text}</Text>
-                </Pressable>
-              );
-            })}
-            <Text style={styles.credit}>Lyrics from LRCLIB · community-sourced</Text>
-          </ScrollView>
+          <View style={styles.listWrap}>
+            <ScrollView
+              ref={scrollRef}
+              contentContainerStyle={styles.lines}
+              showsVerticalScrollIndicator={false}
+              onScrollBeginDrag={() => {
+                pausedUntil.current = Date.now() + 4000;
+              }}
+            >
+              {!lyrics.synced ? <Text style={styles.unsynced}>Not time-synced — reading order only</Text> : null}
+              {lyrics.lines.map((line, index) => {
+                const distance = active < 0 ? 3 : Math.abs(index - active);
+                const isActive = index === active;
+                return (
+                  <Pressable
+                    key={`${index}-${line.text}`}
+                    onLayout={(event) => {
+                      offsets.current[index] = event.nativeEvent.layout.y;
+                      if (!positioned.current && index === active && Date.now() >= pausedUntil.current) {
+                        reveal(index, false);
+                      }
+                    }}
+                    onPress={() => {
+                      if (lyrics.synced && isCurrent) seekTo(line.time);
+                    }}
+                    disabled={!lyrics.synced || !isCurrent}
+                    accessibilityRole="button"
+                    accessibilityLabel={line.text}
+                  >
+                    <Text style={[styles.line, lineStyle(distance)]}>{line.text}</Text>
+                    {isActive ? <View style={styles.activeRule} /> : null}
+                  </Pressable>
+                );
+              })}
+
+              <View style={styles.source}>
+                <Text style={styles.sourceLabel}>Lyrics source</Text>
+                <Text style={styles.sourceText}>
+                  {lyrics.synced ? 'Time-synced by LRCLIB' : 'Plain text from LRCLIB'}
+                  {lyrics.matched
+                    ? ` · matched to “${lyrics.matched.trackName}” by ${lyrics.matched.artistName}`
+                    : ''}
+                </Text>
+                <Text style={styles.sourceHint}>
+                  Community-contributed and may be incomplete, or timed slightly off.
+                </Text>
+              </View>
+            </ScrollView>
+
+            {/* Edge scrims: the band reads as blurred top and bottom. */}
+            <View style={styles.fadeTop} pointerEvents="none">
+              <View style={styles.fadeTopA} />
+              <View style={styles.fadeTopB} />
+              <View style={styles.fadeTopC} />
+            </View>
+            <View style={styles.fadeBottom} pointerEvents="none">
+              <View style={styles.fadeBottomC} />
+              <View style={styles.fadeBottomB} />
+              <View style={styles.fadeBottomA} />
+            </View>
+          </View>
         )}
       </View>
     </Modal>
@@ -174,53 +218,63 @@ export function LyricsSheet() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, paddingTop: 54 },
-  header: {
+  screen: { flex: 1, backgroundColor: '#0A0A0B', paddingTop: 46 },
+  stageScrim: { backgroundColor: 'rgba(10,10,11,0.72)' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingBottom: 10 },
+  headerText: { flex: 1, minWidth: 0 },
+  headerTitle: { color: '#FFFFFF', fontFamily: fonts.sansBold, fontSize: 15, letterSpacing: -0.2 },
+  headerArtist: { color: 'rgba(255,255,255,0.55)', fontFamily: fonts.sans, fontSize: 11.5, marginTop: 1 },
+  close: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 34 },
+  muted: { color: 'rgba(255,255,255,0.62)', fontFamily: fonts.sans, fontSize: 13.5, lineHeight: 21, textAlign: 'center' },
+  retry: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  label: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase' },
-  close: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  titleBlock: { paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.line },
-  title: { color: colors.text, fontFamily: fonts.serif, fontSize: 27, lineHeight: 32, letterSpacing: -0.4 },
-  artist: { color: colors.muted, fontFamily: fonts.sans, fontSize: 13, marginTop: 4 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 34 },
-  muted: { color: colors.muted, fontFamily: fonts.sans, fontSize: 13.5, lineHeight: 21, textAlign: 'center' },
-  retry: {
+    gap: 7,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
-  retryText: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 12.5 },
-  lines: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 60 },
+  retryText: { color: '#FFFFFF', fontFamily: fonts.sansMedium, fontSize: 12.5 },
+  listWrap: { flex: 1 },
+  lines: { paddingHorizontal: 26, paddingTop: 170, paddingBottom: 240 },
   unsynced: {
-    color: colors.muted,
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
+    color: 'rgba(255,255,255,0.5)',
+    fontFamily: fonts.sansMedium,
+    fontSize: 10.5,
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   line: {
-    color: colors.muted,
-    fontFamily: fonts.serif,
-    fontSize: 19,
-    lineHeight: 30,
+    fontFamily: fonts.sansMedium,
+    fontSize: 21,
+    lineHeight: 31,
     paddingVertical: 5,
   },
-  lineActive: { color: colors.text, fontFamily: fonts.serifSemi },
-  credit: {
-    color: colors.muted,
-    fontFamily: fonts.mono,
-    fontSize: 9.5,
-    letterSpacing: 0.8,
-    marginTop: 26,
+  lineActive: { color: '#FFFFFF', fontFamily: fonts.sansBold, fontSize: 22, lineHeight: 32 },
+  lineNear: { color: 'rgba(255,255,255,0.5)' },
+  lineMid: { color: 'rgba(255,255,255,0.3)' },
+  lineFar: { color: 'rgba(255,255,255,0.16)' },
+  activeRule: { width: 18, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  source: { marginTop: 44, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.18)', gap: 6 },
+  sourceLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontFamily: fonts.sansMedium,
+    fontSize: 10,
+    letterSpacing: 1.3,
     textTransform: 'uppercase',
   },
+  sourceText: { color: 'rgba(255,255,255,0.78)', fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 19 },
+  sourceHint: { color: 'rgba(255,255,255,0.42)', fontFamily: fonts.sans, fontSize: 11.5, lineHeight: 17 },
+  fadeTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 190 },
+  fadeTopA: { position: 'absolute', top: 0, left: 0, right: 0, height: 60, backgroundColor: 'rgba(10,10,11,0.92)' },
+  fadeTopB: { position: 'absolute', top: 60, left: 0, right: 0, height: 60, backgroundColor: 'rgba(10,10,11,0.62)' },
+  fadeTopC: { position: 'absolute', top: 120, left: 0, right: 0, height: 70, backgroundColor: 'rgba(10,10,11,0.32)' },
+  fadeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 170 },
+  fadeBottomA: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: 'rgba(10,10,11,0.9)' },
+  fadeBottomB: { position: 'absolute', bottom: 60, left: 0, right: 0, height: 55, backgroundColor: 'rgba(10,10,11,0.55)' },
+  fadeBottomC: { position: 'absolute', bottom: 115, left: 0, right: 0, height: 55, backgroundColor: 'rgba(10,10,11,0.28)' },
 });

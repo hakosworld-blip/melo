@@ -146,17 +146,42 @@ function mapAlbum(p: AudiusPlaylist): AlbumSummary {
   };
 }
 
-async function trending(limit = 24, genre?: string): Promise<Track[]> {
+export async function fetchTrending(limit = 24, genre?: string): Promise<Track[]> {
   const res = await getJson<ListResponse<AudiusTrack>>('/tracks/trending', { limit, time: 'week', genre });
   return (res.data || []).map(mapTrack).filter((t) => t.streamable);
 }
 
-const GENRES = ['Electronic', 'Hip-Hop/Rap', 'Lo-Fi', 'House'];
+/** Real catalogue genres — every tile is backed by tracks, never decoration. */
+export const GENRES = ['Electronic', 'Hip-Hop/Rap', 'Lo-Fi', 'House', 'Ambient', 'Pop', 'R&B/Soul', 'Rock'];
+
+export async function fetchGenreTracks(genre: string, limit = 50): Promise<Track[]> {
+  return fetchTrending(limit, genre);
+}
+
+export async function fetchArtistTracks(artistId: string, limit = 25): Promise<Track[]> {
+  const nativeId = artistId.includes(':') ? artistId.split(':').slice(1).join(':') : artistId;
+  const res = await getJson<ListResponse<AudiusTrack>>(`/users/${encodeURIComponent(nativeId)}/tracks`, {
+    sort: 'plays',
+    limit,
+  });
+  return (res.data || []).map(mapTrack).filter((t) => t.streamable);
+}
+
+/** Genre tiles need a cover; the first track of each genre supplies a real one. */
+export async function fetchGenreTiles(): Promise<{ name: string; artwork?: string }[]> {
+  const rows = await Promise.all(
+    GENRES.map(async (name) => {
+      const tracks = await fetchTrending(2, name).catch(() => [] as Track[]);
+      return { name, artwork: tracks[0]?.artworkSmall || tracks[0]?.artwork };
+    }),
+  );
+  return rows;
+}
 
 export async function fetchHome(): Promise<HomeSection[]> {
   const [global, ...genreRows] = await Promise.all([
-    trending(24),
-    ...GENRES.map(async (genre) => ({ genre, tracks: await trending(16, genre).catch(() => [] as Track[]) })),
+    fetchTrending(24),
+    ...GENRES.slice(0, 4).map(async (genre) => ({ genre, tracks: await fetchTrending(16, genre).catch(() => [] as Track[]) })),
   ]);
   const sections: HomeSection[] = [{ id: 'trending', title: 'Trending this week', subtitle: 'What the Audius community is playing right now', kind: 'tracks', items: global }];
   const artists = new Map<string, ArtistSummary>();

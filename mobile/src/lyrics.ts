@@ -15,9 +15,13 @@ export interface Lyrics {
   synced: boolean;
   lines: LyricLine[];
   instrumental: boolean;
+  /** Which LRCLIB record this came from, so the credit can name it. */
+  matched?: { trackName: string; artistName: string };
 }
 
 interface LrclibRecord {
+  trackName?: string;
+  artistName?: string;
   syncedLyrics?: string | null;
   plainLyrics?: string | null;
   instrumental?: boolean;
@@ -64,15 +68,18 @@ async function getJson(url: string) {
 }
 
 function toLyrics(record: LrclibRecord): Lyrics | null {
-  if (record.instrumental) return { synced: false, lines: [], instrumental: true };
+  const matched = record.trackName && record.artistName
+    ? { trackName: record.trackName, artistName: record.artistName }
+    : undefined;
+  if (record.instrumental) return { synced: false, lines: [], instrumental: true, matched };
   const synced = record.syncedLyrics ? parseLrc(record.syncedLyrics) : [];
-  if (synced.length) return { synced: true, lines: synced, instrumental: false };
+  if (synced.length) return { synced: true, lines: synced, instrumental: false, matched };
   const plain = (record.plainLyrics || '')
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
   if (plain.length) {
-    return { synced: false, lines: plain.map((text) => ({ time: 0, text })), instrumental: false };
+    return { synced: false, lines: plain.map((text) => ({ time: 0, text })), instrumental: false, matched };
   }
   return null;
 }

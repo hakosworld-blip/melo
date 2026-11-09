@@ -17,9 +17,24 @@ export interface LocalPlaylist {
 
 const FILE = 'melo-playlists';
 
+/** What goes to disk: playlists plus the two lists Home reads. */
+interface StoredLibrary {
+  playlists: LocalPlaylist[];
+  recent: Track[];
+  pinned: Track[];
+}
+
 interface LibraryState {
   ready: boolean;
   playlists: LocalPlaylist[];
+  /** Most recent first, capped: the only listening history the app keeps. */
+  recent: Track[];
+  /** Starred in the player so Home can play them in one tap. */
+  pinned: Track[];
+  recordPlay: (track: Track) => void;
+  togglePin: (track: Track) => boolean;
+  isPinned: (trackId: string) => boolean;
+  clearHistory: () => void;
   createPlaylist: (name: string, tracks?: Track[]) => string;
   addTracks: (playlistId: string, tracks: Track[]) => number;
   addTrack: (playlistId: string, track: Track) => boolean;
@@ -36,9 +51,38 @@ function cleanName(name: string) {
   return name.trim().slice(0, 80) || 'Untitled playlist';
 }
 
+const RECENT_LIMIT = 24;
+const PIN_LIMIT = 24;
+
 export const useLibrary = create<LibraryState>((set, get) => ({
   ready: false,
   playlists: [],
+  recent: [],
+  pinned: [],
+
+  recordPlay(track) {
+    const rest = get().recent.filter((item) => item.id !== track.id);
+    set({ recent: [track, ...rest].slice(0, RECENT_LIMIT) });
+  },
+
+  togglePin(track) {
+    const pinned = get().pinned;
+    const already = pinned.some((item) => item.id === track.id);
+    if (already) {
+      set({ pinned: pinned.filter((item) => item.id !== track.id) });
+      return false;
+    }
+    set({ pinned: [track, ...pinned].slice(0, PIN_LIMIT) });
+    return true;
+  },
+
+  isPinned(trackId) {
+    return get().pinned.some((item) => item.id === trackId);
+  },
+
+  clearHistory() {
+    set({ recent: [] });
+  },
 
   createPlaylist(name, tracks = []) {
     const playlist: LocalPlaylist = {
@@ -102,15 +146,26 @@ export function findPlaylistByName(name: string) {
   return useLibrary.getState().playlists.find((p) => p.name.trim().toLowerCase() === wanted);
 }
 
+function cleanTracks(value: unknown): Track[] {
+  return Array.isArray(value)
+    ? (value.filter((t) => t && typeof (t as Track).id === 'string') as Track[])
+    : [];
+}
+
 export async function hydrateLibrary() {
-  const saved = await loadJson<LocalPlaylist[]>(FILE);
+  const saved = await loadJson<LocalPlaylist[] | StoredLibrary>(FILE);
+  // The first release stored a bare playlist array; keep those libraries intact.
   const playlists = Array.isArray(saved)
     ? saved.filter((p) => p && typeof p.id === 'string' && Array.isArray(p.tracks))
-    : [];
-  useLibrary.setState({ playlists, ready: true });
+    : Array.isArray(saved?.playlists)
+      ? saved.playlists.filter((p) => p && typeof p.id === 'string' && Array.isArray(p.tracks))
+      : [];
+  const recent = Array.isArray(saved) ? [] : cleanTracks(saved?.recent);
+  const pinned = Array.isArray(saved) ? [] : cleanTracks(saved?.pinned);
+  useLibrary.setState({ playlists, recent, pinned, ready: true });
 }
 
 useLibrary.subscribe((state) => {
   if (!state.ready) return;
-  saveJsonSoon(FILE, state.playlists);
+  saveJsonSoon(FILE, { playlists: state.playlists, recent: state.recent, pinned: state.pinned });
 });

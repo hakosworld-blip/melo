@@ -103,15 +103,14 @@ public/sw.js               Offline app shell + artwork cache (audio stays in Ind
 
 ### Design language
 
-Both apps share one system: warm monochrome, editorial type, flat surfaces.
+Both apps share one system: a dark listening room with dense type and no decoration.
 
-- Canvas `#F7F6F3` (bone), surfaces pure white, hairline `#E5E2DB` borders, off-black ink `#141312` and muted `#78746C` — no pure black, no gradients, no glass panels.
-- Newsreader (serif) for titles and lyrics, Geist Sans for UI text, Geist Mono for labels, counts and timestamps. Section headings get a small wide-tracked mono subtitle instead of a coloured one.
-- One accent colour: **Ink**, which means buttons are solid charcoal on paper and solid bone on the dark theme. The other accents in Settings still work, and the whole palette switches live with the theme.
-- Corners are crisp (12px cards, 6px buttons), shadows are almost invisible, and tags are the only pill shapes.
-- Now Playing is a deliberate dark stage in both apps: the song's artwork fills the screen, blurred behind a warm-charcoal scrim, with bone text and serif titles.
-
-The Android app uses the same palette and type pairing (Newsreader + Manrope, bundled through `expo-font`), with rows separated by hairlines instead of cards.
+- Canvas `#0A0A0B`, raised surfaces `#131315`/`#1C1C1F`, hairline `#27272B` borders, off-white text `#F4F4F5` and muted `#9C9CA4`. Cheap dark themes are inverted paper; this one is tuned for long listening sessions.
+- Tight grotesque display type (Geist on the web, Manrope on Android) with -0.5 to -1.6 tracking on titles. Plain-language section subtitles instead of eyebrow labels.
+- One accent: **white**, so primary actions are solid white pills with near-black labels. The other accents in Settings still work.
+- Corners are generous on artwork (6px tiles, 20px player cover) and pills for actions. No shadows, no gradients, no glass except the floating player/nav where depth earns it.
+- Now Playing is the dark stage in both apps: artwork fills the screen, blurred behind a scrim, with a large rounded cover, artist · album, Pin, transport, volume and a Lyrics / Repeat / Up next dock.
+- Icons are one authored 24px grid stroke on the web (`components/ui/icons.tsx`); Android pairs the same weights through `lucide-react-native`. Rows are separated by hairlines rather than cards.
 
 ### Provider layer
 
