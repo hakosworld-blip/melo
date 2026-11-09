@@ -15,7 +15,7 @@ The app follows the same system as the web build: bone canvas, white surfaces, h
 
 Now Playing is a dark stage: the track's artwork is drawn full-screen with `blurRadius` behind a warm-charcoal scrim, so any artwork stays readable under bone text.
 
-**Lyrics** come from LRCLIB (`src/lyrics.ts`) and are reachable two ways — the Lyrics button on Now Playing, or a long press on any track row. Synced lines follow playback and seek when tapped; unsynced records are labelled, and a failed or empty lookup offers a retry. Nothing is cached offline yet.
+**Lyrics** come from LRCLIB (`src/lyrics.ts`) and are reachable two ways — the Lyrics button on Now Playing, or a long press on any track row. Synced lines follow playback — the sheet keeps the current line in view, pauses following for a few seconds while you scroll, and seeks when a line is tapped; unsynced records are labelled, and a failed or empty lookup offers a retry. Nothing is cached offline yet.
 
 ## Playlists and importing
 

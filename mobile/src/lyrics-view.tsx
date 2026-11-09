@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Quote, X } from 'lucide-react-native';
 import { useAudioPlaylistStatus } from 'expo-audio';
@@ -12,6 +12,9 @@ import { loadLyrics, type Lyrics } from './lyrics';
  * Synced lines highlight with playback and jump the player when tapped; records
  * without timestamps are labelled instead of pretending to follow along.
  */
+
+/** Active line sits above centre so the next lines stay readable. */
+const FOCUS_OFFSET = 150;
 
 function activeLine(lyrics: Lyrics | null, time: number) {
   if (!lyrics?.synced || !lyrics.lines.length) return -1;
@@ -31,6 +34,11 @@ export function LyricsSheet() {
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const offsets = useRef<number[]>([]);
+  /** Reading ahead shouldn't be yanked back; follow pauses briefly after a drag. */
+  const pausedUntil = useRef(0);
+  const positioned = useRef(false);
 
   const current = queue[status.currentIndex];
   const isCurrent = Boolean(track && current && current.id === track.id);
@@ -40,6 +48,9 @@ export function LyricsSheet() {
     let cancelled = false;
     setState('loading');
     setLyrics(null);
+    offsets.current = [];
+    pausedUntil.current = 0;
+    positioned.current = false;
     loadLyrics(track)
       .then((result) => {
         if (cancelled) return;
@@ -55,6 +66,26 @@ export function LyricsSheet() {
   }, [track, attempt]);
 
   const active = isCurrent ? activeLine(lyrics, status.currentTime) : -1;
+
+  const reveal = (index: number, animated: boolean) => {
+    const scroller = scrollRef.current;
+    if (!scroller || index < 0) return false;
+    const y = offsets.current[index];
+    if (typeof y !== 'number') return false;
+    scroller.scrollTo({ y: Math.max(0, y - FOCUS_OFFSET), animated });
+    positioned.current = true;
+    return true;
+  };
+
+  useEffect(() => {
+    if (active < 0) {
+      if (Date.now() >= pausedUntil.current) scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return;
+    }
+    if (Date.now() < pausedUntil.current) return;
+    // Opening mid-song lands on the current line; later changes glide.
+    reveal(active, positioned.current);
+  }, [active]);
 
   return (
     <Modal visible={Boolean(track)} animationType="slide" onRequestClose={close}>
@@ -102,13 +133,27 @@ export function LyricsSheet() {
             <Text style={styles.muted}>LRCLIB marks this track as instrumental.</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.lines} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={styles.lines}
+            showsVerticalScrollIndicator={false}
+            onScrollBeginDrag={() => {
+              pausedUntil.current = Date.now() + 4000;
+            }}
+          >
             {!lyrics.synced ? <Text style={styles.unsynced}>Not time-synced</Text> : null}
             {lyrics.lines.map((line, index) => {
               const isActive = index === active;
               return (
                 <Pressable
                   key={`${index}-${line.text}`}
+                  onLayout={(event) => {
+                    offsets.current[index] = event.nativeEvent.layout.y;
+                    // First paint of an already-playing song: land on the line, don't glide from 0.
+                    if (!positioned.current && index === active && Date.now() >= pausedUntil.current) {
+                      reveal(index, false);
+                    }
+                  }}
                   onPress={() => {
                     if (lyrics.synced && isCurrent) seekTo(line.time);
                   }}
