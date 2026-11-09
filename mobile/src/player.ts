@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createAudioPlaylist, requestNotificationPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { streamUrl } from './api';
+import { canStream, streamUrl } from './api';
 import type { Track } from './types';
 
 export const playlist = createAudioPlaylist({ sources: [], updateInterval: 500, loop: 'none' });
@@ -44,7 +44,14 @@ export async function initPlayer() {
 }
 
 function playable(tracks: Track[]) {
-  return tracks.filter((track) => track.streamable);
+  return tracks.filter(canStream);
+}
+
+/** Explains the one case where a song exists but this device can't play it. */
+function unavailableMessage(tracks: Track[]) {
+  return tracks.some((track) => track.provider === 'youtube')
+    ? 'YouTube songs play through a melo server. Add your server address in Settings.'
+    : 'No playable tracks in this list.';
 }
 
 function updateLockScreen(track: Track) {
@@ -63,12 +70,20 @@ function updateLockScreen(track: Track) {
 export function playTracks(tracks: Track[], startIndex = 0) {
   const items = playable(tracks);
   if (!items.length) {
-    usePlayer.getState().setError('No playable tracks in this list.');
+    usePlayer.getState().setError(unavailableMessage(tracks));
     return;
   }
   const index = Math.min(Math.max(startIndex, 0), items.length - 1);
+  const skipped = tracks.filter((track) => !canStream(track)).length;
   usePlayer.getState().setQueue(items);
   usePlayer.getState().setError(null);
+  if (skipped > 0) {
+    usePlayer
+      .getState()
+      .setError(
+        `${skipped} ${skipped === 1 ? 'song is' : 'songs are'} from YouTube and need a melo server to play. The rest of the playlist is playing.`,
+      );
+  }
   playlist.clear();
   items.forEach((track) => playlist.add(streamUrl(track)));
   playlist.skipTo(index);
@@ -82,8 +97,8 @@ export function playTrack(track: Track, context?: Track[]) {
     playTracks(context, index);
     return;
   }
-  if (!track.streamable) {
-    usePlayer.getState().setError('This track is not available to stream.');
+  if (!canStream(track)) {
+    usePlayer.getState().setError(unavailableMessage([track]));
     return;
   }
   playTracks([track], 0);
@@ -112,8 +127,8 @@ export function seekBy(offset: number) {
 }
 
 export function addToQueue(track: Track) {
-  if (!track.streamable) {
-    usePlayer.getState().setError('This track is not available to stream.');
+  if (!canStream(track)) {
+    usePlayer.getState().setError(unavailableMessage([track]));
     return;
   }
   const queue = [...usePlayer.getState().queue, track];

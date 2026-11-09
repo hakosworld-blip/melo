@@ -1,3 +1,4 @@
+import { getServerUrl } from './settings';
 import type { AlbumSummary, ArtistSummary, HomeSection, SearchResults, Track } from './types';
 
 const BASE = 'https://api.audius.co/v1';
@@ -186,6 +187,26 @@ export async function searchAudius(query: string, limit = 20): Promise<SearchRes
   };
 }
 
+/** Tracks only — used by playlist import matching and the artist-free paths. */
+export async function searchTracks(query: string, limit = 12): Promise<Track[]> {
+  const term = query.trim();
+  if (!term) return [];
+  const res = await getJson<ListResponse<AudiusTrack>>('/tracks/search', { query: term, limit }).catch(() => ({
+    data: [] as AudiusTrack[],
+  }));
+  return (res.data || []).map(mapTrack).filter((t) => t.streamable);
+}
+
+/** YouTube songs need the optional melo server: it holds yt-dlp and proxies the audio. */
+export function canStream(track: Track) {
+  return track.streamable && (track.provider !== 'youtube' || Boolean(getServerUrl()));
+}
+
 export function streamUrl(track: Track): string {
+  if (track.provider === 'youtube') {
+    const server = getServerUrl();
+    if (!server) return '';
+    return `${server}/api/stream/youtube/${encodeURIComponent(track.providerId)}`;
+  }
   return `${BASE}/tracks/${encodeURIComponent(track.providerId)}/stream?${q()}`;
 }

@@ -1,9 +1,11 @@
-import type { ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Music2, Pause, Play, Plus, SkipForward } from 'lucide-react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ListPlus, Music2, Pause, Play, Plus, SkipForward, X } from 'lucide-react-native';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import { useNavigation } from '@react-navigation/native';
 import { playlist, togglePlayback, skipNext, usePlayer, playTrack, addToQueue } from './player';
+import { useLibrary } from './library';
+import { useUi } from './ui';
 import type { Track } from './types';
 
 export const colors = {
@@ -60,7 +62,17 @@ export function EmptyState({ children }: { children: ReactNode }) {
   );
 }
 
-export function TrackRow({ track, context, index }: { track: Track; context?: Track[]; index?: number }) {
+export function TrackRow({
+  track,
+  context,
+  index,
+  onRemove,
+}: {
+  track: Track;
+  context?: Track[];
+  index?: number;
+  onRemove?: () => void;
+}) {
   const queue = usePlayer((s) => s.queue);
   const status = useAudioPlaylistStatus(playlist);
   const isCurrent = queue[status.currentIndex]?.id === track.id;
@@ -82,8 +94,200 @@ export function TrackRow({ track, context, index }: { track: Track; context?: Tr
       <Pressable style={styles.iconButton} onPress={() => addToQueue(track)} accessibilityRole="button" accessibilityLabel={`Add ${track.title} to queue`}>
         <Plus size={18} color={colors.muted} />
       </Pressable>
+      <Pressable
+        style={styles.iconButton}
+        onPress={() => useUi.getState().openAddToPlaylist(track)}
+        accessibilityRole="button"
+        accessibilityLabel={`Add ${track.title} to a playlist`}
+      >
+        <ListPlus size={18} color={colors.muted} />
+      </Pressable>
+      {onRemove ? (
+        <Pressable style={styles.iconButton} onPress={onRemove} accessibilityRole="button" accessibilityLabel={`Remove ${track.title} from this playlist`}>
+          <X size={18} color={colors.muted} />
+        </Pressable>
+      ) : null}
       {index !== undefined ? <Text style={styles.index}>{index + 1}</Text> : null}
     </View>
+  );
+}
+
+/** One field, one action: naming or renaming a playlist. */
+export function PromptModal({
+  visible,
+  title,
+  placeholder,
+  initialValue = '',
+  submitLabel = 'Save',
+  onSubmit,
+  onClose,
+}: {
+  visible: boolean;
+  title: string;
+  placeholder?: string;
+  initialValue?: string;
+  submitLabel?: string;
+  onSubmit: (value: string) => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    if (visible) setValue(initialValue);
+  }, [visible, initialValue]);
+
+  const submit = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <View style={styles.dialog}>
+          <Text style={styles.dialogTitle}>{title}</Text>
+          <TextInput
+            value={value}
+            onChangeText={setValue}
+            placeholder={placeholder}
+            placeholderTextColor={colors.muted}
+            style={styles.input}
+            autoFocus
+            autoCapitalize="sentences"
+            returnKeyType="done"
+            onSubmitEditing={submit}
+          />
+          <View style={styles.dialogActions}>
+            <Pressable style={styles.secondaryButton} onPress={onClose} accessibilityRole="button">
+              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.primaryButton, !value.trim() && styles.buttonDisabled]}
+              onPress={submit}
+              disabled={!value.trim()}
+              accessibilityRole="button"
+            >
+              <Text style={styles.primaryButtonText}>{submitLabel}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/** The "file this song somewhere" sheet, reachable from every track row. */
+export function AddToPlaylistSheet() {
+  const pendingTrack = useUi((s) => s.pendingTrack);
+  const close = useUi((s) => s.closeAddToPlaylist);
+  const playlists = useLibrary((s) => s.playlists);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [added, setAdded] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (pendingTrack) {
+      setCreating(false);
+      setName('');
+      setAdded(null);
+    }
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [pendingTrack]);
+
+  const file = (playlistId: string, playlistName: string) => {
+    if (!pendingTrack) return;
+    useLibrary.getState().addTrack(playlistId, pendingTrack);
+    setAdded(playlistName);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => close(), 900);
+  };
+
+  const createAndFile = () => {
+    const trimmed = name.trim();
+    if (!trimmed || !pendingTrack) return;
+    const id = useLibrary.getState().createPlaylist(trimmed, [pendingTrack]);
+    setAdded(trimmed);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => close(), 900);
+  };
+
+  return (
+    <Modal visible={Boolean(pendingTrack)} transparent animationType="slide" onRequestClose={close}>
+      <Pressable style={styles.sheetBackdrop} onPress={close} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable style={styles.sheet} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.dialogTitle}>Add to playlist</Text>
+          {pendingTrack ? (
+            <Text style={styles.sheetSubtitle} numberOfLines={1}>
+              {pendingTrack.title} · {pendingTrack.artist}
+            </Text>
+          ) : null}
+          {added ? <Text style={styles.added}>Added to “{added}”</Text> : null}
+
+          <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
+            {playlists.length === 0 && !creating ? (
+              <Text style={styles.sheetEmpty}>No playlists yet — create the first one below.</Text>
+            ) : null}
+            {playlists.map((item) => {
+              const already = Boolean(pendingTrack && item.tracks.some((t) => t.id === pendingTrack.id));
+              return (
+                <Pressable
+                  key={item.id}
+                  style={styles.sheetRow}
+                  onPress={() => file(item.id, item.name)}
+                  disabled={already}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add to ${item.name}`}
+                >
+                  <Artwork source={item.tracks[0]?.artworkSmall || item.tracks[0]?.artwork} size={40} rounded={10} />
+                  <View style={styles.sheetRowText}>
+                    <Text style={styles.trackTitle} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.trackSubtitle}>
+                      {item.tracks.length} {item.tracks.length === 1 ? 'song' : 'songs'}
+                      {already ? ' · already there' : ''}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {creating ? (
+            <View style={styles.createRow}>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Playlist name"
+                placeholderTextColor={colors.muted}
+                style={styles.createInput}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={createAndFile}
+              />
+              <Pressable
+                style={[styles.primaryButton, !name.trim() && styles.buttonDisabled]}
+                onPress={createAndFile}
+                disabled={!name.trim()}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryButtonText}>Create</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.secondaryButton} onPress={() => setCreating(true)} accessibilityRole="button">
+              <ListPlus size={16} color={colors.text} />
+              <Text style={styles.secondaryButtonText}>New playlist</Text>
+            </Pressable>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -162,4 +366,25 @@ const styles = StyleSheet.create({
   progressTrack: { height: 2, backgroundColor: colors.line, borderRadius: 1, marginTop: 8, overflow: 'hidden' },
   progressFill: { height: 2, backgroundColor: colors.accent },
   miniPlay: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+  input: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 14, paddingVertical: 12 },
+  secondaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.surfaceRaised, borderColor: colors.line, borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 11 },
+  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  primaryButton: { backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center' },
+  primaryButtonText: { color: colors.bg, fontWeight: '800' },
+  backdrop: { flex: 1, backgroundColor: '#000000AA', alignItems: 'center', justifyContent: 'center', padding: 22 },
+  dialog: { width: '100%', maxWidth: 420, backgroundColor: colors.surfaceRaised, borderRadius: 20, borderColor: colors.line, borderWidth: 1, padding: 18, gap: 12 },
+  dialogTitle: { color: colors.text, fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
+  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 2 },
+  buttonDisabled: { opacity: 0.45 },
+  sheetBackdrop: { flex: 1, backgroundColor: '#000000AA', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderColor: colors.line, borderWidth: 1, padding: 18, paddingBottom: 26, gap: 8, maxHeight: '76%' },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line, marginBottom: 8 },
+  sheetSubtitle: { color: colors.muted, fontSize: 13, marginBottom: 4 },
+  sheetList: { marginTop: 4 },
+  sheetEmpty: { color: colors.muted, fontSize: 13, paddingVertical: 10 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  sheetRowText: { flex: 1, minWidth: 0 },
+  added: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  createRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  createInput: { flex: 1, backgroundColor: colors.surfaceRaised, borderColor: colors.line, borderWidth: 1, borderRadius: 12, color: colors.text, fontSize: 15, paddingHorizontal: 12, paddingVertical: 10 },
 });

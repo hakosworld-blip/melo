@@ -36,6 +36,8 @@ bin/yt-dlp --version
 
 The native Android app lives in [`mobile/`](mobile) as a React Native + Expo app. It uses Expo Audio for background playback and lock-screen controls, and streams from Audius directly on device.
 
+It also has local playlists (`Library`) with create, rename, delete, add-from-any-song and play-all, plus the same playlist import: Spotify is read and matched on the phone, while YouTube playlists go through an optional melo server on the same network, since reading YouTube needs `yt-dlp` (that server also serves the audio for YouTube-imported songs). Details in [`mobile/README.md`](mobile/README.md).
+
 ```bash
 cd mobile
 npm install
@@ -154,7 +156,8 @@ No account, no analytics, no telemetry, no third-party requests from the client 
 
 ## Honest limitations
 
-- **The web build is still an installable PWA; the native Android app is separate.** The repo now includes a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The web build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing, and source checks are implemented; downloaded/offline files, lyrics, artist/album detail pages, and the full settings surface are still to be ported.
+- **The web build is still an installable PWA; the native Android app is separate.** The repo now includes a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The web build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing, local playlists, playlist import and source checks are implemented; downloaded/offline files, lyrics, artist/album detail pages, and the full settings surface are still to be ported.
+- **YouTube import on Android needs a melo server.** Reading a YouTube playlist requires yt-dlp, which can't run inside the app, so the YouTube path (and playback of the songs it imports) uses an optional melo server address set in Settings. Spotify import, playlists and search work with no server at all.
 - **YouTube Music cannot stream from this cloud host** because YouTube bot-checks datacenter IPs. The provider is complete; it needs cookies or a residential IP. This is reported in-app rather than silently hidden.
 - **Downloads are source-dependent.** Tracks the source marks as downloadable get a real "Download" (permanent offline copy). Other streamable tracks can be saved as a clearly labelled *private offline copy*; melo never claims the artist authorised a download, and nothing from YouTube is downloaded.
 - **LRCLIB coverage is community-sourced.** Many independent tracks have no lyrics; the manual search exists for exactly that reason.
@@ -176,6 +179,7 @@ Exercised in a real browser against the live catalogue, not just rendered:
 - **Search** — live query returned real tracks, artists and result counts.
 - **Playlist import** — `open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M` returned its real name and 50 songs in 0.29 s; 8 of 8 catalogue songs re-imported at score 100. A 12-song mainstream batch matched 0/12 against Audius (correctly: those tracks aren't there) and 12/12 through the YouTube fallback with the right artists and durations within a second of Spotify's — e.g. "Housewife / Tate McRae" 209 s → 210 s, "Patient Zero / Taylor Swift" 226 s → 229 s. The fallback's scoring was verified here with the availability gate temporarily bypassed, because this cloud host cannot resolve YouTube audio.
 - **YouTube Music import** — `music.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI` imported 182 unique songs in 3.0 s with correct names, channels, durations and thumbnails ("BELLAKEO" / Peso Pluma / 235 s), reading the playlist's own order.
+- **Android import logic** — the phone's pure import module was compiled and run against the live services: link detection and id parsing for Spotify links/URIs, the real embed page parsed into "Today's Top Hits" with 50 songs, and 6 of 6 catalogue songs matched back to the exact same track, with a mainstream control query returning nothing. The app's screens and storage were typechecked but not run on a device or emulator here.
 - **HTTP** — stream proxy served `206` byte ranges and full downloads (`audio/mpeg`, 9.26 MB); artwork proxy serves Audius creator-node hosts with private/loopback and bare-IP targets refused.
 - **Build** — `npx tsc --noEmit` and `npm run build` both pass; first-load JS ~125 kB.
 

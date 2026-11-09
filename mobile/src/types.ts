@@ -1,4 +1,5 @@
-export type ProviderId = 'audius';
+/** Audius plays directly; YouTube songs come from a melo server (see src/import.ts). */
+export type ProviderId = 'audius' | 'youtube';
 
 export interface Track {
   id: string;
