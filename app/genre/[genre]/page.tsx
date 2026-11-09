@@ -42,10 +42,10 @@ export default function GenrePage() {
 
   return (
     <div className="relative min-h-full">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[300px] overflow-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[340px] overflow-hidden">
         {tracks[0]?.artwork && (
           <div
-            className="absolute inset-[-20%] scale-110 opacity-45 blur-3xl"
+            className="absolute inset-[-30%] scale-125 opacity-80 blur-2xl saturate-150"
             style={{
               backgroundImage: `url("/api/image?src=${encodeURIComponent(tracks[0].artwork)}")`,
               backgroundSize: "cover",
