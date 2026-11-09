@@ -5,6 +5,7 @@ import type {
   AlbumSummary,
   Artist,
   ArtistSummary,
+  GenreSummary,
   HomeSection,
   MusicProvider,
   ProviderAvailability,
@@ -350,6 +351,35 @@ export const audiusProvider: MusicProvider = {
         tracks,
       };
       return album;
+    });
+  },
+
+  /** The genre shelf: real covers, taken from each genre's current top track. */
+  async genres(): Promise<GenreSummary[]> {
+    return cached("audius:genres", 10 * 60_000, async () => {
+      const rows = await Promise.all(
+        GENRES.map(async (name) => {
+          const tracks = await trending(3, name).catch(() => [] as Track[]);
+          return { name, artwork: tracks[0]?.artworkSmall || tracks[0]?.artwork, trackCount: tracks.length };
+        }),
+      );
+      return rows.filter((row) => row.artwork);
+    });
+  },
+
+  async genreTracks(genre, limit = 50) {
+    return trending(limit, genre);
+  },
+
+  async artistTracks(artistId, limit = 25) {
+    // Accept both the unified `audius:<id>` key and the bare upstream id.
+    const nativeId = artistId.includes(":") ? artistId.split(":").slice(1).join(":") : artistId;
+    return cached(`audius:artist-tracks:${nativeId}:${limit}`, 5 * 60_000, async () => {
+      const res = await get<ListResponse<AudiusTrack>>(`/users/${encodeURIComponent(nativeId)}/tracks`, {
+        sort: "plays",
+        limit,
+      });
+      return (res.data || []).map(mapTrack).filter((t) => t.streamable);
     });
   },
 

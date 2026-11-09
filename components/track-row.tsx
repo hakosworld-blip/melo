@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { Check, Download, MoreHorizontal, Play } from "lucide-react";
 import { Artwork } from "@/components/artwork";
+import { IconCheck, IconDownload, IconMore, IconPlay } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { formatCount, formatTime } from "@/lib/format";
+import { formatTime } from "@/lib/format";
 import { useProgress } from "@/lib/progress";
 import { useDownloads } from "@/store/downloads";
 import { useTrackArtwork } from "@/lib/use-track-artwork";
@@ -62,24 +61,20 @@ export default function TrackRow({
 
   return (
     <div
-      className={cn(
-        "group relative flex items-center gap-3 rounded-[calc(var(--radius)-4px)] pr-1 pl-2 row-pad",
-        "transition-colors duration-200",
-        isActive ? "bg-[color-mix(in_srgb,var(--ink)_7%,transparent)]" : "hover:bg-[color-mix(in_srgb,var(--ink)_4.5%,transparent)]",
-        className,
-      )}
+      data-active={isActive}
+      className={cn("list-row group", className)}
     >
       {showCoverNumber ? (
-        <div className="relative flex w-8 shrink-0 items-center justify-center">
-          <span className="text-[12.5px] tabular-nums text-muted group-hover:opacity-0">
-            {isActive && !showArtwork ? <Equalizer playing={playing} /> : (index + 1).toString().padStart(2, "0")}
+        <div className="relative flex w-5 shrink-0 items-center justify-center">
+          <span className={cn("text-[12px] tabular-nums text-muted group-hover:opacity-0", isActive && "opacity-0")}>
+            {index + 1}
           </span>
           <button
             onClick={() => playTracks(context, index)}
             aria-label={`Play ${track.title}`}
-            className="press absolute inset-0 flex items-center justify-center rounded-full text-ink opacity-0 transition-opacity group-hover:opacity-100 focus-ring"
+            className="press focus-ring absolute inset-0 flex items-center justify-center text-ink opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
           >
-            <Play size={14} fill="currentColor" />
+            <IconPlay size={12} />
           </button>
         </div>
       ) : (
@@ -89,26 +84,26 @@ export default function TrackRow({
             else playTracks(context, index);
           }}
           aria-label={`Play ${track.title}`}
-          className="relative shrink-0"
+          className="relative shrink-0 overflow-hidden rounded-[6px]"
         >
           {showArtwork ? (
             <Artwork
               src={artworkUrl}
               alt={track.title}
               className={cn("h-11 w-11", dense && "h-10 w-10")}
-              rounded="rounded-[10px]"
+              rounded="rounded-[6px]"
               iconSize={16}
             />
           ) : (
-            <div className="h-9 w-9 rounded-[9px] bg-surface2" />
+            <div className="h-10 w-10 rounded-[6px] bg-surface2" />
           )}
           <span
             className={cn(
-              "absolute inset-0 flex items-center justify-center rounded-[10px] bg-black/45 text-white transition-opacity",
+              "absolute inset-0 flex items-center justify-center bg-black/50 text-white transition-opacity",
               isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100",
             )}
           >
-            {isActive && playing ? <Equalizer playing /> : <Play size={15} fill="currentColor" />}
+            {isActive && playing ? <Equalizer playing /> : <IconPlay size={14} />}
           </span>
         </button>
       )}
@@ -120,50 +115,32 @@ export default function TrackRow({
         }}
         className="min-w-0 flex-1 text-left"
       >
-        <div className="flex items-center gap-1.5">
-          <span className={cn("truncate text-[13.5px] font-medium", isActive && "text-accent")}>{track.title}</span>
-          {track.featuredArtists.length > 0 && (
-            <span className="hidden truncate text-[11.5px] text-muted sm:inline">
-              feat. {track.featuredArtists.join(", ")}
-            </span>
+        <p className={cn("truncate text-[14px] font-medium leading-[1.32]", isActive && "text-accent")}>
+          {track.title}
+        </p>        <p className="mt-0.5 truncate text-[12px] leading-[1.3] text-muted">
+          {[track.artist, showAlbum ? track.album : undefined].filter(Boolean).join(" · ")}
+          {showAlbum && track.featuredArtists.length > 0 && (
+            <span className="hidden sm:inline"> · feat. {track.featuredArtists.join(", ")}</span>
           )}
-        </div>
-        <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted">
-          {track.artistId ? (
-            <Link
-              href={`/artist/${encodeURIComponent(track.artistId)}`}
-              onClick={(event) => event.stopPropagation()}
-              className="truncate hover:text-ink hover:underline"
-            >
-              {track.artist}
-            </Link>
-          ) : (
-            <span className="truncate">{track.artist}</span>
-          )}
-          {showAlbum && track.album && <span className="hidden truncate sm:inline">· {track.album}</span>}
-        </div>
+        </p>
       </button>
 
       {download?.status === "complete" && (
         <span title={download.authorised ? "Downloaded" : "Saved offline"} className="hidden text-muted sm:block">
-          {download.authorised ? <Download size={13} /> : <Check size={13} />}
+          {download.authorised ? <IconDownload size={14} /> : <IconCheck size={14} />}
         </span>
       )}
 
-      {showAlbum && track.playCount ? (
-        <span className="hidden w-20 text-right text-[11.5px] tabular-nums text-muted md:block">
-          {formatCount(track.playCount)} plays
-        </span>
-      ) : null}
-
-      <span className="w-9 text-right text-[12px] tabular-nums text-muted">{formatTime(track.duration)}</span>
+      <span className="hidden w-10 text-right text-[12px] tabular-nums text-muted sm:block">
+        {formatTime(track.duration)}
+      </span>
 
       <button
         aria-label={`More options for ${track.title}`}
         onClick={() => openSheet({ type: "trackMenu", track })}
-        className="press focus-ring flex h-8 w-8 items-center justify-center rounded-full text-muted opacity-70 hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink group-hover:opacity-100"
+        className="press focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted/80 hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink"
       >
-        <MoreHorizontal size={16} />
+        <IconMore size={16} />
       </button>
 
       {onRemove && (

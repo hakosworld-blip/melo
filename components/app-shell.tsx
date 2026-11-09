@@ -28,7 +28,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <main
           id="main"
-          className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(140px+env(safe-area-inset-bottom))] lg:pb-[92px]"
+          className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(152px+env(safe-area-inset-bottom))] lg:pb-[86px]"
         >
           <PageTransition>{children}</PageTransition>
         </main>

@@ -2,18 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import {
-  Disc3,
-  Download,
-  ListEnd,
-  ListPlus,
-  Loader2,
-  Mic2,
-  Play,
-  Share2,
-  Trash2,
-  User,
-  Ban,
-} from "lucide-react";
+  IconBan,
+  IconDisc,
+  IconDownload,
+  IconLyrics,
+  IconNext,
+  IconPin,
+  IconPlay,
+  IconPlus,
+  IconShare,
+  IconSpinner,
+  IconTrash,
+  IconUser,
+} from "@/components/ui/icons";
 import { Artwork } from "@/components/artwork";
 import { PROVIDER_LABEL } from "@/lib/constants";
 import { formatTime } from "@/lib/format";
@@ -37,6 +38,8 @@ export default function TrackMenu({ track }: { track: Track }) {
   const cancel = useDownloads((s) => s.cancel);
   const record = useDownloads((s) => s.records[track.id]);
   const forgetTrack = useLibrary((s) => s.forgetTrack);
+  const pinned = useLibrary((s) => s.pinned.some((entry) => entry.id === track.id));
+  const togglePin = useLibrary((s) => s.togglePin);
 
   const done = (message: string, tone: "neutral" | "success" | "error" = "neutral") => {
     closeSheet();
@@ -80,7 +83,7 @@ export default function TrackMenu({ track }: { track: Track }) {
   return (
     <div className="pb-3">
       <div className="flex items-center gap-3 px-3 pb-3">
-        <Artwork src={track.artworkSmall || track.artwork} alt={track.title} className="h-14 w-14" rounded="rounded-[10px]" iconSize={18} />
+        <Artwork src={track.artworkSmall || track.artwork} alt={track.title} className="h-14 w-14" rounded="rounded-[6px]" iconSize={18} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-medium">{track.title}</p>
           <p className="mt-0.5 truncate text-[12px] text-muted">
@@ -102,32 +105,41 @@ export default function TrackMenu({ track }: { track: Track }) {
       </div>
 
       <div className="space-y-0.5 px-1.5">
-        <MenuRow icon={<Play size={16} />} label="Play now" onClick={() => { playTrack(track); closeSheet(); }} />
+        <MenuRow icon={<IconPlay size={16} />} label="Play now" onClick={() => { playTrack(track); closeSheet(); }} />
         <MenuRow
-          icon={<ListEnd size={16} />}
+          icon={<IconNext size={16} />}
           label="Play next"
           onClick={() => { addNext(track); done("Playing next", "success"); }}
         />
         <MenuRow
-          icon={<ListPlus size={16} />}
+          icon={<IconPlus size={16} />}
           label="Add to queue"
           onClick={() => { addToQueue(track); done("Added to queue", "success"); }}
         />
         <MenuRow
-          icon={<ListPlus size={16} />}
+          icon={<IconPlus size={16} />}
           label="Add to playlist"
           onClick={() => openSheet({ type: "addToPlaylist", track })}
+        />
+        <MenuRow
+          icon={<IconPin size={16} filled={pinned} />}
+          label={pinned ? "Unpin from Home" : "Pin to Home"}
+          detail={pinned ? undefined : "Keeps it at the top of Home for one tap"}
+          onClick={() => {
+            const nowPinned = togglePin(track);
+            done(nowPinned ? "Pinned to Home" : "Unpinned from Home", nowPinned ? "success" : "neutral");
+          }}
         />
 
         {track.streamable ? (
           <MenuRow
             icon={
               record?.status === "downloading" || record?.status === "queued" ? (
-                <Loader2 size={16} className="anim-spin" />
+                <IconSpinner size={16} />
               ) : record?.status === "complete" ? (
-                <Trash2 size={16} />
+                <IconTrash size={16} />
               ) : (
-                <Download size={16} />
+                <IconDownload size={16} />
               )
             }
             label={downloadLabel}
@@ -172,7 +184,7 @@ export default function TrackMenu({ track }: { track: Track }) {
           />
         ) : (
           <MenuRow
-            icon={<Ban size={16} />}
+            icon={<IconBan size={16} />}
             label="Unavailable to stream"
             detail="The source reports this track as not streamable (removed or gated)."
             disabled
@@ -184,7 +196,7 @@ export default function TrackMenu({ track }: { track: Track }) {
 
         {track.artistId && (
           <MenuRow
-            icon={<User size={16} />}
+            icon={<IconUser size={16} />}
             label="View artist"
             onClick={() => {
               closeSheet();
@@ -194,7 +206,7 @@ export default function TrackMenu({ track }: { track: Track }) {
         )}
         {track.albumId && (
           <MenuRow
-            icon={<Disc3 size={16} />}
+            icon={<IconDisc size={16} />}
             label="View album"
             onClick={() => {
               closeSheet();
@@ -202,13 +214,13 @@ export default function TrackMenu({ track }: { track: Track }) {
             }}
           />
         )}
-        <MenuRow icon={<Mic2 size={16} />} label="View lyrics" onClick={() => openSheet({ type: "lyrics", track })} />
-        <MenuRow icon={<Share2 size={16} />} label="Share" onClick={share} />
+        <MenuRow icon={<IconLyrics size={16} />} label="View lyrics" onClick={() => openSheet({ type: "lyrics", track })} />
+        <MenuRow icon={<IconShare size={16} />} label="Share" onClick={share} />
 
         <div className="my-2 h-px bg-line" />
 
         <MenuRow
-          icon={<Trash2 size={16} />}
+          icon={<IconTrash size={16} />}
           label="Remove from library"
           detail="Clears this track from your history and play counts"
           onClick={() => {

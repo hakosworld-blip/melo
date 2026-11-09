@@ -96,7 +96,7 @@ export default function AlbumPage() {
 
         <section className="mt-8">
           {album.tracks.length ? (
-            <div className="surface px-1.5 py-2 sm:px-2">
+            <div className="py-1">
               <TrackList tracks={album.tracks} showCoverNumber showAlbum />
             </div>
           ) : (

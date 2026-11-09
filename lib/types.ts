@@ -96,6 +96,13 @@ export interface HomeSection {
   items: Track[] | ArtistSummary[] | AlbumSummary[];
 }
 
+/** A browsable genre with a real cover taken from its own top track. */
+export interface GenreSummary {
+  name: string;
+  artwork?: string;
+  trackCount?: number;
+}
+
 export interface ProviderAvailability {
   provider: ProviderId;
   available: boolean;
@@ -132,6 +139,10 @@ export interface MusicProvider {
   /** Resolves a direct upstream audio URL for proxying. */
   streamUrl(id: string): Promise<string>;
   availability(): Promise<ProviderAvailability>;
+  /** Optional catalogue browsing, used by Home's genre row and daily mix. */
+  genres?(): Promise<GenreSummary[]>;
+  genreTracks?(genre: string, limit?: number): Promise<Track[]>;
+  artistTracks?(artistId: string, limit?: number): Promise<Track[]>;
 }
 
 /** A locally stored (downloaded) track. */

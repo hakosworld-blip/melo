@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { IconChevronLeft } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 /**
@@ -49,22 +49,19 @@ export default function AppBar({
       data-scrolled={scrolled}
       className={cn("appbar chrome sticky top-0 z-30 pt-[env(safe-area-inset-top)]", className)}
     >
-      <div className="flex h-[54px] items-center gap-2">
+      <div className="flex min-h-[58px] items-center gap-2 pb-1.5 pt-1">
         {backHref && (
           <Link
             href={backHref}
             aria-label="Back"
             className="press focus-ring -ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink/70 hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink"
           >
-            <ChevronLeft size={20} />
+            <IconChevronLeft size={20} />
           </Link>
         )}
         {title ? (
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display truncate text-[19px] leading-tight">{title}</h1>
-            {subtitle && (
-              <p className="meta-label mt-1 truncate text-[9.5px] tracking-[0.12em] text-muted">{subtitle}</p>
-            )}
+          <div className="min-w-0 flex-1">              <h1 className="font-display truncate text-[20px] leading-tight">{title}</h1>
+            {subtitle && <p className="mt-0.5 truncate text-[11.5px] text-muted">{subtitle}</p>}
           </div>
         ) : (
           <div className="min-w-0 flex-1" />

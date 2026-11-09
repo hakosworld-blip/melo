@@ -22,8 +22,8 @@ export default function GlobalSheets() {
       <Sheet
         open={sheet?.type === "queue"}
         onClose={close}
-        title="Queue"
-        description="Drag to reorder · tap a song to jump"
+        title="Up next"
+        description="The next 15 songs in order · drag to reorder"
         wide
       >
         {sheet?.type === "queue" && <QueueView />}

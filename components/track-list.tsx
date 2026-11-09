@@ -17,7 +17,7 @@ export default function TrackList({
   onRemove?: (track: Track) => void;
 }) {
   return (
-    <div className="space-y-0.5">
+    <div className="divide-y divide-[color-mix(in_srgb,var(--ink)_6%,transparent)]">
       {tracks.map((track, index) => (
         <TrackRow
           key={`${track.id}-${index}`}

@@ -104,17 +104,10 @@ export default function LibraryPage() {
                 ))}
               </div>
               {!playlists.length && (
-                <EmptyState
-                  compact
-                  icon={<ListMusic size={20} />}
-                  title="No playlists yet"
-                  description="Build one from any song's menu, or paste a Spotify playlist link to import it. No account, no syncing — it stays here."
-                  action={
-                    <Button variant="surface" size="sm" onClick={() => openSheet({ type: "importPlaylist" })}>
-                      <Link2 size={14} /> Import a playlist
-                    </Button>
-                  }
-                />
+                <p className="mt-4 max-w-md text-[12.5px] leading-relaxed text-muted">
+                  Playlists stay on this device. Start one from any song&apos;s menu, or import a Spotify or
+                  YouTube Music link to bring a list you already have.
+                </p>
               )}
             </section>
           )}
@@ -162,7 +155,7 @@ export default function LibraryPage() {
               {recent.length > 0 && (
                 <div>
                   <SectionTitle title="Recently played" subtitle={`${recent.length} tracks in your history`} />
-                  <div className="surface px-1.5 py-1.5 sm:px-2">
+                  <div className="py-1">
                     <TrackList tracks={recent.slice(0, 20)} showAlbum />
                   </div>
                 </div>
@@ -170,7 +163,7 @@ export default function LibraryPage() {
               {mostPlayed.length > 1 && (
                 <div>
                   <SectionTitle title="Most played" subtitle="Local play counts only" />
-                  <div className="surface px-1.5 py-1.5 sm:px-2">
+                  <div className="py-1">
                     <TrackList tracks={mostPlayed} showCoverNumber />
                   </div>
                 </div>
@@ -207,7 +200,7 @@ export default function LibraryPage() {
                   </Link>
                 }
               />
-              <div className={cn("surface px-1.5 py-1.5 sm:px-2")}>
+              <div className={cn("py-1")}>
                 <DownloadList />
               </div>
             </section>

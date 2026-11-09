@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f7f6f3",
+  themeColor: "#0a0a0b",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -30,7 +30,7 @@ const bootScript = `(function(){try{
   var raw = localStorage.getItem('melo-settings');
   var s = raw ? (JSON.parse(raw).state || {}) : {};
   var root = document.documentElement;
-  var mode = s.theme || 'light';
+  var mode = s.theme || 'dark';
   var resolved = mode === 'system'
     ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
     : mode;
@@ -57,7 +57,7 @@ const bootScript = `(function(){try{
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />
       </head>

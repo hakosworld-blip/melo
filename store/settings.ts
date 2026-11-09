@@ -75,10 +75,10 @@ const plainBackground = (color: string): BackgroundConfig => ({
 });
 
 const defaultSettings: Settings = {
-  theme: "light",
+  theme: "dark",
   accent: "ink",
   density: "comfortable",
-  radius: 12,
+  radius: 10,
   font: "sans",
   animations: "full",
   motion: "slide",
@@ -101,7 +101,7 @@ const defaultSettings: Settings = {
     artworkBlur: 60,
     artworkStyle: "rounded",
     controlsStyle: "filled",
-    showRemaining: true,
+    showRemaining: false,
     glow: true,
   },
   lyrics: {
@@ -139,13 +139,12 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "melo-settings",
-      version: 2,
-      /** v2 is the editorial redesign: bone paper, ink accent, crisp corners. */
+      version: 3,
+      /** v3 is the dark listening room: near-black canvas, white controls. */
       migrate: (persisted, version) => {
         const state = persisted as SettingsState;
-        if (version < 2) {
-          return { ...state, theme: "light", accent: "ink", radius: 12 };
-        }
+        if (version < 2) return { ...state, accent: "ink", radius: 10, theme: "dark" };
+        if (version < 3) return { ...state, theme: "dark", radius: 10 };
         return state;
       },
     },

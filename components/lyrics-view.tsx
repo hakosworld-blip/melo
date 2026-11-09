@@ -1,11 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Download, RefreshCw, Search, X } from "lucide-react";
 import { Button, EmptyState, IconButton, Skeleton, Spinner } from "@/components/ui/primitives";
+import {
+  IconArrowRight,
+  IconChevronLeft,
+  IconCloudOff,
+  IconDownload,
+  IconInfo,
+  IconMusic,
+  IconRefresh,
+  IconSearch,
+} from "@/components/ui/icons";
 import { apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
-import { formatCount } from "@/lib/format";
 import { useProgress } from "@/lib/progress";
 import { KEYS, idbGet, idbSet } from "@/lib/storage";
 import { usePlayer } from "@/store/player";
@@ -13,12 +21,24 @@ import { useSettings } from "@/store/settings";
 import { toast } from "@/store/toast";
 import type { Lyrics, Track } from "@/lib/types";
 
+/** How many lines either side of the sung line stay in focus. */
+function focusFor(index: number, active: number, synced: boolean): "active" | "mid" | "near" | "far" | "static" {
+  if (!synced) return "static";
+  if (index === active) return "active";
+  const distance = Math.abs(index - active);
+  if (distance === 1) return "mid";
+  if (distance === 2) return "near";
+  return "far";
+}
+
 /**
- * Lyrics screen.
- * - Downloads first, then LRCLIB (cached in IndexedDB).
- * - Synced lines highlight + auto-scroll + tap-to-seek when timestamps exist.
- * - Unsynced lyrics are labelled as such; nothing is faked.
- * - If nothing matches, the user can search LRCLIB manually and attach a match.
+ * Lyrics.
+ *
+ * Downloads first, then LRCLIB (cached on the device). Synced lines highlight,
+ * auto-scroll and seek on tap. The sheet keeps a readable band in the middle of
+ * the screen: the lines above and below it fade and lose focus, so the eye
+ * lands on the line being sung. The source sits at the end of the sheet, after
+ * the last line, rather than in a permanent footer.
  */
 export default function LyricsView({
   track,
@@ -161,54 +181,34 @@ export default function LyricsView({
 
   const muted = overlay ? "text-white/45" : "text-muted";
   const strong = overlay ? "text-white" : "text-ink";
+  const iconTone = overlay ? "text-white/75 hover:!text-white hover:!bg-white/10" : "";
+  const source = lyrics ? (lyrics.synced ? "Time-synced by LRCLIB" : "Text lyrics from LRCLIB") : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 pb-2 pt-1 sm:px-6">
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-1 px-3 pb-1 pt-1 sm:px-6">
         {onClose && (
-          <IconButton
-            label="Back"
-            onClick={onClose}
-            className={overlay ? "text-white/75 hover:!text-white hover:!bg-white/10" : ""}
-          >
-            <ArrowLeft size={18} />
+          <IconButton label="Back to player" onClick={onClose} className={iconTone}>
+            <IconChevronLeft size={20} />
           </IconButton>
         )}
-        <div className="min-w-0 flex-1">
-          <p className={cn("text-[11px] uppercase tracking-[0.16em]", muted)}>Lyrics</p>
-          <p className={cn("truncate text-[13px] font-medium", strong)}>
-            {track.title} <span className={muted}>· {track.artist}</span>
-          </p>
+        <div className="min-w-0 flex-1 px-1">
+          <p className={cn("truncate text-[15px] font-semibold tracking-[-0.01em]", strong)}>{track.title}</p>
+          <p className={cn("truncate text-[12px]", muted)}>{track.artist}</p>
         </div>
-        {lyrics && (
-          <div className={cn("hidden items-center gap-1.5 text-[10.5px] uppercase tracking-[0.1em] sm:flex", muted)}>
-            <span className="rounded-full border border-current/25 px-2 py-0.5">LRCLIB</span>
-            <span className={cn("rounded-full px-2 py-0.5", lyrics.synced ? "bg-accent/15 text-accent" : "border border-current/25")}>
-              {lyrics.synced ? "Synced" : "Unsynced"}
-            </span>
-          </div>
-        )}
-        <IconButton
-          label="Search lyrics"
-          onClick={() => setSearchOpen((v) => !v)}
-          className={overlay ? "text-white/75 hover:!text-white hover:!bg-white/10" : ""}
-        >
-          <Search size={17} />
+        <IconButton label="Search lyrics" onClick={() => setSearchOpen((v) => !v)} className={iconTone}>
+          <IconSearch size={18} />
         </IconButton>
         {lyrics && (
-          <IconButton
-            label="Save lyrics offline"
-            onClick={saveOffline}
-            className={overlay ? "text-white/75 hover:!text-white hover:!bg-white/10" : ""}
-          >
-            <Download size={17} />
+          <IconButton label="Save lyrics offline" onClick={saveOffline} className={iconTone}>
+            <IconDownload size={18} />
           </IconButton>
         )}
       </div>
 
       {searchOpen ? (
         <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4 sm:px-6">
-          <div className="flex gap-2">
+          <div className="mt-2 flex gap-2">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -217,11 +217,11 @@ export default function LyricsView({
               className={cn(
                 "h-10 min-w-0 flex-1 rounded-full border px-4 text-[13px] outline-none transition-colors",
                 overlay
-                  ? "border-white/15 bg-white/10 text-white placeholder:text-white/35 focus:border-white/35"
-                  : "border-line bg-surface text-ink placeholder:text-muted focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--line))]",
+                  ? "border-white/15 bg-white/10 text-white placeholder:text-white/35 focus:border-white/40"
+                  : "border-line bg-surface text-ink placeholder:text-muted focus:border-white/30",
               )}
             />
-            <Button variant={overlay ? "surface" : "surface"} onClick={runSearch} disabled={searching}>
+            <Button variant="surface" onClick={runSearch} disabled={searching}>
               {searching ? <Spinner /> : "Search"}
             </Button>
           </div>
@@ -245,9 +245,7 @@ export default function LyricsView({
                     onClick={() => attach(match)}
                     className={cn(
                       "press flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left",
-                      overlay
-                        ? "border-white/10 bg-white/5 hover:bg-white/10"
-                        : "border-line bg-surface hover:bg-[color-mix(in_srgb,var(--ink)_5%,var(--surface))]",
+                      overlay ? "border-white/10 bg-white/5 hover:bg-white/10" : "border-line bg-surface hover:bg-surface2",
                     )}
                   >
                     <div className="min-w-0 flex-1">
@@ -260,7 +258,7 @@ export default function LyricsView({
                     <span
                       className={cn(
                         "shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide",
-                        match.synced ? "bg-accent/15 text-accent" : "border border-current/20",
+                        match.synced ? "bg-white/15 text-white" : "border border-current/20",
                         !match.synced && muted,
                       )}
                     >
@@ -282,12 +280,12 @@ export default function LyricsView({
           ref={scrollRef}
           onWheel={markManualScroll}
           onTouchMove={markManualScroll}
-          className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 sm:px-6"
+          className={cn("lyrics-scroll min-h-0 flex-1 overflow-y-auto px-5 sm:px-8", !overlay && "pt-2")}
           style={{ scrollbarWidth: "none" }}
         >
-          <div className="mx-auto w-full max-w-3xl">
+          <div className={cn("mx-auto w-full max-w-2xl", settings.align === "center" ? "text-center" : "text-left")}>
             {loading && !lyrics && (
-              <div className="space-y-4 pt-8">
+              <div className="space-y-4 pt-16">
                 {[70, 90, 55, 80, 65, 88, 50, 75].map((width, i) => (
                   <Skeleton key={i} className="h-5" />
                 ))}
@@ -296,13 +294,13 @@ export default function LyricsView({
 
             {!loading && error && (
               <EmptyState
-                icon={<AlertGlyph />}
+                icon={<IconCloudOff size={20} />}
                 title="Lyrics unavailable"
                 description={error}
                 action={
                   <div className="flex gap-2">
                     <Button variant="surface" onClick={() => setTick((t) => t + 1)}>
-                      <RefreshCw size={14} /> Try again
+                      <IconRefresh size={14} /> Try again
                     </Button>
                     <Button variant="ghost" onClick={() => setSearchOpen(true)}>
                       Search lyrics
@@ -314,98 +312,97 @@ export default function LyricsView({
 
             {!loading && !error && notFound && !lyrics && (
               <EmptyState
-                icon={<Search size={20} />}
+                icon={<IconSearch size={20} />}
                 title="No lyrics found for this track"
                 description="LRCLIB is community-sourced and doesn't cover everything. You can search for the right match yourself."
-                action={<Button variant="surface" onClick={() => setSearchOpen(true)}>Search lyrics</Button>}
+                action={
+                  <Button variant="surface" onClick={() => setSearchOpen(true)}>
+                    Search lyrics
+                  </Button>
+                }
               />
             )}
 
             {lyrics?.instrumental && (
-              <EmptyState icon={<MusicGlyph />} title="Instrumental" description="LRCLIB lists this track as an instrumental." />
+              <EmptyState
+                icon={<IconMusic size={20} />}
+                title="Instrumental"
+                description="LRCLIB lists this track as an instrumental, so there's nothing to sing along to."
+              />
             )}
 
             {lyrics && !lyrics.instrumental && lyrics.lines.length > 0 && (
-              <div
-                className={cn(
-                  "py-10",
-                  settings.align === "center" ? "text-center" : "text-left",
-                )}
-              >
-                {!lyrics.synced && (
-                  <p className={cn("mb-6 text-[11px] uppercase tracking-[0.14em]", muted)}>
-                    Not time-synced · lyrics only
+              <>
+                <div className="pb-2 pt-[26vh]">
+                  {!lyrics.synced && (
+                    <p className={cn("mb-5 flex items-center gap-1.5 text-[11.5px]", muted)}>
+                      <IconInfo size={13} /> Not time-synced — lyrics only
+                    </p>
+                  )}
+                  {lyrics.lines.map((line, index) => {
+                    const isActive = lyrics.synced && index === activeIndex;
+                    const focus = focusFor(index, activeIndex, lyrics.synced);
+                    return (
+                      <button
+                        key={`${line.time}-${index}`}
+                        ref={(el) => {
+                          lineRefs.current[index] = el;
+                        }}
+                        onClick={() => lyrics.synced && seek(line.time)}
+                        disabled={!lyrics.synced}
+                        data-active={isActive}
+                        data-focus={focus}
+                        data-highlight={settings.highlight}
+                        className={cn(
+                          "lyric block w-full text-left font-semibold leading-[1.24]",
+                          settings.align === "center" && "text-center",
+                          !lyrics.synced && "cursor-default font-medium leading-[1.45]",
+                          overlay
+                            ? isActive
+                              ? "text-white"
+                              : "text-white/70"
+                            : isActive
+                              ? "text-ink"
+                              : "text-ink/70",
+                        )}
+                        style={{
+                          fontSize: `clamp(18px, ${Math.min(settings.fontSize, 34) / 16}rem, 34px)`,
+                          paddingBlock: lyrics.synced ? "9px" : "7px",
+                          opacity: isActive ? 1 : undefined,
+                        }}
+                      >
+                        {line.text || "♪"}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={cn("mb-[18vh] mt-6 border-t pt-5", overlay ? "border-white/10" : "border-line")}>
+                  <p className={cn("text-[11px] uppercase tracking-[0.14em]", muted)}>Lyrics source</p>
+                  <a
+                    href="https://lrclib.net"
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn(
+                      "group mt-1.5 inline-flex items-center gap-1.5 text-[14px] font-medium hover:underline",
+                      strong,
+                    )}
+                  >
+                    LRCLIB
+                    <IconArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                  </a>
+                  <p className={cn("mt-1 text-[12px] leading-relaxed", muted)}>
+                    {source}
+                    {lyrics.trackName ? ` · matched to “${lyrics.trackName}”` : ""}
+                    {lyrics.artistName ? ` by ${lyrics.artistName}` : ""}. Community-contributed and may be
+                    incomplete or timed slightly off.
                   </p>
-                )}
-                {lyrics.lines.map((line, index) => {
-                  const isActive = lyrics.synced && index === activeIndex;
-                  const isPast = lyrics.synced && index < activeIndex;
-                  const wordIndex =
-                    isActive && line.words
-                      ? line.words.reduce((acc, word, i) => (word.t <= progress.position + 0.08 ? i : acc), -1)
-                      : -1;
-                  return (
-                    <button
-                      key={`${line.time}-${index}`}
-                      ref={(el) => {
-                        lineRefs.current[index] = el;
-                      }}
-                      onClick={() => lyrics.synced && seek(line.time)}
-                      disabled={!lyrics.synced}
-                      data-active={isActive}
-                      data-highlight={settings.highlight}
-                      className={cn(
-                        "lyric block w-full py-[7px] text-left leading-[1.28]",
-                        settings.align === "center" && "text-center",
-                        !lyrics.synced && "cursor-default",
-                        isActive && "font-semibold",
-                        isPast && "opacity-80",
-                      )}
-                      style={{
-                        fontSize: `${settings.fontSize}px`,
-                        color: overlay && !lyrics.synced ? "rgba(255,255,255,0.62)" : undefined,
-                      }}
-                    >
-                      {line.text || "♪"}
-                      {wordIndex >= 0 && line.words && (
-                        <span className="sr-only">{line.words.map((w) => w.w).join(" ")}</span>
-                      )}
-                      {wordIndex >= 0 && line.words && (
-                        <span aria-hidden="true" className="absolute opacity-0 pointer-events-none">
-                          {line.words[wordIndex]?.w}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
       )}
-
-      <div className={cn("px-5 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 text-[10.5px]", muted)}>
-        Lyrics from LRCLIB · community-sourced, may be incomplete
-      </div>
     </div>
-  );
-}
-
-function AlertGlyph() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 8v5M12 16.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-function MusicGlyph() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <circle cx="6.5" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <circle cx="16.5" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
   );
 }

@@ -16,21 +16,26 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-/* Warm monochrome, dark stage: charcoal canvas, bone ink, one pastel at a time. */
+/* The default: a dark listening room. Near-black canvas, soft graphite
+   surfaces, one hairline family, white as the only "brand" colour. */
 :root {
-  --bg: #141312;
-  --surface: #1b1a18;
-  --surface-2: #232120;
-  --line: #322f2b;
-  --ink: #f4f1ec;
-  --muted: #9c968c;
+  --bg: #0a0a0b;
+  --surface: #131315;
+  --surface-2: #1b1b1e;
+  --line: #27272b;
+  --ink: #f4f4f5;
+  --muted: #9c9ca4;
   --accent: var(--ink);
   --accent-ink: var(--bg);
-  --radius: 12px;
+  --radius: 10px;
   --density: 1;
-  --chrome: rgba(20, 19, 18, 0.86);
-  --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.28);
-  --shadow-art: 0 12px 30px -20px rgba(0, 0, 0, 0.55);
+  --chrome: rgba(10, 10, 11, 0.72);
+  --glass: rgba(24, 24, 27, 0.66);
+  --glass-strong: rgba(18, 18, 20, 0.9);
+  --glass-line: rgba(255, 255, 255, 0.1);
+  --stage: #0a0a0b;
+  --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --shadow-art: 0 24px 60px -30px rgba(0, 0, 0, 0.9);
   --pale-red: #3a2321;
   --pale-blue: #1f2c36;
   --pale-green: #232d23;
@@ -38,19 +43,23 @@
   color-scheme: dark;
 }
 
-/* The editorial default: warm bone paper, pure white surfaces, hairline rules. */
+/* Daylight: warm paper, white cards, the same layout and rhythm. */
 [data-theme="light"] {
-  --bg: #f7f6f3;
+  --bg: #f4f3f0;
   --surface: #ffffff;
-  --surface-2: #f1efe9;
-  --line: #e5e2db;
-  --ink: #141312;
-  --muted: #78746c;
+  --surface-2: #ecebe6;
+  --line: #e0ddd6;
+  --ink: #101011;
+  --muted: #6f6c66;
   --accent: var(--ink);
   --accent-ink: var(--bg);
-  --chrome: rgba(247, 246, 243, 0.88);
-  --shadow-soft: 0 1px 2px rgba(20, 19, 18, 0.04);
-  --shadow-art: 0 12px 26px -22px rgba(20, 19, 18, 0.4);
+  --chrome: rgba(244, 243, 240, 0.76);
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.92);
+  --glass-line: rgba(16, 16, 17, 0.1);
+  --stage: #101011;
+  --shadow-soft: 0 1px 2px rgba(16, 16, 17, 0.05);
+  --shadow-art: 0 18px 40px -26px rgba(16, 16, 17, 0.5);
   --pale-red: #fdebec;
   --pale-blue: #e1f3fe;
   --pale-green: #edf3ec;
@@ -144,17 +153,37 @@ input[type="range"]::-moz-range-track {
   background: transparent;
 }
 
+/* Headlines are the same grotesque as the UI, set heavy and tight. */
 .font-display {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-optical-sizing: auto;
-  font-weight: 450;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.06;
 }
 
-.data-font-serif .font-display,
 [data-font="serif"] .font-display {
   font-family: "Newsreader Variable", ui-serif, Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Section headlines: 24 on phones, 30 on wide screens, no eyebrow labels. */
+.section-head {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.028em;
+  line-height: 1.1;
+  font-size: clamp(21px, 3.1vw, 28px);
+  color: var(--ink);
+}
+
+.page-head {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  font-size: clamp(30px, 6.4vw, 46px);
 }
 
 /* Tags, counts and metadata: small, wide-tracked, mono. */
@@ -399,12 +428,6 @@ nav {
   transition: color 0.4s ease, opacity 0.4s ease, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
     filter 0.4s ease;
 }
-.lyric[data-active="true"] {
-  color: var(--ink);
-}
-.lyric[data-active="false"] {
-  color: color-mix(in srgb, var(--ink) 44%, transparent);
-}
 .lyric[data-active="true"][data-highlight="glow"] {
   text-shadow: 0 0 26px color-mix(in srgb, var(--accent) 55%, transparent);
 }
@@ -528,4 +551,224 @@ nav {
 }
 [data-animations="reduced"] * {
   transition-duration: 0.05ms !important;
+}
+
+/* ---------- glass chrome ---------- */
+/* Blur is used for one thing only: floating chrome over artwork or lists,
+   so the content stays legible instead of the panel pretending to be content. */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: saturate(160%) blur(22px);
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+}
+
+.glass-strong {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: saturate(170%) blur(28px);
+  -webkit-backdrop-filter: saturate(170%) blur(28px);
+}
+
+/* Floating pill navigation: detached from the edges, like a native tab bar. */
+.pill-nav {
+  border-radius: 999px;
+  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ---------- the player stage ---------- */
+/* A blurred enlargement of the artwork is the room. Darken below it so the
+   title, controls and timings keep AA contrast on any cover. */
+.stage-art {
+  position: absolute;
+  inset: -20%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(56px) saturate(205%) brightness(0.8);
+  transform: scale(1.2);
+  will-change: filter;
+}
+.stage-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(8, 8, 9, 0.38) 0%,
+    rgba(8, 8, 9, 0.3) 34%,
+    rgba(8, 8, 9, 0.56) 68%,
+    rgba(8, 8, 9, 0.86) 100%
+  );
+}
+.stage-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  mix-blend-mode: overlay;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.28) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+}
+
+/* ---------- lyrics focus ---------- */
+/* The readable band sits in the middle of the screen; the edges fall out of
+   focus, both by fading and by blurring, so the eye lands on the active line
+   without the lyric sheet feeling like a form. */
+.lyrics-scroll {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.55) 9%,
+    #000 24%,
+    #000 76%,
+    rgba(0, 0, 0, 0.55) 91%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.55) 9%,
+    #000 24%,
+    #000 76%,
+    rgba(0, 0, 0, 0.55) 91%,
+    transparent 100%
+  );
+}
+
+.lyric {
+  transition: color 0.45s ease, opacity 0.45s ease, filter 0.55s ease, transform 0.55s var(--ease-out-expo);
+  transform-origin: left center;
+  will-change: filter, opacity;
+}
+.lyric[data-focus="far"] {
+  filter: blur(3.2px);
+  opacity: 0.34;
+}
+.lyric[data-focus="near"] {
+  filter: blur(1.4px);
+  opacity: 0.58;
+}
+.lyric[data-focus="mid"] {
+  filter: blur(0.5px);
+  opacity: 0.78;
+}
+.lyric[data-focus="active"] {
+  filter: none;
+  opacity: 1;
+  transform: translateZ(0) scale(1.008);
+}
+
+/* ---------- home ---------- */
+/* Sections are labelled by their heading and the shelf itself; the old
+   mono eyebrows are gone. */
+.shelf {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 6px;
+  margin-inline: calc(var(--page-pad) * -1);
+  padding-inline: var(--page-pad);
+}
+.shelf > * {
+  scroll-snap-align: start;
+}
+
+.genre-tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 12px;
+  min-height: 94px;
+  background: var(--surface-2);
+}
+.genre-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(112deg, rgba(0, 0, 0, 0.72) 8%, rgba(0, 0, 0, 0.16) 62%, rgba(0, 0, 0, 0.42));
+  z-index: -1;
+}
+
+/* The play affordance on cover art: one shape, always the same place. */
+.cover-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  height: 34px;
+  width: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(8, 8, 9, 0.62);
+  color: #fff;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.9);
+  transition: transform 0.22s var(--ease-out-quint), background-color 0.2s ease, opacity 0.2s ease;
+}
+
+/* ---------- list rows ---------- */
+.list-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px 7px 6px;
+  border-radius: 8px;
+  transition: background-color 0.16s ease;
+}
+.list-row:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.list-row[data-active="true"] {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/* ---------- selection & focus, themed from the palette ---------- */
+input::placeholder {
+  color: color-mix(in srgb, var(--ink) 42%, transparent);
+}
+:focus-visible {
+  outline-offset: 3px;
+}
+::selection {
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+  color: var(--ink);
+}
+
+/* ---------- volume ---------- */
+.vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  outline-offset: 8px;
+}
+.vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: none;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.vol-slider:hover::-webkit-slider-thumb,
+.vol-slider:focus-visible::-webkit-slider-thumb,
+.vol-slider:active::-webkit-slider-thumb {
+  opacity: 1;
+}
+.vol-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+}
+.vol-slider::-moz-range-track {
+  background: transparent;
 }

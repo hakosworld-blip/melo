@@ -2,25 +2,25 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { IconClose } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 type ButtonVariant = "primary" | "surface" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "press focus-ring inline-flex items-center justify-center gap-2 rounded-[6px] font-medium disabled:opacity-45 disabled:pointer-events-none";
+  "press focus-ring inline-flex items-center justify-center gap-2 rounded-full font-medium disabled:opacity-45 disabled:pointer-events-none";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accentink hover:brightness-[1.06]",
-  surface: "bg-surface2 text-ink border border-line hover:bg-[color-mix(in_srgb,var(--ink)_8%,var(--surface-2))]",
+  primary: "bg-accent text-accentink hover:brightness-95",
+  surface: "bg-surface2 text-ink border border-line hover:bg-[color-mix(in_srgb,var(--ink)_10%,var(--surface-2))]",
   ghost: "text-ink/80 hover:text-ink hover:bg-[color-mix(in_srgb,var(--ink)_7%,transparent)]",
-  danger: "bg-[#b4433a] text-white hover:brightness-110",
+  danger: "bg-[#c0453a] text-white hover:brightness-110",
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-8 px-3.5 text-[13px]",
-  md: "h-10 px-5 text-sm",
+  sm: "h-8 px-3.5 text-[12.5px]",
+  md: "h-10 px-5 text-[13.5px]",
   lg: "h-12 px-7 text-[15px]",
 };
 
@@ -140,26 +140,27 @@ export function Sheet({
           "mx-0 sm:mx-6",
           wide ? "sm:max-w-2xl" : "sm:max-w-md",
           "max-h-[88vh] sm:max-h-[82vh] flex flex-col",
-          "rounded-t-[14px] sm:rounded-[12px] border border-line",
-          "bg-[color-mix(in_srgb,var(--surface)_97%,transparent)] backdrop-blur-xl shadow-[var(--shadow-soft)]",
+          "rounded-t-[20px] sm:rounded-[16px] border border-transparent sm:border-line",
+          "glass-strong shadow-[0_-24px_60px_-30px_rgba(0,0,0,0.8)] sm:shadow-[var(--shadow-soft)]",
           "pb-[max(env(safe-area-inset-bottom),14px)] sm:pb-0",
         )}
       >
-        <div className="flex items-start justify-between gap-4 px-5 pt-4 sm:px-6 sm:pt-5">
+        <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-ink/25 sm:hidden" aria-hidden="true" />
+        <div className="flex items-start justify-between gap-4 px-5 pt-3 sm:px-6 sm:pt-5">
           <div className="min-w-0">
             {title && (
-              <h2 id={titleId} className="text-[17px] font-semibold tracking-tight">
+              <h2 id={titleId} className="text-[19px] font-semibold tracking-[-0.02em]">
                 {title}
               </h2>
             )}
-            {description && <p className="mt-1 text-[13px] text-muted">{description}</p>}
+            {description && <p className="mt-1 text-[12.5px] text-muted">{description}</p>}
           </div>
           <IconButton label="Close" size="sm" onClick={onClose}>
-            <X size={16} />
+            <IconClose size={16} />
           </IconButton>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pt-2 pb-2 sm:px-3">{children}</div>
-        {footer && <div className="border-t border-line px-5 py-3 sm:px-6">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2 pt-2 sm:px-3">{children}</div>
+        {footer && <div className="border-t border-white/10 px-5 py-3 sm:px-6">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -182,7 +183,7 @@ export function Segmented<T extends string>({
   return (
     <div
       className={cn(
-        "inline-flex w-full items-center gap-1 overflow-x-auto rounded-[7px] border border-line bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-1 no-scrollbar",
+        "inline-flex w-full items-center gap-1 overflow-x-auto rounded-full border border-line bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-1 no-scrollbar",
         className,
       )}
       role="tablist"
@@ -196,9 +197,9 @@ export function Segmented<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "press flex shrink-0 grow items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] font-medium transition-colors",
-              size === "sm" ? "h-7 px-2.5 text-[12px]" : "h-9 px-2.5 text-[13px]",
-              selected ? "bg-surface text-ink" : "text-muted hover:text-ink",
+              "press flex shrink-0 grow items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors",
+              size === "sm" ? "h-7 px-3 text-[12px]" : "h-8 px-3.5 text-[12.5px]",
+              selected ? "bg-ink text-bg" : "text-muted hover:text-ink",
             )}
           >
             {option.icon && <span className="hidden shrink-0 items-center sm:flex">{option.icon}</span>}
@@ -262,11 +263,9 @@ export function EmptyState({
   return (
     <div className={cn("flex flex-col items-center justify-center text-center", compact ? "py-10" : "py-16", className)}>
       {icon && (
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[10px] border border-line bg-surface text-muted">
-          {icon}
-        </div>
+        <div className="glass mb-4 flex h-12 w-12 items-center justify-center rounded-full text-muted">{icon}</div>
       )}
-      <h3 className="text-[15px] font-semibold">{title}</h3>
+      <h3 className="text-[16px] font-semibold tracking-[-0.01em]">{title}</h3>
       {description && <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -285,12 +284,10 @@ export function SectionTitle({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 flex items-end justify-between gap-4", className)}>
+    <div className={cn("mb-3 flex items-end justify-between gap-4", className)}>
       <div className="min-w-0">
-        <h2 className="font-display truncate text-[22px] leading-[1.1] sm:text-[24px]">{title}</h2>
-        {subtitle && (
-          <p className="meta-label mt-1.5 truncate text-[10.5px] tracking-[0.1em] text-muted">{subtitle}</p>
-        )}
+        <h2 className="section-head truncate">{title}</h2>
+        {subtitle && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-muted">{subtitle}</p>}
       </div>
       {action}
     </div>

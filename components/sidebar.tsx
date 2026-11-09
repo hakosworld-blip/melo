@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Download, Home, Library, Plus, Settings2 } from "lucide-react";
+import { Artwork } from "@/components/artwork";
+import { IconDownload, IconHome, IconLibrary, IconPlus, IconSearch, IconSettings } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { useInstallPrompt } from "@/lib/use-install-prompt";
 import { useLibrary } from "@/store/library";
-import { usePlayer } from "@/store/player";
 import { useUi } from "@/store/ui";
-import { Artwork } from "@/components/artwork";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/search", label: "Search", icon: Compass },
-  { href: "/library", label: "Library", icon: Library },
+  { href: "/", label: "Home", icon: IconHome },
+  { href: "/search", label: "Search", icon: IconSearch },
+  { href: "/library", label: "Library", icon: IconLibrary },
 ];
 
 export default function Sidebar() {
@@ -21,61 +20,53 @@ export default function Sidebar() {
   const playlists = useLibrary((s) => s.playlists);
   const followed = useLibrary((s) => s.followedArtists);
   const openSheet = useUi((s) => s.openSheet);
-  const queueLength = usePlayer((s) => s.queue.length);
   const { available: canInstall, install } = useInstallPrompt();
 
   return (
-    <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-line bg-[color-mix(in_srgb,var(--bg)_86%,transparent)] lg:flex">
-      <div className="px-6 pt-7 pb-6">
+    <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-line/70 bg-[color-mix(in_srgb,var(--bg)_72%,transparent)] lg:flex">
+      <div className="px-6 pb-6 pt-7">
         <Link href="/" className="group inline-flex items-baseline gap-1.5">
-          <span className="font-display text-[26px] leading-none tracking-tight">melo</span>
+          <span className="font-display text-[26px] leading-none tracking-[-0.055em]">melo</span>
           <span className="mb-[3px] h-1.5 w-1.5 rounded-full bg-accent transition-transform duration-300 group-hover:scale-125" />
         </Link>
       </div>
 
-      <nav className="px-3">
+      <nav className="space-y-0.5 px-3">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "press group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium",
-                active ? "text-ink" : "text-muted hover:text-ink",
+                "press relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors",
+                active ? "bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] text-ink" : "text-muted hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] hover:text-ink",
               )}
             >
-              {active && (
-                <span className="absolute inset-0 rounded-xl bg-[color-mix(in_srgb,var(--ink)_7%,transparent)]" />
-              )}
-              <Icon size={17} strokeWidth={active ? 2.2 : 1.8} className="relative" />
-              <span className="relative">{label}</span>
-              {label === "Library" && queueLength > 0 && (
-                <span className="relative ml-auto rounded-full bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] px-1.5 py-0.5 text-[10px] tabular-nums text-muted">
-                  {queueLength}
-                </span>
-              )}
+              <Icon size={19} strokeWidth={active ? 2 : 1.7} filled={href === "/" ? active : undefined} />
+              {label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-7 flex items-center justify-between px-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Playlists</p>
+      <div className="mb-2 mt-7 flex items-center justify-between px-6">
+        <p className="text-[11.5px] font-semibold tracking-[0.01em] text-muted">Playlists</p>
         <button
           onClick={() => openSheet({ type: "createPlaylist" })}
           aria-label="New playlist"
-          className="press focus-ring flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink"
+          className="press focus-ring flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink"
         >
-          <Plus size={14} />
+          <IconPlus size={14} />
         </button>
       </div>
 
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {playlists.length === 0 ? (
           <button
             onClick={() => openSheet({ type: "createPlaylist" })}
-            className="mt-1 w-full rounded-xl border border-dashed border-line px-3 py-3 text-left text-[12px] leading-relaxed text-muted transition-colors hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--line))] hover:text-ink"
+            className="mt-1 w-full rounded-lg border border-dashed border-line px-3 py-3 text-left text-[12px] leading-relaxed text-muted transition-colors hover:border-white/25 hover:text-ink"
           >
             Create your first playlist. It stays on this device.
           </button>
@@ -85,23 +76,21 @@ export default function Sidebar() {
               key={playlist.id}
               href={`/playlist/${playlist.id}`}
               className={cn(
-                "press group flex items-center gap-3 rounded-xl px-2 py-1.5",
-                pathname === `/playlist/${playlist.id}`
-                  ? "bg-[color-mix(in_srgb,var(--ink)_7%,transparent)]"
-                  : "hover:bg-[color-mix(in_srgb,var(--ink)_4.5%,transparent)]",
+                "press group flex items-center gap-3 rounded-lg px-2 py-1.5",
+                pathname === `/playlist/${playlist.id}` ? "bg-[color-mix(in_srgb,var(--ink)_9%,transparent)]" : "hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]",
               )}
             >
               <Artwork
                 src={playlist.artworkUrl}
                 alt={playlist.name}
                 className="h-8 w-8 shrink-0"
-                rounded="rounded-[7px]"
+                rounded="rounded-[5px]"
                 iconSize={13}
               />
               <div className="min-w-0">
                 <p className="truncate text-[12.5px] font-medium">{playlist.name}</p>
                 <p className="truncate text-[11px] text-muted">
-                  {playlist.tracks.length} {playlist.tracks.length === 1 ? "song" : "songs"}
+                  Playlist · {playlist.tracks.length} {playlist.tracks.length === 1 ? "song" : "songs"}
                 </p>
               </div>
             </Link>
@@ -110,13 +99,13 @@ export default function Sidebar() {
 
         {followed.length > 0 && (
           <>
-            <p className="mt-6 px-3 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Following</p>
-            <div className="mt-2 space-y-0.5">
+            <p className="mb-1 mt-6 px-3 text-[11.5px] font-semibold text-muted">Following</p>
+            <div className="space-y-0.5">
               {followed.slice(0, 6).map((artist) => (
                 <Link
                   key={artist.id}
                   href={`/artist/${encodeURIComponent(artist.id)}`}
-                  className="press flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-[color-mix(in_srgb,var(--ink)_4.5%,transparent)]"
+                  className="press flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]"
                 >
                   <Artwork
                     src={artist.artwork}
@@ -133,23 +122,23 @@ export default function Sidebar() {
         )}
       </div>
 
-      <div className="border-t border-line p-3">
+      <div className="border-t border-line/70 p-3">
         {canInstall && (
           <button
             onClick={() => void install()}
-            className="press focus-ring mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-accent"
+            className="press focus-ring mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-ink"
           >
-            <Download size={17} /> Install melo
+            <IconDownload size={19} /> Install melo
           </button>
         )}
         <Link
           href="/settings"
           className={cn(
-            "press flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium",
-            pathname.startsWith("/settings") ? "text-ink bg-[color-mix(in_srgb,var(--ink)_7%,transparent)]" : "text-muted hover:text-ink",
+            "press flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors",
+            pathname.startsWith("/settings") ? "bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] text-ink" : "text-muted hover:text-ink",
           )}
         >
-          <Settings2 size={17} />
+          <IconSettings size={19} strokeWidth={pathname.startsWith("/settings") ? 2 : 1.7} />
           Settings
         </Link>
       </div>

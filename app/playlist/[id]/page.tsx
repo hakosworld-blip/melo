@@ -119,7 +119,7 @@ export default function PlaylistPage() {
 
         <section className="mt-8">
           {playlist.tracks.length ? (
-            <div className="surface px-1.5 py-2 sm:px-2">
+            <div className="py-1">
               <TrackList
                 tracks={playlist.tracks}
                 showAlbum

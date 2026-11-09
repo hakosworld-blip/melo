@@ -2,39 +2,59 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Home, Library, Settings2 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { IconHome, IconLibrary, IconSearch, IconSettings } from "@/components/ui/icons";
 
 const items = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/search", label: "Search", icon: Compass },
-  { href: "/library", label: "Library", icon: Library },
-  { href: "/settings", label: "Settings", icon: Settings2 },
+  { href: "/", label: "Home", icon: IconHome },
+  { href: "/library", label: "Library", icon: IconLibrary },
+  { href: "/settings", label: "Settings", icon: IconSettings },
 ];
 
+/**
+ * Two pieces of chrome, exactly as the phone app draws them: a floating pill
+ * for the three destinations and a separate search button beside it. Detached
+ * from the screen edge so content scrolls underneath rather than stopping at a
+ * hard bar.
+ */
 export default function MobileNav() {
   const pathname = usePathname();
+  const searchActive = pathname.startsWith("/search") || pathname.startsWith("/genre");
+
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line chrome pb-[env(safe-area-inset-bottom)] lg:hidden">
-      <div className="mx-auto flex h-[60px] max-w-lg items-stretch">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "press relative flex flex-1 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors",
-                active ? "text-ink" : "text-muted",
-              )}
-            >
-              <Icon size={19} strokeWidth={active ? 2.2 : 1.8} />
-              <span>{label}</span>
-              {active && <span className="absolute top-0 h-[2px] w-7 rounded-full bg-accent anim-fade" />}
-            </Link>
-          );
-        })}
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),8px)] lg:hidden">
+      <div className="pointer-events-auto mx-auto flex max-w-lg items-center gap-2">
+        <div className="glass-strong pill-nav flex h-[58px] flex-1 items-center px-1.5">
+          {items.map(({ href, label, icon: Icon }) => {
+            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "press focus-ring relative flex h-full flex-1 flex-col items-center justify-center gap-[3px] rounded-full text-[11px] font-medium tracking-[0.01em] transition-colors",
+                  active ? "text-ink" : "text-ink/65 hover:text-ink",
+                )}
+              >
+                <Icon size={22} strokeWidth={active ? 2 : 1.75} filled={href === "/" ? active : undefined} />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        <Link
+          href="/search"
+          aria-label="Search"
+          aria-current={searchActive ? "page" : undefined}
+          className={cn(
+            "glass-strong pill-nav press focus-ring flex h-[58px] w-[58px] shrink-0 items-center justify-center",
+            searchActive ? "text-ink" : "text-ink/80 hover:text-ink",
+          )}
+        >
+          <IconSearch size={22} strokeWidth={searchActive ? 2 : 1.75} />
+        </Link>
       </div>
     </nav>
   );

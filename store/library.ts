@@ -13,6 +13,8 @@ interface LibraryState {
   playlists: LocalPlaylist[];
   followedArtists: ArtistSummary[];
   recent: Track[];
+  /** Songs the listener pinned to the top of Home with the star on the player. */
+  pinned: Track[];
   playStats: Record<string, PlayStat>;
   createPlaylist: (name: string, tracks?: Track[]) => string;
   renamePlaylist: (id: string, name: string) => void;
@@ -23,6 +25,8 @@ interface LibraryState {
   reorder: (playlistId: string, from: number, to: number) => void;
   recordPlay: (track: Track) => void;
   forgetTrack: (trackId: string) => void;
+  togglePin: (track: Track) => boolean;
+  isPinned: (trackId: string) => boolean;
   toggleFollow: (artist: ArtistSummary) => boolean;
   isFollowing: (artistId: string) => boolean;
   topTracks: (limit?: number) => { track: Track; count: number }[];
@@ -39,6 +43,7 @@ export const useLibrary = create<LibraryState>()(
       playlists: [],
       followedArtists: [],
       recent: [],
+      pinned: [],
       playStats: {},
 
       createPlaylist: (name, tracks = []) => {
@@ -130,6 +135,18 @@ export const useLibrary = create<LibraryState>()(
           delete stats[trackId];
           return { playStats: stats, recent: state.recent.filter((t) => t.id !== trackId) };
         }),
+
+      togglePin: (track) => {
+        const pinned = get().isPinned(track.id);
+        set((state) => ({
+          pinned: pinned
+            ? state.pinned.filter((t) => t.id !== track.id)
+            : [track, ...state.pinned].slice(0, 24),
+        }));
+        return !pinned;
+      },
+
+      isPinned: (trackId) => get().pinned.some((t) => t.id === trackId),
 
       toggleFollow: (artist) => {
         const following = get().isFollowing(artist.id);

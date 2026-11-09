@@ -231,7 +231,7 @@ export default function StoragePanel() {
         <p className="mb-2 flex items-center gap-2 text-[12px] font-medium">
           <HardDrive size={14} className="text-muted" /> Downloaded songs
         </p>
-        <div className="surface px-1.5 py-1.5 sm:px-2">
+        <div className="py-1">
           <DownloadList />
         </div>
       </div>

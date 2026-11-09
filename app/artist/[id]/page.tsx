@@ -123,7 +123,7 @@ export default function ArtistPage() {
         {popular.length > 0 && (
           <section className="mt-9 anim-rise">
             <SectionTitle title="Popular" subtitle="Ordered by the source's real play counts" />
-            <div className="surface px-1.5 py-2 sm:px-2">
+            <div className="py-1">
               <TrackList tracks={popular} showCoverNumber showAlbum />
             </div>
           </section>
@@ -132,7 +132,7 @@ export default function ArtistPage() {
         {artist.latestTracks.length > 0 && (
           <section className="mt-9">
             <SectionTitle title="Latest" subtitle="Most recent releases" />
-            <div className="surface px-1.5 py-2 sm:px-2">
+            <div className="py-1">
               <TrackList tracks={artist.latestTracks.slice(0, 8)} showAlbum />
             </div>
           </section>

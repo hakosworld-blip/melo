@@ -1,17 +1,26 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { IconCheck, IconClose, IconInfo } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { useToasts } from "@/store/toast";
+import { useUi } from "@/store/ui";
 
 export default function Toaster() {
   const items = useToasts((s) => s.items);
   const dismiss = useToasts((s) => s.dismiss);
+  const playerOpen = useUi((s) => s.nowPlayingOpen);
   if (!items.length) return null;
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+140px)] z-[100] flex flex-col items-center gap-2 px-4 sm:bottom-[calc(env(safe-area-inset-bottom)+104px)]"
+      className={cn(
+        "pointer-events-none fixed inset-x-0 z-[100] flex flex-col items-center gap-2 px-4",
+        // In the player the transport owns the bottom of the screen, so its
+        // messages arrive at the top instead of sitting on the controls.
+        playerOpen
+          ? "top-[calc(env(safe-area-inset-top)+62px)]"
+          : "bottom-[calc(env(safe-area-inset-bottom)+140px)] sm:bottom-[calc(env(safe-area-inset-bottom)+104px)]",
+      )}
       role="status"
       aria-live="polite"
     >
@@ -25,11 +34,11 @@ export default function Toaster() {
         >
           <span className="shrink-0">
             {item.tone === "success" ? (
-              <CheckCircle2 size={17} className="text-accent" />
+              <IconCheck size={17} className="text-accent" />
             ) : item.tone === "error" ? (
-              <AlertCircle size={17} className="text-[#f08c7e]" />
+              <IconInfo size={17} className="text-[#f08c7e]" />
             ) : (
-              <Info size={17} className="text-muted" />
+              <IconInfo size={17} className="text-muted" />
             )}
           </span>
           <p className="min-w-0 flex-1 text-[13px] leading-snug">{item.message}</p>
@@ -49,7 +58,7 @@ export default function Toaster() {
             aria-label="Dismiss"
             className="press shrink-0 rounded-full p-1 text-muted hover:text-ink"
           >
-            <X size={14} />
+            <IconClose size={14} />
           </button>
         </div>
       ))}

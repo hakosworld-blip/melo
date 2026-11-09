@@ -23,16 +23,13 @@ export function MediaCard({
   className?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={cn("group block min-w-0 rounded-[calc(var(--radius)+4px)] p-1.5 transition-colors hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)]", className)}
-    >
-      <div className="relative">
+    <Link href={href} className={cn("group block min-w-0", className)}>
+      <div className={cn("relative overflow-hidden", round ? "rounded-full" : "rounded-[6px]")}>
         <Artwork
           src={artwork}
           alt={title}
-          rounded={round ? "rounded-full" : "rounded-[calc(var(--radius)-2px)]"}
-          className="aspect-square w-full shadow-[0_16px_38px_-24px_rgba(0,0,0,0.9)] transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)] group-hover:scale-[1.025]"
+          rounded={round ? "rounded-full" : "rounded-[6px]"}
+          className="aspect-square w-full shadow-[var(--shadow-art)] transition-transform duration-[700ms] ease-[cubic-bezier(.2,.8,.2,1)] group-hover:scale-[1.03]"
           iconSize={26}
         />
         {badge && (
@@ -41,10 +38,8 @@ export function MediaCard({
           </span>
         )}
       </div>
-      <div className="px-1 pt-2.5 pb-1">
-        <p className="truncate text-[13.5px] font-medium leading-snug">{title}</p>
-        {subtitle && <p className="mt-0.5 truncate text-[12px] text-muted">{subtitle}</p>}
-      </div>
+      <p className="mt-2 truncate text-[13px] font-medium leading-snug">{title}</p>
+      {subtitle && <p className="mt-0.5 truncate text-[12px] text-muted">{subtitle}</p>}
     </Link>
   );
 }
@@ -54,11 +49,13 @@ export function ArtistCard({
   name,
   artwork,
   followers,
+  className,
 }: {
   href: string;
   name: string;
   artwork?: string;
   followers?: number;
+  className?: string;
 }) {
   return (
     <MediaCard
@@ -67,6 +64,7 @@ export function ArtistCard({
       subtitle={followers !== undefined ? `${formatCount(followers)} followers` : undefined}
       artwork={artwork}
       round
+      className={className}
     />
   );
 }

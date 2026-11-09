@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Search, SearchX, X } from "lucide-react";
+import { IconClose, IconSearch, IconSearchX } from "@/components/ui/icons";
 import { ArtistCard, MediaCard } from "@/components/media-card";
 import SectionBackground from "@/components/section-background";
 import TrackList from "@/components/track-list";
@@ -42,7 +42,7 @@ export default function SearchPage() {
         <div className="chrome sticky top-0 z-30 border-b border-line px-4 pb-3 pt-[max(env(safe-area-inset-top),14px)] sm:px-6">
           <div className="mx-auto max-w-3xl">
             <div className="relative">
-              <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+              <IconSearch size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
               <input
                 ref={inputRef}
                 value={query}
@@ -61,7 +61,7 @@ export default function SearchPage() {
                   aria-label="Clear search"
                   className="press absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink"
                 >
-                  <X size={14} />
+                  <IconClose size={14} />
                 </button>
               )}
             </div>
@@ -86,7 +86,11 @@ export default function SearchPage() {
         <div className="mx-auto max-w-5xl page-pad pb-12 pt-6">
           {!query && (
             <div className="anim-rise">
-              <SectionTitle title="Explore" />
+              <h1 className="page-head">Search</h1>
+              <p className="mt-2 text-[12.5px] text-muted">
+                {provider === "youtube" ? "Songs from YouTube Music" : "Songs, artists and albums from Audius"}
+              </p>
+              <p className="mb-3 mt-7 text-[12.5px] font-semibold text-muted">Try a sound</p>
               <div className="flex flex-wrap gap-2">
                 {SUGGESTIONS.map((suggestion) => (
                   <button
@@ -117,7 +121,7 @@ export default function SearchPage() {
 
           {error && (
             <EmptyState
-              icon={<SearchX size={20} />}
+              icon={<IconSearchX size={20} />}
               title="Search failed"
               description={error}
             />
@@ -125,7 +129,7 @@ export default function SearchPage() {
 
           {empty && (
             <EmptyState
-              icon={<SearchX size={20} />}
+              icon={<IconSearchX size={20} />}
               title="No matches"
               description={`Nothing in the catalogue matched “${debounced.trim()}”. Try a different spelling or another source.`}
             />
@@ -136,7 +140,7 @@ export default function SearchPage() {
               {(tab === "all" || tab === "songs") && tracks.length > 0 && (
                 <section className="anim-fade">
                   <SectionTitle title="Songs" />
-                  <div className="surface px-1.5 py-1.5 sm:px-2">
+                  <div className="py-1">
                     <TrackList tracks={tab === "all" ? tracks.slice(0, 8) : tracks} showAlbum />
                   </div>
                   {tab === "all" && tracks.length > 8 && (
@@ -196,7 +200,7 @@ function NoTabMatches({ label, query }: { label: string; query: string }) {
   return (
     <EmptyState
       compact
-      icon={<SearchX size={20} />}
+      icon={<IconSearchX size={20} />}
       title={`No ${label} found`}
       description={`Nothing matched “${query}” in ${label}.`}
     />
