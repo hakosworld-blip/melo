@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "melo",
+    "slug": "melo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hakosworld.melo"
+    },
+    "android": {
+      "package": "com.hakosworld.melo",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#11100F",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true
+        }
+      ],
+      "expo-font",
+      "expo-asset"
+    ]
+  }
+}

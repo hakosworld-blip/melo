@@ -1,0 +1,47 @@
+appId: com.hakosworld.melo
+productName: melo
+copyright: MIT
+
+directories:
+  output: dist
+  buildResources: build
+
+# Only the Electron entry point lives in the asar; the Next server is added
+# as an unpacked resource so it can be executed and read at runtime.
+files:
+  - main.js
+  - package.json
+
+extraResources:
+  - from: ../.next/standalone
+    to: app
+
+asar: true
+compression: normal
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: melo-${version}-windows-x64-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: melo
+  uninstallDisplayName: melo
+
+linux:
+  icon: build/icon.png
+  category: Audio
+  synopsis: Free, ad-free music player
+  description: melo is a free, ad-free, account-free music app that streams a live catalogue with synced lyrics, downloads and playlists.
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  artifactName: melo-${version}-linux-x64.${ext}

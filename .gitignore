@@ -4,7 +4,13 @@ out/
 bin/
 *.log
 .DS_Store
+# Android signing secrets — never commit
+*.jks
+*.keystore
+android/key.properties
+android/app/melo-release.jks
 .env*.local
 next-env.d.ts
 tsconfig.tsbuildinfo
 .tmp/
+artifacts/

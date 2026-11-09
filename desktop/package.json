@@ -1,0 +1,18 @@
+{
+  "name": "melo-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "melo desktop — the same free, ad-free music app, packaged for Linux and Windows.",
+  "homepage": "https://github.com/hakosworld-blip/melo",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:linux": "electron-builder --linux",
+    "build:windows": "electron-builder --win",
+    "pack:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  }
+}

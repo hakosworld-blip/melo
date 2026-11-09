@@ -1,0 +1,128 @@
+name: Build · Test · Release APK
+
+# Manual trigger: Actions tab -> "Build · Test · Release APK" -> Run workflow.
+# You choose the release tag, version number, and pre-release flag each run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.2.0)"
+        required: true
+        type: string
+      version:
+        description: "Version number (e.g. 1.2.0) — written to mobile/app.json"
+        required: true
+        type: string
+      build_number:
+        description: "Android versionCode (e.g. 3)"
+        required: false
+        default: "1"
+        type: string
+      prerelease:
+        description: "Mark this release as a pre-release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write   # needed to create GitHub Releases
+
+concurrency:
+  group: release-apk
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: mobile
+        run: npm run typecheck
+
+  build-and-release:
+    name: Build, sign & release APK
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Stamp version into app.json
+        run: |
+          node -e "const fs=require('fs'); const p='app.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.expo.version=process.env.VERSION_NAME; j.expo.android.versionCode=Number(process.env.VERSION_CODE); fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');"
+        env:
+          VERSION_NAME: ${{ inputs.version }}
+          VERSION_CODE: ${{ inputs.build_number }}
+
+      - name: Decode release keystore from secrets
+        # Requires repo secret KEYSTORE_BASE64 (base64 of your .jks file).
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/melo-release.jks
+          ls -lh android/app/melo-release.jks
+
+      - name: Write android/key.properties from secrets
+        # Requires secrets: KEYSTORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/melo-release.jks
+          EOF
+          echo "key.properties written (storeFile=app/melo-release.jks, keyAlias=${{ secrets.KEY_ALIAS }})"
+
+      - name: Build signed release APK (Gradle)
+        run: |
+          cd android
+          ./gradlew app:assembleRelease --stacktrace
+
+      - name: Upload APK as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: melo-${{ inputs.tag }}
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: melo ${{ inputs.tag }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          files: mobile/android/app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true

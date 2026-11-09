@@ -32,6 +32,33 @@ Optional, only for the YouTube Music source (see below):
 bin/yt-dlp --version
 ```
 
+### Android app
+
+The native Android app lives in [`mobile/`](mobile) as a React Native + Expo app. It uses Expo Audio for background playback and lock-screen controls, and streams from Audius directly on device.
+
+```bash
+cd mobile
+npm install
+npm run typecheck
+npm run prebuild   # regenerate android/ after app.json changes
+npm run android:release
+```
+
+GitHub Actions workflow (`.github/workflows/build-release-apk.yml`) typechecks the mobile app, builds the signed release APK with Gradle, and publishes it as a GitHub Release with a configurable tag, version, and pre-release flag.
+
+### Desktop app (Linux + Windows 10/11)
+
+The desktop build lives in [`desktop/`](desktop) and packages this same Next.js app with Electron — same UI, same local API routes, no accounts or telemetry. The Next server is bundled inside the installer and started on a loopback port at launch.
+
+```bash
+cd desktop
+npm ci
+npm run build:linux     # AppImage
+npm run build:windows   # NSIS installer (use Windows or CI)
+```
+
+`.github/workflows/build-release-desktop.yml` builds both platforms and attaches them to the GitHub Release for the same tag. If that release already exists — for example the one the APK workflow created — the desktop files are added to its existing assets instead of creating a second release, so mobile and desktop ship as one version.
+
 ---
 
 ## Architecture
@@ -113,7 +140,7 @@ No account, no analytics, no telemetry, no third-party requests from the client 
 
 ## Honest limitations
 
-- **Native Android packaging is not included here.** This build is an installable PWA: Android gives it a foreground-style media experience through the Media Session API (background audio, lock-screen artwork and transport controls while the browser process is alive). A Media3/ExoPlayer foreground service would require an Android toolchain (SDK, Gradle, device/emulator) that this environment does not have, so no APK was built or tested. The provider/player/download architecture is platform-agnostic and can be wrapped (e.g. Capacitor) with a native media service without touching the UI.
+- **The web build is still an installable PWA; the native Android app is separate.** The repo now includes a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The web build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing, and source checks are implemented; downloaded/offline files, lyrics, artist/album detail pages, and the full settings surface are still to be ported.
 - **YouTube Music cannot stream from this cloud host** because YouTube bot-checks datacenter IPs. The provider is complete; it needs cookies or a residential IP. This is reported in-app rather than silently hidden.
 - **Downloads are source-dependent.** Tracks the source marks as downloadable get a real "Download" (permanent offline copy). Other streamable tracks can be saved as a clearly labelled *private offline copy*; melo never claims the artist authorised a download, and nothing from YouTube is downloaded.
 - **LRCLIB coverage is community-sourced.** Many independent tracks have no lyrics; the manual search exists for exactly that reason.
@@ -135,10 +162,12 @@ Exercised in a real browser against the live catalogue, not just rendered:
 - **HTTP** — stream proxy served `206` byte ranges and full downloads (`audio/mpeg`, 9.26 MB); artwork proxy serves Audius creator-node hosts with private/loopback and bare-IP targets refused.
 - **Build** — `npx tsc --noEmit` and `npm run build` both pass; first-load JS ~125 kB.
 
-Not verified here: real airplane-mode testing (network was blocked at the page instead), OS lock-screen buttons on a physical device, and native Android packaging (see limitations).
+Not verified here: real airplane-mode testing (network was blocked at the page instead), OS lock-screen buttons on a physical device, and the signed Android APK on a real device. The mobile app typecheck and Expo config pass; Gradle signing happens in GitHub Actions with the secrets described in `mobile/android/key.properties.example`.
+
+For the desktop app, `MELO_DESKTOP_BUILD=1 npm run build`, `scripts/prepare-desktop.mjs`, and `electron-builder --linux` were all run successfully, producing a 160 MB AppImage whose bundled Next server answered `200` on `/`, `/_next/static/css/*`, and `/api/home`. The Electron window itself could not be launched in this container (missing Chromium system libraries and no root to install them), and the Windows installer was not built here.
 
 ## Legal
 
 melo is a client for sources you are authorised to use. It does not bypass DRM, paywalls, gated content or access controls, and it does not claim ownership of any music or lyrics. Lyrics are provided by LRCLIB; catalogue data and streams belong to the selected source. Respect the terms of the sources you configure.
 
-MIT licensed. Built with Next.js, React, Zustand, Tailwind CSS, LRCLIB, Audius and yt-dlp.
+MIT licensed. Built with Next.js, React, Zustand, Tailwind CSS, React Native, Expo, LRCLIB, Audius and yt-dlp.
