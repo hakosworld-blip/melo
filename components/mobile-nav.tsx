@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { IconHome, IconLibrary, IconSearch, IconSettings } from "@/components/ui/icons";
+import { useUi } from "@/store/ui";
 
 const items = [
   { href: "/", label: "Home", icon: IconHome },
@@ -20,9 +21,13 @@ const items = [
 export default function MobileNav() {
   const pathname = usePathname();
   const searchActive = pathname.startsWith("/search") || pathname.startsWith("/genre");
+  const sheetOpen = useUi((s) => s.sheet !== null);
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),8px)] lg:hidden">
+    <nav className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),8px)] transition-opacity duration-200 lg:hidden",
+        sheetOpen ? "invisible opacity-0" : "opacity-100",
+      )}>
       <div className="pointer-events-auto mx-auto flex max-w-lg items-center gap-2">
         <div className="glass-strong pill-nav flex h-[58px] flex-1 items-center px-1.5">
           {items.map(({ href, label, icon: Icon }) => {

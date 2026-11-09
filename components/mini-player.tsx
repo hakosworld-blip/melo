@@ -17,10 +17,11 @@ export default function MiniPlayer() {
   const next = usePlayer((s) => s.next);
   const openNowPlaying = useUi((s) => s.openNowPlaying);
   const openSheet = useUi((s) => s.openSheet);
+  const sheetOpen = useUi((s) => s.sheet !== null);
   const progress = useProgress();
   const artworkUrl = useTrackArtwork(track);
 
-  if (!track) return null;
+  if (!track || sheetOpen) return null;
   const duration = progress.duration || track.duration || 0;
   const pct = duration ? Math.min(100, (progress.position / duration) * 100) : 0;
 
