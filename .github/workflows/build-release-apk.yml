@@ -1,7 +1,7 @@
 name: Build · Test · Release APK
 
 # Manual trigger: Actions tab -> "Build · Test · Release APK" -> Run workflow.
-# You choose the release tag, version number, and pre-release flag each run.
+# You choose the release tag, version number and whether it is a pre-release.
 
 on:
   workflow_dispatch:
@@ -19,6 +19,11 @@ on:
         required: true
         default: "1"
         type: string
+      prerelease:
+        description: "Mark this GitHub Release as a pre-release. No Play Store runs from this workflow."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write   # needed to create GitHub Releases
