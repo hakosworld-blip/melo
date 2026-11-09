@@ -81,6 +81,17 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Version identity lives in app.json so the release workflow can stamp a tag
+// into the APK; the hardcoded values are only a fallback if that file is gone.
+def appVersionName = "1.0.0"
+def appVersionCode = 1
+def appJsonFile = file("../app.json")
+if (appJsonFile.exists()) {
+    def appJson = new groovy.json.JsonSlurper().parseText(appJsonFile.text)
+    appVersionName = appJson.expo?.version ?: appVersionName
+    appVersionCode = (appJson.expo?.android?.versionCode ?: appVersionCode) as Integer
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -92,8 +103,8 @@ android {
         applicationId 'com.hakosworld.melo'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appVersionCode
+        versionName appVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -106,13 +117,30 @@ android {
         }
         release {
             def keystorePropertiesFile = rootProject.file("key.properties")
+            def requireReleaseSigning = (findProperty("meloRequireReleaseSigning") ?: "false").toBoolean()
             if (keystorePropertiesFile.exists()) {
                 def keystoreProperties = new Properties()
-                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-                storeFile file(keystoreProperties["storeFile"])
+                keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+                def configuredStore = keystoreProperties["storeFile"]
+                // Relative paths are read from android/app by Gradle, but people
+                // (and CI) also write "app/melo-release.jks" from the android root.
+                def store = [file(configuredStore), rootProject.file(configuredStore)].find { it.exists() }
+                if (store == null) {
+                    throw new GradleException(
+                        "Release keystore not found. key.properties says storeFile=${configuredStore}; " +
+                        "looked in ${projectDir} and ${rootProject.projectDir}."
+                    )
+                }
+                println "melo: signing release with ${store}"
+                storeFile store
                 storePassword keystoreProperties["storePassword"]
                 keyAlias keystoreProperties["keyAlias"]
                 keyPassword keystoreProperties["keyPassword"]
+            } else if (requireReleaseSigning) {
+                throw new GradleException(
+                    "This release build requires android/key.properties (storeFile, storePassword, " +
+                    "keyAlias, keyPassword). Refusing to fall back to the debug keystore."
+                )
             }
         }
     }

@@ -89,32 +89,87 @@ jobs:
           VERSION_CODE: ${{ inputs.build_number }}
 
       - name: Decode release keystore from secrets
-        # Requires repo secret KEYSTORE_BASE64 (base64 of your .jks file).
+        # Requires repo secret KEYSTORE_BASE64: `base64 -w 0 melo-release.jks`
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/melo-release.jks
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 is not set on this repository. Run: base64 -w 0 melo-release.jks"
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/melo-release.jks
           ls -lh android/app/melo-release.jks
+          keytool -list -keystore android/app/melo-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null
+          echo "keystore opens and alias \"$KEY_ALIAS\" exists"
 
       - name: Write android/key.properties from secrets
         # Requires secrets: KEYSTORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          cat > android/key.properties <<EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=app/melo-release.jks
-          EOF
-          echo "key.properties written (storeFile=app/melo-release.jks, keyAlias=${{ secrets.KEY_ALIAS }})"
+          for value in KEYSTORE_PASSWORD KEY_PASSWORD KEY_ALIAS; do
+            if [ -z "${!value}" ]; then echo "::error::secret $value is not set"; exit 1; fi
+          done
+          {
+            echo 'storeFile=melo-release.jks'
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+          echo "key.properties written for alias $KEY_ALIAS"
 
       - name: Build signed release APK (Gradle)
+        # -PmeloRequireReleaseSigning makes Gradle fail instead of quietly
+        # signing the release with the public debug key.
         run: |
           cd android
-          ./gradlew app:assembleRelease --stacktrace
+          ./gradlew app:assembleRelease -PmeloRequireReleaseSigning=true --stacktrace
+
+      - name: Verify signature and version of the built APK
+        env:
+          VERSION_NAME: ${{ inputs.version }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::APK was not produced"; exit 1; }
+
+          APKSIGNER=$(ls -1 "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          test -n "$APKSIGNER" || { echo "::error::apksigner not found in the Android SDK"; exit 1; }
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/apk-certs.txt
+          if grep -qi 'CN=Android Debug' /tmp/apk-certs.txt; then
+            echo "::error::APK is signed with the debug key, not your release keystore"
+            exit 1
+          fi
+
+          RELEASE_SHA=$(keytool -list -v -keystore android/app/melo-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" \
+            | grep -m1 'SHA256:' | sed 's/.*SHA256: //; s/ //g')
+          if ! grep -qi "$RELEASE_SHA" /tmp/apk-certs.txt; then
+            echo "::error::APK certificate does not match the release keystore"
+            exit 1
+          fi
+          echo "APK is signed by the release keystore ($RELEASE_SHA)"
+
+          AAPT2=$(ls -1 "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          if [ -n "$AAPT2" ]; then
+            BADGING=$("$AAPT2" dump badging "$APK")
+            echo "$BADGING" | head -1
+            echo "$BADGING" | grep -q "versionName='"$VERSION_NAME"'" \
+              || { echo "::error::APK versionName does not match $VERSION_NAME"; exit 1; }
+          fi
+
+          cp "$APK" "melo-${{ inputs.tag }}.apk"
+          ls -lh "melo-${{ inputs.tag }}.apk"
 
       - name: Upload APK as build artifact
         uses: actions/upload-artifact@v4
         with:
           name: melo-${{ inputs.tag }}
-          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          path: mobile/melo-${{ inputs.tag }}.apk
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -124,5 +179,5 @@ jobs:
           name: melo ${{ inputs.tag }}
           prerelease: ${{ inputs.prerelease }}
           generate_release_notes: true
-          files: mobile/android/app/build/outputs/apk/release/app-release.apk
+          files: mobile/melo-${{ inputs.tag }}.apk
           fail_on_unmatched_files: true

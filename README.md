@@ -48,7 +48,7 @@ npm run prebuild   # regenerate android/ after app.json changes
 npm run android:release
 ```
 
-GitHub Actions workflow (`.github/workflows/build-release-apk.yml`) typechecks the mobile app, builds the signed release APK with Gradle, and publishes it as a GitHub Release with a configurable tag, version, and pre-release flag.
+GitHub Actions workflow (`.github/workflows/build-release-apk.yml`) typechecks the mobile app, builds the signed release APK with Gradle, and publishes it as a GitHub Release with a configurable tag, version, and pre-release flag. The version you enter is stamped into `mobile/app.json` and read by Gradle, so the APK reports it in Android's app info; before uploading, the workflow verifies with `apksigner` that the APK carries the release keystore's certificate (and fails if it is debug-signed or the certificate differs), then publishes it as `melo-<tag>.apk`.
 
 ### Desktop app (Linux + Windows 10/11)
 

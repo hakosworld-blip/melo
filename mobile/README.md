@@ -51,4 +51,8 @@ Add these repository secrets:
 - `KEY_PASSWORD` — key password
 - `KEY_ALIAS` — `melo`
 
-The Gradle `release` signing config reads `mobile/android/key.properties`. Local development falls back to the debug keystore when that file is absent. Never commit the keystore or `key.properties`.
+The Gradle `release` signing config reads `mobile/android/key.properties`. Local development falls back to the debug keystore when that file is absent; the release workflow passes `-PmeloRequireReleaseSigning=true`, so CI aborts with a clear message instead of quietly shipping a debug-signed release. `storeFile` is resolved against both `android/app` and `android/`, so `melo-release.jks` and `app/melo-release.jks` both work.
+
+Version identity lives in `app.json` (`expo.version`, `expo.android.versionCode`); the workflow stamps it from its inputs and Gradle reads it, so the APK reports the version you typed rather than a hardcoded 1.0.0. Before uploading, the workflow runs `apksigner verify --print-certs` and fails if the certificate isn't the keystore's (including the debug key), and it checks the APK's `versionName` matches the input. The asset is published as `melo-<tag>.apk`.
+
+Never commit the keystore or `key.properties`; both are ignored by git. If you rerun `expo prebuild`, reapply the `app.json` version read, the keystore path resolution in `android/app/build.gradle`, and `android:usesCleartextTraffic="true"` in the manifest.
