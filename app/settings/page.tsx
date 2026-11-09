@@ -107,13 +107,13 @@ export default function SettingsPage() {
                         ? "border-ink scale-110"
                         : "border-transparent",
                     )}
-                    style={{ background: accent.value }}
+                    style={{ background: accent.value === "ink" ? "var(--ink)" : accent.value }}
                   />
                 ))}
                 <label className="ml-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed border-line text-[11px] text-muted">
                   <input
                     type="color"
-                    value={settings.accent}
+                    value={settings.accent === "ink" ? "#141312" : settings.accent}
                     onChange={(event) => settings.update({ accent: event.target.value })}
                     className="h-0 w-0 opacity-0"
                     aria-label="Custom accent colour"

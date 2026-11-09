@@ -51,6 +51,7 @@ export interface Settings {
 }
 
 export const ACCENTS = [
+  { name: "Ink", value: "ink" },
   { name: "Sand", value: "#E6BE86" },
   { name: "Coral", value: "#F08C7E" },
   { name: "Mint", value: "#7FDCC0" },
@@ -74,10 +75,10 @@ const plainBackground = (color: string): BackgroundConfig => ({
 });
 
 const defaultSettings: Settings = {
-  theme: "dark",
-  accent: ACCENTS[0].value,
+  theme: "light",
+  accent: "ink",
   density: "comfortable",
-  radius: 18,
+  radius: 12,
   font: "sans",
   animations: "full",
   motion: "slide",
@@ -136,7 +137,18 @@ export const useSettings = create<SettingsState>()(
       lyricsChange: (patch) => set((state) => ({ lyrics: { ...state.lyrics, ...patch } })),
       reset: () => set({ ...defaultSettings }),
     }),
-    { name: "melo-settings", version: 1 },
+    {
+      name: "melo-settings",
+      version: 2,
+      /** v2 is the editorial redesign: bone paper, ink accent, crisp corners. */
+      migrate: (persisted, version) => {
+        const state = persisted as SettingsState;
+        if (version < 2) {
+          return { ...state, theme: "light", accent: "ink", radius: 12 };
+        }
+        return state;
+      },
+    },
   ),
 );
 

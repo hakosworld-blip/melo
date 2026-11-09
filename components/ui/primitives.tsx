@@ -9,7 +9,7 @@ type ButtonVariant = "primary" | "surface" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "press focus-ring inline-flex items-center justify-center gap-2 rounded-full font-medium disabled:opacity-45 disabled:pointer-events-none";
+  "press focus-ring inline-flex items-center justify-center gap-2 rounded-[6px] font-medium disabled:opacity-45 disabled:pointer-events-none";
 
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-accent text-accentink hover:brightness-[1.06]",
@@ -140,8 +140,8 @@ export function Sheet({
           "mx-0 sm:mx-6",
           wide ? "sm:max-w-2xl" : "sm:max-w-md",
           "max-h-[88vh] sm:max-h-[82vh] flex flex-col",
-          "rounded-t-[26px] sm:rounded-[26px] border border-line",
-          "bg-[color-mix(in_srgb,var(--surface)_96%,transparent)] backdrop-blur-2xl shadow-[var(--shadow-soft)]",
+          "rounded-t-[14px] sm:rounded-[12px] border border-line",
+          "bg-[color-mix(in_srgb,var(--surface)_97%,transparent)] backdrop-blur-xl shadow-[var(--shadow-soft)]",
           "pb-[max(env(safe-area-inset-bottom),14px)] sm:pb-0",
         )}
       >
@@ -182,7 +182,7 @@ export function Segmented<T extends string>({
   return (
     <div
       className={cn(
-        "inline-flex w-full items-center gap-1 overflow-x-auto rounded-full border border-line bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-1 no-scrollbar",
+        "inline-flex w-full items-center gap-1 overflow-x-auto rounded-[7px] border border-line bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-1 no-scrollbar",
         className,
       )}
       role="tablist"
@@ -196,9 +196,9 @@ export function Segmented<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "press flex shrink-0 grow items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors",
+              "press flex shrink-0 grow items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] font-medium transition-colors",
               size === "sm" ? "h-7 px-2.5 text-[12px]" : "h-9 px-2.5 text-[13px]",
-              selected ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink",
+              selected ? "bg-surface text-ink" : "text-muted hover:text-ink",
             )}
           >
             {option.icon && <span className="hidden shrink-0 items-center sm:flex">{option.icon}</span>}
@@ -262,7 +262,7 @@ export function EmptyState({
   return (
     <div className={cn("flex flex-col items-center justify-center text-center", compact ? "py-10" : "py-16", className)}>
       {icon && (
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-surface text-muted">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[10px] border border-line bg-surface text-muted">
           {icon}
         </div>
       )}
@@ -287,10 +287,10 @@ export function SectionTitle({
   return (
     <div className={cn("mb-4 flex items-end justify-between gap-4", className)}>
       <div className="min-w-0">
-        <h2 className="truncate text-[16.5px] font-semibold leading-tight tracking-[-0.01em] sm:text-[17.5px]">
-          {title}
-        </h2>
-        {subtitle && <p className="mt-1 truncate text-[12px] text-muted">{subtitle}</p>}
+        <h2 className="font-display truncate text-[22px] leading-[1.1] sm:text-[24px]">{title}</h2>
+        {subtitle && (
+          <p className="meta-label mt-1.5 truncate text-[10.5px] tracking-[0.1em] text-muted">{subtitle}</p>
+        )}
       </div>
       {action}
     </div>

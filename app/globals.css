@@ -12,37 +12,49 @@
   --radius-card: var(--radius);
   --radius-xl2: calc(var(--radius) + 8px);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Fraunces Variable", ui-serif, "Iowan Old Style", Georgia, serif;
+  --font-display: "Newsreader Variable", ui-serif, "Iowan Old Style", Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
+/* Warm monochrome, dark stage: charcoal canvas, bone ink, one pastel at a time. */
 :root {
-  --bg: #0a0a0b;
-  --surface: #131316;
-  --surface-2: #1b1b20;
-  --line: rgba(255, 255, 255, 0.085);
-  --ink: #f3f1ec;
-  --muted: #9b9ba4;
-  --accent: #e6be86;
-  --accent-ink: #17130a;
-  --radius: 18px;
+  --bg: #141312;
+  --surface: #1b1a18;
+  --surface-2: #232120;
+  --line: #322f2b;
+  --ink: #f4f1ec;
+  --muted: #9c968c;
+  --accent: var(--ink);
+  --accent-ink: var(--bg);
+  --radius: 12px;
   --density: 1;
-  --chrome: rgba(10, 10, 12, 0.9);
-  --shadow-soft: 0 28px 70px -30px rgba(0, 0, 0, 0.75);
-  --shadow-art: 0 34px 80px -28px rgba(0, 0, 0, 0.8);
+  --chrome: rgba(20, 19, 18, 0.86);
+  --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.28);
+  --shadow-art: 0 12px 30px -20px rgba(0, 0, 0, 0.55);
+  --pale-red: #3a2321;
+  --pale-blue: #1f2c36;
+  --pale-green: #232d23;
+  --pale-yellow: #332b1c;
   color-scheme: dark;
 }
 
+/* The editorial default: warm bone paper, pure white surfaces, hairline rules. */
 [data-theme="light"] {
-  --bg: #f7f5f0;
+  --bg: #f7f6f3;
   --surface: #ffffff;
-  --surface-2: #efece5;
-  --line: rgba(24, 20, 12, 0.1);
-  --ink: #16140f;
-  --muted: #6d6a63;
-  --chrome: rgba(247, 245, 240, 0.92);
-  --shadow-soft: 0 24px 60px -30px rgba(31, 26, 16, 0.28);
-  --shadow-art: 0 30px 70px -30px rgba(31, 26, 16, 0.35);
+  --surface-2: #f1efe9;
+  --line: #e5e2db;
+  --ink: #141312;
+  --muted: #78746c;
+  --accent: var(--ink);
+  --accent-ink: var(--bg);
+  --chrome: rgba(247, 246, 243, 0.88);
+  --shadow-soft: 0 1px 2px rgba(20, 19, 18, 0.04);
+  --shadow-art: 0 12px 26px -22px rgba(20, 19, 18, 0.4);
+  --pale-red: #fdebec;
+  --pale-blue: #e1f3fe;
+  --pale-green: #edf3ec;
+  --pale-yellow: #fbf3db;
   color-scheme: light;
 }
 
@@ -135,12 +147,23 @@ input[type="range"]::-moz-range-track {
 .font-display {
   font-family: var(--font-display);
   font-optical-sizing: auto;
-  letter-spacing: -0.015em;
+  font-weight: 450;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
 }
 
 .data-font-serif .font-display,
 [data-font="serif"] .font-display {
-  font-family: "Fraunces Variable", ui-serif, Georgia, serif;
+  font-family: "Newsreader Variable", ui-serif, Georgia, serif;
+}
+
+/* Tags, counts and metadata: small, wide-tracked, mono. */
+.meta-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 [data-font="mono"] {
@@ -152,7 +175,7 @@ input[type="range"]::-moz-range-track {
 }
 
 .surface {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
@@ -177,8 +200,8 @@ input[type="range"]::-moz-range-track {
 
 .chrome {
   background: var(--chrome);
-  backdrop-filter: saturate(160%) blur(22px);
-  -webkit-backdrop-filter: saturate(160%) blur(22px);
+  backdrop-filter: saturate(120%) blur(18px);
+  -webkit-backdrop-filter: saturate(120%) blur(18px);
 }
 
 .hairline {
@@ -390,6 +413,21 @@ nav {
   text-decoration-thickness: 2px;
   text-underline-offset: 8px;
   text-decoration-color: color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+/* ---------- tags ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--pale-yellow);
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
 }
 
 /* ---------- backgrounds ---------- */

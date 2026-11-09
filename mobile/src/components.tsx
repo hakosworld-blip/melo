@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ListPlus, Music2, Pause, Play, Plus, SkipForward, X } from 'lucide-react-native';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import { useNavigation } from '@react-navigation/native';
@@ -8,15 +8,35 @@ import { useLibrary } from './library';
 import { useUi } from './ui';
 import type { Track } from './types';
 
+/**
+ * Warm monochrome, editorial: bone paper, white surfaces, hairline rules,
+ * a serif for headings and one charcoal fill for actions. Colour only shows up
+ * as a muted pastel on status chips.
+ */
+
 export const colors = {
-  bg: '#11100F',
-  surface: '#1B1A18',
-  surfaceRaised: '#25231F',
-  line: '#2B2925',
-  text: '#F4F1EC',
-  muted: '#A8A29A',
-  accent: '#F5C46B',
-  danger: '#FF8A7A',
+  bg: '#F7F6F3',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F1EFE9',
+  line: '#E5E2DB',
+  text: '#141312',
+  muted: '#78746C',
+  accent: '#141312',
+  accentInk: '#FBFAF7',
+  danger: '#9F2F2D',
+  paleRed: '#FDEBEC',
+  paleBlue: '#E1F3FE',
+  paleGreen: '#EDF3EC',
+  paleYellow: '#FBF3DB',
+};
+
+export const fonts = {
+  serif: 'Newsreader_500Medium',
+  serifSemi: 'Newsreader_600SemiBold',
+  sans: 'Manrope_400Regular',
+  sansMedium: 'Manrope_500Medium',
+  sansBold: 'Manrope_700Bold',
+  mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string,
 };
 
 export function formatTime(seconds: number) {
@@ -26,22 +46,42 @@ export function formatTime(seconds: number) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function Artwork({ source, size = 56, rounded = 12 }: { source?: string; size?: number; rounded?: number }) {
+export function Artwork({
+  source,
+  size = 56,
+  rounded = 8,
+  blurred = false,
+}: {
+  source?: string;
+  size?: number;
+  rounded?: number;
+  blurred?: boolean;
+}) {
   if (source) {
-    return <Image source={{ uri: source }} style={[styles.artwork, { width: size, height: size, borderRadius: rounded }]} resizeMode="cover" />;
+    return (
+      <Image
+        source={{ uri: source }}
+        style={[styles.artwork, { width: size, height: size, borderRadius: rounded }]}
+        resizeMode="cover"
+        blurRadius={blurred ? 40 : 0}
+      />
+    );
   }
   return (
     <View style={[styles.artworkFallback, { width: size, height: size, borderRadius: rounded }]}>
-      <Music2 size={Math.round(size * 0.34)} color={colors.muted} />
+      <Music2 size={Math.round(size * 0.3)} color={colors.muted} />
     </View>
   );
 }
 
-export function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+export function SectionTitle({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {action}
     </View>
   );
 }
@@ -54,11 +94,39 @@ export function ErrorBanner({ message }: { message: string }) {
   );
 }
 
-export function EmptyState({ children }: { children: ReactNode }) {
+export function EmptyState({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <View style={styles.emptyState}>
       <Text style={styles.emptyText}>{children}</Text>
+      {action ? <View style={styles.emptyAction}>{action}</View> : null}
     </View>
+  );
+}
+
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  icon,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  variant?: 'primary' | 'ghost';
+  icon?: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      style={[styles.button, variant === 'primary' ? styles.buttonPrimary : styles.buttonGhost, disabled && styles.disabled]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {icon}
+      <Text style={variant === 'primary' ? styles.buttonPrimaryText : styles.buttonGhostText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -78,8 +146,15 @@ export function TrackRow({
   const isCurrent = queue[status.currentIndex]?.id === track.id;
   return (
     <View style={styles.trackRow}>
-      <Pressable style={styles.trackMain} onPress={() => playTrack(track, context)} accessibilityRole="button" accessibilityLabel={`Play ${track.title}`}>
-        <Artwork source={track.artworkSmall || track.artwork} size={52} />
+      <Pressable
+        style={styles.trackMain}
+        onPress={() => playTrack(track, context)}
+        onLongPress={() => useUi.getState().openLyrics(track)}
+        delayLongPress={320}
+        accessibilityRole="button"
+        accessibilityLabel={`Play ${track.title}. Long press for lyrics`}
+      >
+        <Artwork source={track.artworkSmall || track.artwork} size={48} />
         <View style={styles.trackText}>
           <Text style={[styles.trackTitle, isCurrent && styles.currentTrack]} numberOfLines={1}>
             {track.title}
@@ -91,8 +166,13 @@ export function TrackRow({
         </View>
       </Pressable>
       <Text style={styles.duration}>{formatTime(track.duration)}</Text>
-      <Pressable style={styles.iconButton} onPress={() => addToQueue(track)} accessibilityRole="button" accessibilityLabel={`Add ${track.title} to queue`}>
-        <Plus size={18} color={colors.muted} />
+      <Pressable
+        style={styles.iconButton}
+        onPress={() => addToQueue(track)}
+        accessibilityRole="button"
+        accessibilityLabel={`Add ${track.title} to queue`}
+      >
+        <Plus size={17} color={colors.muted} />
       </Pressable>
       <Pressable
         style={styles.iconButton}
@@ -100,11 +180,16 @@ export function TrackRow({
         accessibilityRole="button"
         accessibilityLabel={`Add ${track.title} to a playlist`}
       >
-        <ListPlus size={18} color={colors.muted} />
+        <ListPlus size={17} color={colors.muted} />
       </Pressable>
       {onRemove ? (
-        <Pressable style={styles.iconButton} onPress={onRemove} accessibilityRole="button" accessibilityLabel={`Remove ${track.title} from this playlist`}>
-          <X size={18} color={colors.muted} />
+        <Pressable
+          style={styles.iconButton}
+          onPress={onRemove}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${track.title} from this playlist`}
+        >
+          <X size={17} color={colors.muted} />
         </Pressable>
       ) : null}
       {index !== undefined ? <Text style={styles.index}>{index + 1}</Text> : null}
@@ -146,6 +231,7 @@ export function PromptModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
+          <Text style={styles.label}>Playlist</Text>
           <Text style={styles.dialogTitle}>{title}</Text>
           <TextInput
             value={value}
@@ -159,16 +245,16 @@ export function PromptModal({
             onSubmitEditing={submit}
           />
           <View style={styles.dialogActions}>
-            <Pressable style={styles.secondaryButton} onPress={onClose} accessibilityRole="button">
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            <Pressable style={styles.buttonGhost} onPress={onClose} accessibilityRole="button">
+              <Text style={styles.buttonGhostText}>Cancel</Text>
             </Pressable>
             <Pressable
-              style={[styles.primaryButton, !value.trim() && styles.buttonDisabled]}
+              style={[styles.buttonPrimary, !value.trim() && styles.disabled]}
               onPress={submit}
               disabled={!value.trim()}
               accessibilityRole="button"
             >
-              <Text style={styles.primaryButtonText}>{submitLabel}</Text>
+              <Text style={styles.buttonPrimaryText}>{submitLabel}</Text>
             </Pressable>
           </View>
         </View>
@@ -209,7 +295,7 @@ export function AddToPlaylistSheet() {
   const createAndFile = () => {
     const trimmed = name.trim();
     if (!trimmed || !pendingTrack) return;
-    const id = useLibrary.getState().createPlaylist(trimmed, [pendingTrack]);
+    useLibrary.getState().createPlaylist(trimmed, [pendingTrack]);
     setAdded(trimmed);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => close(), 900);
@@ -219,8 +305,7 @@ export function AddToPlaylistSheet() {
     <Modal visible={Boolean(pendingTrack)} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.sheetBackdrop} onPress={close} accessibilityRole="button" accessibilityLabel="Close">
         <Pressable style={styles.sheet} onPress={() => {}}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.dialogTitle}>Add to playlist</Text>
+          <Text style={styles.label}>Add to playlist</Text>
           {pendingTrack ? (
             <Text style={styles.sheetSubtitle} numberOfLines={1}>
               {pendingTrack.title} · {pendingTrack.artist}
@@ -243,7 +328,7 @@ export function AddToPlaylistSheet() {
                   accessibilityRole="button"
                   accessibilityLabel={`Add to ${item.name}`}
                 >
-                  <Artwork source={item.tracks[0]?.artworkSmall || item.tracks[0]?.artwork} size={40} rounded={10} />
+                  <Artwork source={item.tracks[0]?.artworkSmall || item.tracks[0]?.artwork} size={38} />
                   <View style={styles.sheetRowText}>
                     <Text style={styles.trackTitle} numberOfLines={1}>
                       {item.name}
@@ -271,18 +356,18 @@ export function AddToPlaylistSheet() {
                 onSubmitEditing={createAndFile}
               />
               <Pressable
-                style={[styles.primaryButton, !name.trim() && styles.buttonDisabled]}
+                style={[styles.buttonPrimary, !name.trim() && styles.disabled]}
                 onPress={createAndFile}
                 disabled={!name.trim()}
                 accessibilityRole="button"
               >
-                <Text style={styles.primaryButtonText}>Create</Text>
+                <Text style={styles.buttonPrimaryText}>Create</Text>
               </Pressable>
             </View>
           ) : (
-            <Pressable style={styles.secondaryButton} onPress={() => setCreating(true)} accessibilityRole="button">
-              <ListPlus size={16} color={colors.text} />
-              <Text style={styles.secondaryButtonText}>New playlist</Text>
+            <Pressable style={styles.buttonGhost} onPress={() => setCreating(true)} accessibilityRole="button">
+              <ListPlus size={15} color={colors.text} />
+              <Text style={styles.buttonGhostText}>New playlist</Text>
             </Pressable>
           )}
         </Pressable>
@@ -299,8 +384,13 @@ export function MiniPlayer() {
   if (!track) return null;
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
   return (
-    <Pressable style={styles.miniPlayer} onPress={() => navigation.navigate('NowPlaying')} accessibilityRole="button" accessibilityLabel={`Open ${track.title}`}>
-      <Artwork source={track.artworkSmall || track.artwork} size={44} rounded={10} />
+    <Pressable
+      style={styles.miniPlayer}
+      onPress={() => navigation.navigate('NowPlaying')}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${track.title}`}
+    >
+      <Artwork source={track.artworkSmall || track.artwork} size={42} />
       <View style={styles.miniText}>
         <Text style={styles.miniTitle} numberOfLines={1}>
           {track.title}
@@ -312,79 +402,175 @@ export function MiniPlayer() {
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
       </View>
-      <Pressable style={styles.miniPlay} onPress={togglePlayback} accessibilityRole="button" accessibilityLabel={status.playing ? 'Pause' : 'Play'}>
-        {status.playing ? <Pause size={20} color={colors.bg} fill={colors.bg} /> : <Play size={20} color={colors.bg} fill={colors.bg} />}
+      <Pressable
+        style={styles.miniPlay}
+        onPress={togglePlayback}
+        accessibilityRole="button"
+        accessibilityLabel={status.playing ? 'Pause' : 'Play'}
+      >
+        {status.playing ? (
+          <Pause size={16} color={colors.accentInk} fill={colors.accentInk} />
+        ) : (
+          <Play size={16} color={colors.accentInk} fill={colors.accentInk} />
+        )}
       </Pressable>
       <Pressable style={styles.iconButton} onPress={skipNext} accessibilityRole="button" accessibilityLabel="Next track">
-        <SkipForward size={20} color={colors.text} />
+        <SkipForward size={18} color={colors.text} />
       </Pressable>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   artwork: { backgroundColor: colors.surfaceRaised },
   artworkFallback: { backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
-  sectionHeader: { marginTop: 24, marginBottom: 10 },
-  sectionTitle: { color: colors.text, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
-  sectionSubtitle: { color: colors.muted, fontSize: 13, marginTop: 3 },
-  errorBanner: { backgroundColor: '#3A211D', borderColor: '#5A332E', borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 14 },
-  errorText: { color: colors.danger, fontSize: 13 },
-  emptyState: { padding: 28, alignItems: 'center' },
-  emptyText: { color: colors.muted, fontSize: 14, textAlign: 'center' },
-  trackRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  label: {
+    color: colors.muted,
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  sectionHeader: { marginTop: 30, marginBottom: 10, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 },
+  sectionHeading: { flex: 1, minWidth: 0 },
+  sectionTitle: { color: colors.text, fontFamily: fonts.serif, fontSize: 23, letterSpacing: -0.4 },
+  sectionSubtitle: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 },
+  errorBanner: { backgroundColor: colors.paleRed, borderColor: '#F2D6D7', borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 14 },
+  errorText: { color: colors.danger, fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 18 },
+  emptyState: { paddingVertical: 26, paddingHorizontal: 6 },
+  emptyText: { color: colors.muted, fontFamily: fonts.sans, fontSize: 13.5, lineHeight: 21 },
+  emptyAction: { marginTop: 14, flexDirection: 'row' },
+  trackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 11 },
   trackText: { flex: 1, minWidth: 0 },
-  trackTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  currentTrack: { color: colors.accent },
-  trackSubtitle: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  duration: { color: colors.muted, fontSize: 12, fontVariant: ['tabular-nums'] },
-  iconButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  index: { color: colors.muted, fontSize: 12, width: 18, textAlign: 'right' },
+  trackTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 14.5 },
+  currentTrack: { color: colors.text },
+  trackSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5, marginTop: 2 },
+  duration: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10.5 },
+  iconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  index: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10.5, width: 16, textAlign: 'right' },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  buttonPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  buttonPrimaryText: { color: colors.accentInk, fontFamily: fonts.sansBold, fontSize: 13.5 },
+  buttonGhost: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  buttonGhostText: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13.5 },
+  disabled: { opacity: 0.4 },
   miniPlayer: {
     position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 92,
+    left: 10,
+    right: 10,
+    bottom: 88,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#242220F2',
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
   },
   miniText: { flex: 1, minWidth: 0 },
-  miniTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  miniSubtitle: { color: colors.muted, fontSize: 12, marginTop: 1 },
-  progressTrack: { height: 2, backgroundColor: colors.line, borderRadius: 1, marginTop: 8, overflow: 'hidden' },
-  progressFill: { height: 2, backgroundColor: colors.accent },
-  miniPlay: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
-  input: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 14, paddingVertical: 12 },
-  secondaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.surfaceRaised, borderColor: colors.line, borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 11 },
-  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  primaryButton: { backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center' },
-  primaryButtonText: { color: colors.bg, fontWeight: '800' },
-  backdrop: { flex: 1, backgroundColor: '#000000AA', alignItems: 'center', justifyContent: 'center', padding: 22 },
-  dialog: { width: '100%', maxWidth: 420, backgroundColor: colors.surfaceRaised, borderRadius: 20, borderColor: colors.line, borderWidth: 1, padding: 18, gap: 12 },
-  dialogTitle: { color: colors.text, fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
-  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 2 },
-  buttonDisabled: { opacity: 0.45 },
-  sheetBackdrop: { flex: 1, backgroundColor: '#000000AA', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderColor: colors.line, borderWidth: 1, padding: 18, paddingBottom: 26, gap: 8, maxHeight: '76%' },
-  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line, marginBottom: 8 },
-  sheetSubtitle: { color: colors.muted, fontSize: 13, marginBottom: 4 },
+  miniTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13 },
+  miniSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11, marginTop: 1 },
+  miniPlay: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressTrack: { height: 2, backgroundColor: colors.line, marginTop: 7, overflow: 'hidden' },
+  progressFill: { height: 2, backgroundColor: colors.text },
+  input: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    color: colors.text,
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  backdrop: { flex: 1, backgroundColor: '#141312AA', alignItems: 'center', justifyContent: 'center', padding: 22 },
+  dialog: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderColor: colors.line,
+    borderWidth: 1,
+    padding: 18,
+    gap: 12,
+  },
+  dialogTitle: { color: colors.text, fontFamily: fonts.serif, fontSize: 21, letterSpacing: -0.3 },
+  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 2 },
+  sheetBackdrop: { flex: 1, backgroundColor: '#14131299', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderColor: colors.line,
+    borderWidth: 1,
+    padding: 18,
+    paddingBottom: 26,
+    gap: 8,
+    maxHeight: '76%',
+  },
+  sheetSubtitle: { color: colors.text, fontFamily: fonts.serif, fontSize: 19, marginBottom: 4 },
   sheetList: { marginTop: 4 },
-  sheetEmpty: { color: colors.muted, fontSize: 13, paddingVertical: 10 },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  sheetEmpty: { color: colors.muted, fontFamily: fonts.sans, fontSize: 12.5, paddingVertical: 10 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 8 },
   sheetRowText: { flex: 1, minWidth: 0 },
-  added: { color: colors.accent, fontSize: 13, fontWeight: '600' },
-  createRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
-  createInput: { flex: 1, backgroundColor: colors.surfaceRaised, borderColor: colors.line, borderWidth: 1, borderRadius: 12, color: colors.text, fontSize: 15, paddingHorizontal: 12, paddingVertical: 10 },
+  added: { color: colors.text, fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.8, textTransform: 'uppercase' },
+  createRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  createInput: {
+    flex: 1,
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    color: colors.text,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
 });

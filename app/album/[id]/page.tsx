@@ -62,7 +62,7 @@ export default function AlbumPage() {
             eager
           />
           <div className="min-w-0">
-            <h1 className="text-[clamp(22px,4.4vw,30px)] font-semibold leading-[1.1] tracking-[-0.02em]">{album.name}</h1>
+            <h1 className="font-display text-[clamp(26px,5vw,38px)] leading-[1.05]">{album.name}</h1>
             <p className="mt-2 text-[13px]">
               {album.artistId ? (
                 <Link href={`/artist/${encodeURIComponent(album.artistId)}`} className="hover:underline">

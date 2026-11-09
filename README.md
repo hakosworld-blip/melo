@@ -38,6 +38,8 @@ The native Android app lives in [`mobile/`](mobile) as a React Native + Expo app
 
 It also has local playlists (`Library`) with create, rename, delete, add-from-any-song and play-all, plus the same playlist import: Spotify is read and matched on the phone, while YouTube playlists go through an optional melo server on the same network, since reading YouTube needs `yt-dlp` (that server also serves the audio for YouTube-imported songs). Details in [`mobile/README.md`](mobile/README.md).
 
+Now Playing blurs the song's artwork behind the controls and opens **synced lyrics** from LRCLIB — either from the player's Lyrics button or by long-pressing any song row. Synced lines highlight as the song plays and jump the player when tapped; records without timestamps are labelled "Not time-synced".
+
 ```bash
 cd mobile
 npm install
@@ -99,6 +101,18 @@ components/                Now Playing, lyrics, queue, sheets, rows, cards, UI p
 public/sw.js               Offline app shell + artwork cache (audio stays in IndexedDB)
 ```
 
+### Design language
+
+Both apps share one system: warm monochrome, editorial type, flat surfaces.
+
+- Canvas `#F7F6F3` (bone), surfaces pure white, hairline `#E5E2DB` borders, off-black ink `#141312` and muted `#78746C` — no pure black, no gradients, no glass panels.
+- Newsreader (serif) for titles and lyrics, Geist Sans for UI text, Geist Mono for labels, counts and timestamps. Section headings get a small wide-tracked mono subtitle instead of a coloured one.
+- One accent colour: **Ink**, which means buttons are solid charcoal on paper and solid bone on the dark theme. The other accents in Settings still work, and the whole palette switches live with the theme.
+- Corners are crisp (12px cards, 6px buttons), shadows are almost invisible, and tags are the only pill shapes.
+- Now Playing is a deliberate dark stage in both apps: the song's artwork fills the screen, blurred behind a warm-charcoal scrim, with bone text and serif titles.
+
+The Android app uses the same palette and type pairing (Newsreader + Manrope, bundled through `expo-font`), with rows separated by hairlines instead of cards.
+
 ### Provider layer
 
 Every source implements one interface (`lib/types.ts` → `MusicProvider`): `home`, `search`, `track`, `artist`, `album`, `streamUrl`, `availability`. The UI, queue, player, downloads and offline library only see normalised `Track`/`Artist`/`Album` shapes, so a new source is one file plus a registry entry — no UI changes.
@@ -156,7 +170,7 @@ No account, no analytics, no telemetry, no third-party requests from the client 
 
 ## Honest limitations
 
-- **The web build is still an installable PWA; the native Android app is separate.** The repo now includes a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The web build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing, local playlists, playlist import and source checks are implemented; downloaded/offline files, lyrics, artist/album detail pages, and the full settings surface are still to be ported.
+- **The web build is still an installable PWA; the native Android app is separate.** The repo now includes a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The web build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing (with the blurred-artwork stage and synced lyrics), local playlists, playlist import and source checks are implemented; downloaded/offline files, artist/album detail pages, and the full settings surface are still to be ported.
 - **YouTube import on Android needs a melo server.** Reading a YouTube playlist requires yt-dlp, which can't run inside the app, so the YouTube path (and playback of the songs it imports) uses an optional melo server address set in Settings. Spotify import, playlists and search work with no server at all.
 - **YouTube Music cannot stream from this cloud host** because YouTube bot-checks datacenter IPs. The provider is complete; it needs cookies or a residential IP. This is reported in-app rather than silently hidden.
 - **Downloads are source-dependent.** Tracks the source marks as downloadable get a real "Download" (permanent offline copy). Other streamable tracks can be saved as a clearly labelled *private offline copy*; melo never claims the artist authorised a download, and nothing from YouTube is downloaded.

@@ -17,8 +17,11 @@ export default function ThemeApplier() {
       root.dataset.font = settings.font;
       root.dataset.animations = settings.animations;
       root.dataset.motion = settings.motion;
-      root.style.setProperty("--accent", settings.accent);
-      root.style.setProperty("--accent-ink", contrastInk(settings.accent));
+      // "ink" is the monochrome default: the CTA is the text colour, so it
+      // inverts with the theme instead of pinning one brand colour.
+      const monochrome = settings.accent === "ink";
+      root.style.setProperty("--accent", monochrome ? "var(--ink)" : settings.accent);
+      root.style.setProperty("--accent-ink", monochrome ? "var(--bg)" : contrastInk(settings.accent));
       root.style.setProperty("--radius", `${settings.radius}px`);
       root.style.setProperty(
         "--density",

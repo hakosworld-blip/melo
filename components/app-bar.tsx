@@ -61,8 +61,10 @@ export default function AppBar({
         )}
         {title ? (
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[15.5px] font-semibold leading-tight tracking-[-0.01em]">{title}</h1>
-            {subtitle && <p className="mt-0.5 truncate text-[11.5px] text-muted">{subtitle}</p>}
+            <h1 className="font-display truncate text-[19px] leading-tight">{title}</h1>
+            {subtitle && (
+              <p className="meta-label mt-1 truncate text-[9.5px] tracking-[0.12em] text-muted">{subtitle}</p>
+            )}
           </div>
         ) : (
           <div className="min-w-0 flex-1" />

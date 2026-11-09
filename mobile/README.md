@@ -9,6 +9,14 @@ npm run prebuild
 npm run android:release
 ```
 
+## Design and lyrics
+
+The app follows the same system as the web build: bone canvas, white surfaces, hairline rules, Newsreader for headings (bundled via `@expo-google-fonts/newsreader`), Manrope for UI text and the platform mono for labels. There are no card shadows and no pill buttons.
+
+Now Playing is a dark stage: the track's artwork is drawn full-screen with `blurRadius` behind a warm-charcoal scrim, so any artwork stays readable under bone text.
+
+**Lyrics** come from LRCLIB (`src/lyrics.ts`) and are reachable two ways — the Lyrics button on Now Playing, or a long press on any track row. Synced lines follow playback and seek when tapped; unsynced records are labelled, and a failed or empty lookup offers a retry. Nothing is cached offline yet.
+
 ## Playlists and importing
 
 Playlists live on the phone, in a JSON file in the app's private storage: create one in **Library**, add songs from the playlist button on any track row, rename or delete it from the playlist screen. Nothing is uploaded and no account exists.

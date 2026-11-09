@@ -26,7 +26,6 @@ import LyricsView from "@/components/lyrics-view";
 import { IconButton } from "@/components/ui/primitives";
 import { PROVIDER_LABEL } from "@/lib/constants";
 import { cn } from "@/lib/cn";
-import { useArtworkAccent } from "@/lib/palette";
 import { useTrackArtwork } from "@/lib/use-track-artwork";
 import { useProgress } from "@/lib/progress";
 import { useDownloads } from "@/store/downloads";
@@ -51,7 +50,6 @@ export default function NowPlaying() {
   const enqueue = useDownloads((s) => s.enqueue);
   const settings = useSettings();
   const progress = useProgress();
-  const accent = useArtworkAccent(track?.artwork);
   const artworkUrl = useTrackArtwork(track);
   const [lyricsOpen, setLyricsOpen] = useState(false);
   const dragStart = useRef<number | null>(null);
@@ -108,7 +106,8 @@ export default function NowPlaying() {
 
   return (
     <div
-      className="fixed inset-0 z-[70] overflow-hidden bg-bg"
+      /* The player is a dark stage on purpose: blurred artwork behind warm-charcoal, bone text. */
+      className="fixed inset-0 z-[70] overflow-hidden bg-[#141312] text-[#f4f1ec]"
       role="dialog"
       aria-modal="true"
       aria-label="Now playing"
@@ -119,18 +118,11 @@ export default function NowPlaying() {
       }}
     >
       <SectionBackground section="nowPlaying" artworkUrl={track.artwork} />
-      {accent && settings.nowPlaying.glow && (
-        <div
-          className="pointer-events-none absolute inset-0 opacity-70 transition-opacity duration-700"
-          style={{
-            background: `radial-gradient(60% 45% at 50% 26%, rgba(${accent},0.34), transparent 70%)`,
-          }}
-        />
-      )}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.28), rgba(0,0,0,0.5))",
+          background:
+            "linear-gradient(to bottom, rgba(20,19,18,0.58), rgba(20,19,18,0.9) 62%, rgba(20,19,18,0.97))",
         }}
       />
 
@@ -182,8 +174,8 @@ export default function NowPlaying() {
               <div className="relative mx-auto w-[min(70vw,320px,33vh)] shrink-0 lg:w-full lg:max-w-none">
                 {settings.nowPlaying.glow && (
                   <div
-                    className="absolute -inset-6 -z-10 rounded-[40px] opacity-60 blur-3xl transition-opacity duration-700"
-                    style={{ background: accent ? `rgba(${accent},0.55)` : "rgba(255,255,255,0.08)" }}
+                    className="absolute -inset-6 -z-10 rounded-[24px] opacity-70 blur-2xl transition-opacity duration-700"
+                    style={{ background: "rgba(244,241,236,0.08)" }}
                   />
                 )}
                 <div key={track.id} className="anim-scale">
@@ -206,7 +198,7 @@ export default function NowPlaying() {
 
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-col items-center text-center lg:items-start lg:text-left">
-                  <h1 className="font-display line-clamp-2 text-[clamp(21px,5vw,30px)] leading-[1.06] text-white">
+                  <h1 className="font-display line-clamp-2 text-[clamp(24px,5.4vw,36px)] leading-[1.04] text-white">
                     {track.title}
                   </h1>
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[14px] text-white/75 lg:justify-start">

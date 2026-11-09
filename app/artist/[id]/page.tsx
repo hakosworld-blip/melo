@@ -72,7 +72,7 @@ export default function ArtistPage() {
             eager
           />
           <div className="min-w-0">
-            <h1 className="flex flex-wrap items-center gap-2 text-[clamp(24px,4.6vw,34px)] font-semibold leading-[1.08] tracking-[-0.02em]">
+            <h1 className="font-display flex flex-wrap items-center gap-2 text-[clamp(28px,5.2vw,42px)] leading-[1.03]">
               {artist.name}
               {artist.verified && <BadgeCheck size={20} className="text-accent" aria-label="Verified" />}
             </h1>

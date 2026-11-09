@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
@@ -8,9 +8,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import Slider from '@react-native-community/slider';
-import { ArrowLeft, ChevronDown, ChevronRight, Home, Library, Link2, ListMusic, Pause, Pencil, Play, Plus, RefreshCw, Search, Settings, SkipBack, SkipForward, Trash2, X } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import { Newsreader_500Medium, Newsreader_600SemiBold } from '@expo-google-fonts/newsreader';
+import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-google-fonts/manrope';
+import { ArrowLeft, ChevronDown, ChevronRight, Home, Library, Link2, ListMusic, Pause, Pencil, Play, Plus, Quote, RefreshCw, Search, Settings, SkipBack, SkipForward, Trash2, X } from 'lucide-react-native';
 import { fetchHome, searchAudius } from './src/api';
-import { AddToPlaylistSheet, colors, EmptyState, ErrorBanner, formatTime, MiniPlayer, PromptModal, SectionTitle, Artwork, TrackRow } from './src/components';
+import { AddToPlaylistSheet, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PromptModal, SectionTitle, Artwork, TrackRow } from './src/components';
+import { LyricsSheet } from './src/lyrics-view';
+import { useUi } from './src/ui';
 import { initPlayer, playTracks, playlist, seekBy, seekTo, skipNext, skipPrevious, togglePlayback, usePlayer } from './src/player';
 import { findPlaylistByName, hydrateLibrary, useLibrary } from './src/library';
 import { hydrateSettings, useSettings } from './src/settings';
@@ -24,7 +29,7 @@ function Loading() {
   return (
     <View style={styles.center}>
       <ActivityIndicator color={colors.accent} />
-      <Text style={styles.muted}>Loading melo…</Text>
+      <Text style={styles.loadingText}>Loading melo…</Text>
     </View>
   );
 }
@@ -581,38 +586,99 @@ function NowPlayingScreen({ navigation }: any) {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.center}>
           <Text style={styles.muted}>Nothing is playing.</Text>
-          <Pressable style={styles.primaryButton} onPress={() => navigation.goBack()} accessibilityRole="button"><Text style={styles.primaryButtonText}>Back</Text></Pressable>
+          <Pressable style={styles.primaryButton} onPress={() => navigation.goBack()} accessibilityRole="button">
+            <Text style={styles.primaryButtonText}>Back</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
   }
   const duration = status.duration || track.duration || 0;
+  const art = track.artwork || track.artworkSmall;
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <View style={styles.nowPlaying}>
-        <View style={styles.nowActions}>
-          <Pressable style={styles.iconButton} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Close now playing"><ChevronDown size={24} color={colors.text} /></Pressable>
-          <Text style={styles.nowLabel}>Now Playing</Text>
-          <Pressable style={styles.iconButton} onPress={() => navigation.navigate('Queue')} accessibilityRole="button" accessibilityLabel="Open queue"><ListMusic size={22} color={colors.text} /></Pressable>
+    <View style={styles.nowStage}>
+      {art ? (
+        <Image source={{ uri: art }} style={StyleSheet.absoluteFill} blurRadius={48} resizeMode="cover" />
+      ) : null}
+      <View style={[StyleSheet.absoluteFill, styles.nowScrim]} />
+      <SafeAreaView style={styles.nowStage} edges={['top', 'bottom']}>
+        <View style={styles.nowHeader}>
+          <Pressable style={styles.nowIcon} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Close now playing">
+            <ChevronDown size={22} color={colors.accentInk} />
+          </Pressable>
+          <Text style={styles.nowLabel}>Now playing</Text>
+          <Pressable style={styles.nowIcon} onPress={() => navigation.navigate('Queue')} accessibilityRole="button" accessibilityLabel="Open queue">
+            <ListMusic size={20} color={colors.accentInk} />
+          </Pressable>
         </View>
-        <Artwork source={track.artwork} size={300} rounded={24} />
-        <View style={styles.nowText}>
-          <Text style={styles.nowTitle} numberOfLines={1}>{track.title}</Text>
-          <Text style={styles.nowArtist} numberOfLines={1}>{track.artist}</Text>
+
+        <View style={styles.nowBody}>
+          <Artwork source={art} size={286} rounded={10} />
+          <View style={styles.nowText}>
+            <Text style={styles.nowTitle} numberOfLines={2}>
+              {track.title}
+            </Text>
+            <Text style={styles.nowArtist} numberOfLines={1}>
+              {track.artist}
+            </Text>
+            {track.album ? (
+              <Text style={styles.nowMeta} numberOfLines={1}>
+                {track.album}
+              </Text>
+            ) : null}
+          </View>
+
+          <Slider
+            value={status.currentTime}
+            minimumValue={0}
+            maximumValue={duration || 1}
+            onSlidingComplete={seekTo}
+            minimumTrackTintColor={colors.accentInk}
+            maximumTrackTintColor="rgba(251,250,247,0.22)"
+            thumbTintColor={colors.accentInk}
+            style={styles.slider}
+          />
+          <View style={styles.nowTimeRow}>
+            <Text style={styles.nowTime}>{formatTime(status.currentTime)}</Text>
+            <Text style={styles.nowTime}>-{formatTime(Math.max(0, duration - status.currentTime))}</Text>
+          </View>
+
+          <View style={styles.nowControls}>
+            <Pressable style={styles.nowControl} onPress={skipPrevious} accessibilityRole="button" accessibilityLabel="Previous track">
+              <SkipBack size={26} color={colors.accentInk} />
+            </Pressable>
+            <Pressable style={styles.nowPlay} onPress={togglePlayback} accessibilityRole="button" accessibilityLabel={status.playing ? 'Pause' : 'Play'}>
+              {status.playing ? (
+                <Pause size={26} color="#141312" fill="#141312" />
+              ) : (
+                <Play size={26} color="#141312" fill="#141312" />
+              )}
+            </Pressable>
+            <Pressable style={styles.nowControl} onPress={skipNext} accessibilityRole="button" accessibilityLabel="Next track">
+              <SkipForward size={26} color={colors.accentInk} />
+            </Pressable>
+          </View>
+
+          <View style={styles.nowActionsRow}>
+            <Pressable
+              style={styles.nowAction}
+              onPress={() => useUi.getState().openLyrics(track)}
+              accessibilityRole="button"
+              accessibilityLabel="Show synced lyrics"
+            >
+              <Quote size={13} color={colors.accentInk} />
+              <Text style={styles.nowActionText}>Lyrics</Text>
+            </Pressable>
+            <Pressable style={styles.nowAction} onPress={() => seekBy(-10)} accessibilityRole="button" accessibilityLabel="Back 10 seconds">
+              <Text style={styles.nowActionText}>−10s</Text>
+            </Pressable>
+            <Pressable style={styles.nowAction} onPress={() => seekBy(10)} accessibilityRole="button" accessibilityLabel="Forward 10 seconds">
+              <Text style={styles.nowActionText}>+10s</Text>
+            </Pressable>
+          </View>
         </View>
-        <Slider value={status.currentTime} minimumValue={0} maximumValue={duration || 1} onSlidingComplete={seekTo} minimumTrackTintColor={colors.accent} maximumTrackTintColor={colors.line} thumbTintColor={colors.text} style={styles.slider} />
-        <View style={styles.timeRow}><Text style={styles.time}>{formatTime(status.currentTime)}</Text><Text style={styles.time}>-{formatTime(Math.max(0, duration - status.currentTime))}</Text></View>
-        <View style={styles.controls}>
-          <Pressable style={styles.controlButton} onPress={skipPrevious} accessibilityRole="button" accessibilityLabel="Previous track"><SkipBack size={28} color={colors.text} fill={colors.text} /></Pressable>
-          <Pressable style={styles.playButton} onPress={togglePlayback} accessibilityRole="button" accessibilityLabel={status.playing ? 'Pause' : 'Play'}>{status.playing ? <Pause size={34} color={colors.bg} fill={colors.bg} /> : <Play size={34} color={colors.bg} fill={colors.bg} />}</Pressable>
-          <Pressable style={styles.controlButton} onPress={skipNext} accessibilityRole="button" accessibilityLabel="Next track"><SkipForward size={28} color={colors.text} fill={colors.text} /></Pressable>
-        </View>
-        <View style={styles.seekRow}>
-          <Pressable style={styles.secondaryButton} onPress={() => seekBy(-10)} accessibilityRole="button"><Text style={styles.secondaryButtonText}>−10s</Text></Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => seekBy(10)} accessibilityRole="button"><Text style={styles.secondaryButtonText}>+10s</Text></Pressable>
-        </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -647,7 +713,7 @@ function MainTabs() {
           tabBarStyle: { backgroundColor: colors.bg, borderTopColor: colors.line, height: 74, paddingBottom: 10 },
           tabBarActiveTintColor: colors.text,
           tabBarInactiveTintColor: colors.muted,
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+          tabBarLabelStyle: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
         }}
       >
         <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: ({ color, size }) => <Home size={size} color={color} /> }} />
@@ -663,6 +729,13 @@ function MainTabs() {
 export default function App() {
   const libraryReady = useLibrary((s) => s.ready);
   const settingsReady = useSettings((s) => s.ready);
+  const [fontsLoaded] = useFonts({
+    Newsreader_500Medium,
+    Newsreader_600SemiBold,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_700Bold,
+  });
 
   useEffect(() => {
     void initPlayer();
@@ -670,7 +743,7 @@ export default function App() {
     void hydrateSettings();
   }, []);
 
-  if (!libraryReady || !settingsReady) return <Loading />;
+  if (!libraryReady || !settingsReady || !fontsLoaded) return <Loading />;
 
   return (
     <SafeAreaProvider>
@@ -686,6 +759,7 @@ export default function App() {
           </Stack.Navigator>
         </NavigationContainer>
         <AddToPlaylistSheet />
+        <LyricsSheet />
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
@@ -694,46 +768,33 @@ export default function App() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   screen: { flex: 1, backgroundColor: colors.bg },
-  page: { padding: 18, paddingBottom: 170 },
-  pageTitle: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  pageSubtitle: { color: colors.muted, fontSize: 14, marginTop: 3, marginBottom: 16 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.bg },
-  muted: { color: colors.muted, fontSize: 13 },
-  rail: { gap: 14, paddingRight: 18 },
-  card: { width: 132, gap: 6 },
-  cardTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginTop: 8 },
-  cardSubtitle: { color: colors.muted, fontSize: 12 },
-  input: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
-  trackTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  trackSubtitle: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  page: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 170 },
+  pageTitle: { color: colors.text, fontFamily: fonts.serif, fontSize: 34, letterSpacing: -0.7 },
+  pageSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 13, lineHeight: 20, marginTop: 6, marginBottom: 18 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: colors.bg },
+  muted: { color: colors.muted, fontFamily: fonts.sans, fontSize: 13 },
+  loadingText: { color: colors.muted, fontSize: 13 },
+  rail: { gap: 12, paddingRight: 20 },
+  card: { width: 132, gap: 4 },
+  cardTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13, marginTop: 6 },
+  cardSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5 },
+  input: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    color: colors.text,
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginBottom: 10,
+  },
+  trackTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 14.5 },
+  trackSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5, marginTop: 2 },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.line },
   personText: { flex: 1, minWidth: 0 },
-  secondaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.surfaceRaised, borderColor: colors.line, borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 11, marginTop: 14 },
-  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  primaryButton: { backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12 },
-  primaryButtonText: { color: colors.bg, fontWeight: '800' },
-  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  settingText: { flex: 1, minWidth: 0 },
-  result: { color: colors.accent, fontSize: 13, marginTop: 12 },
-  body: { color: colors.muted, fontSize: 14, lineHeight: 21 },
-  nowPlaying: { flex: 1, padding: 18, alignItems: 'center', justifyContent: 'center', gap: 18 },
-  nowActions: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  nowLabel: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  nowText: { width: '100%', alignItems: 'center', gap: 4 },
-  nowTitle: { color: colors.text, fontSize: 24, fontWeight: '800', textAlign: 'center' },
-  nowArtist: { color: colors.muted, fontSize: 16, textAlign: 'center' },
-  slider: { width: '100%', height: 36 },
-  timeRow: { width: '100%', flexDirection: 'row', justifyContent: 'space-between' },
-  time: { color: colors.muted, fontSize: 12, fontVariant: ['tabular-nums'] },
-  controls: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 34 },
-  controlButton: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  playButton: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
-  seekRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', gap: 12 },
-  queueHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, paddingBottom: 0 },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 6 },
-  actionButton: {
-    flex: 1,
+  secondaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -741,31 +802,94 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginTop: 12,
+  },
+  secondaryButtonText: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13 },
+  primaryButton: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 11, alignItems: 'center' },
+  primaryButtonText: { color: colors.accentInk, fontFamily: fonts.sansBold, fontSize: 13.5 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  settingText: { flex: 1, minWidth: 0 },
+  result: { color: colors.text, fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 19, marginTop: 10 },
+  body: { color: colors.muted, fontFamily: fonts.sans, fontSize: 13.5, lineHeight: 21 },
+  actionRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 8,
     paddingVertical: 12,
   },
-  actionButtonText: { color: colors.text, fontSize: 13.5, fontWeight: '700' },
-  playlistRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  actionButtonText: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 12.5 },
+  playlistRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.line },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
-  headerLabel: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  headerLabel: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase' },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
+  iconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   playAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     backgroundColor: colors.accent,
-    borderRadius: 999,
+    borderRadius: 8,
     paddingVertical: 13,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  playAllText: { color: colors.bg, fontSize: 15, fontWeight: '800' },
-  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 8 },
-  fieldHint: { color: colors.muted, fontSize: 12.5, lineHeight: 18, marginTop: -2, marginBottom: 12 },
-  progressCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 12 },
-  resultCard: { backgroundColor: colors.surfaceRaised, borderColor: colors.line, borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 12, gap: 6 },
-  resultText: { color: colors.text, fontSize: 13.5, lineHeight: 20 },
-  resultStrong: { fontWeight: '800' },
+  playAllText: { color: colors.accentInk, fontFamily: fonts.sansBold, fontSize: 14 },
+  fieldLabel: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
+  fieldHint: { color: colors.muted, fontFamily: fonts.sans, fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  progressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  },
+  resultCard: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 14, marginBottom: 12, gap: 6 },
+  resultText: { color: colors.text, fontFamily: fonts.sans, fontSize: 13, lineHeight: 20 },
+  resultStrong: { fontFamily: fonts.sansBold },
   importButton: { alignSelf: 'stretch', alignItems: 'center', marginTop: 4 },
-  buttonDisabled: { opacity: 0.45 },
+  buttonDisabled: { opacity: 0.4 },
+  queueHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 8 },
+
+  nowStage: { flex: 1, backgroundColor: '#141312' },
+  nowScrim: { backgroundColor: 'rgba(20,19,18,0.86)' },
+  nowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 6 },
+  nowLabel: { color: 'rgba(251,250,247,0.45)', fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase' },
+  nowIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  nowBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 16, gap: 16 },
+  nowText: { width: '100%', alignItems: 'center', gap: 5 },
+  nowTitle: { color: colors.accentInk, fontFamily: fonts.serif, fontSize: 27, lineHeight: 32, textAlign: 'center', letterSpacing: -0.4 },
+  nowArtist: { color: 'rgba(251,250,247,0.72)', fontFamily: fonts.sansMedium, fontSize: 14, textAlign: 'center' },
+  nowMeta: { color: 'rgba(251,250,247,0.4)', fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' },
+  slider: { width: '100%', height: 32 },
+  nowTimeRow: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', marginTop: -6 },
+  nowTime: { color: 'rgba(251,250,247,0.5)', fontFamily: fonts.mono, fontSize: 10.5 },
+  nowControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28 },
+  nowPlay: { width: 62, height: 62, borderRadius: 10, backgroundColor: colors.accentInk, alignItems: 'center', justifyContent: 'center' },
+  nowControl: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
+  nowActionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 },
+  nowAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(251,250,247,0.18)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  nowActionText: { color: colors.accentInk, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' },
 });
