@@ -1,13 +1,26 @@
 import { NextRequest } from "next/server";
 import { getProvider } from "@/lib/provider";
-import { pickBestMatch, scoreCandidate, type MatchQuery } from "@/lib/match-import";
+import { youtubeSearchTracks } from "@/lib/provider/youtube";
+import {
+  pickBestMatch,
+  pickYoutubeMatch,
+  scoreCandidate,
+  type MatchQuery,
+} from "@/lib/match-import";
+import type { ProviderId, Track } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BATCH = 12;
-const CONCURRENCY = 4;
 
 interface MatchRequest extends MatchQuery {}
+
+interface MatchResult {
+  matched: Track | null;
+  score: number;
+  source: ProviderId | null;
+  failed: boolean;
+}
 
 function readQuery(value: unknown): MatchRequest | null {
   if (!value || typeof value !== "object") return null;
@@ -34,8 +47,14 @@ export async function POST(req: NextRequest) {
   if (!queries.length) return Response.json({ results: [] });
 
   const provider = getProvider(req.nextUrl.searchParams.get("provider"));
+  const youtube = getProvider("youtube");
+  const wantsFallback = req.nextUrl.searchParams.get("fallback") !== "none" && provider.id !== "youtube";
+  // A cached probe: if yt-dlp is missing or YouTube is blocking this host, songs
+  // without a catalogue match are reported as missing instead of stalling.
+  const youtubeReady = wantsFallback ? (await youtube.availability()).available : false;
 
-  const results: { matched: unknown; score: number; failed: boolean }[] = new Array(queries.length);
+  const results: MatchResult[] = new Array(queries.length);
+  const concurrency = youtubeReady ? 3 : 4;
   let cursor = 0;
 
   async function worker() {
@@ -45,14 +64,26 @@ export async function POST(req: NextRequest) {
       const search = query.artist ? `${query.title} ${query.artist}` : query.title;
       try {
         const found = await provider.search(search, 8);
-        const matched = pickBestMatch(query, found.tracks);
-        results[index] = { matched, score: matched ? scoreCandidate(query, matched) : 0, failed: false };
+        let matched = pickBestMatch(query, found.tracks);
+        if (matched) {
+          results[index] = { matched, score: scoreCandidate(query, matched), source: provider.id, failed: false };
+          continue;
+        }
+        if (youtubeReady) {
+          const viaYoutube = await youtubeSearchTracks(search, 6).catch(() => [] as Track[]);
+          const hit = viaYoutube.length ? pickYoutubeMatch(query, viaYoutube) : null;
+          if (hit) {
+            results[index] = { matched: hit, score: scoreCandidate(query, hit), source: "youtube", failed: false };
+            continue;
+          }
+        }
+        results[index] = { matched: null, score: 0, source: null, failed: false };
       } catch {
-        results[index] = { matched: null, score: 0, failed: true };
+        results[index] = { matched: null, score: 0, source: null, failed: true };
       }
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queries.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency, queries.length) }, worker));
   return Response.json({ results });
 }

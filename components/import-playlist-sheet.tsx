@@ -18,6 +18,7 @@ interface Outcome {
   imported: number;
   duplicates: number;
   missing: string[];
+  streamOnly: number;
   capped: boolean;
 }
 
@@ -35,105 +36,126 @@ export function ImportPlaylistSheet() {
 
   const busy = phase !== "idle";
 
+  function save(name: string, tracks: Track[], missing: string[], duplicates: number, capped: boolean) {
+    if (!tracks.length) {
+      setOutcome({ playlistId: "", name, imported: 0, duplicates, missing, streamOnly: 0, capped });
+      return;
+    }
+    const library = useLibrary.getState();
+    const existing = library.playlists.find(
+      (candidate) => candidate.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    );
+    let playlistId: string;
+    if (existing) {
+      library.addTracks(existing.id, tracks);
+      playlistId = existing.id;
+    } else {
+      playlistId = library.createPlaylist(name, tracks);
+    }
+    const streamOnly = tracks.filter((track) => track.provider === "youtube").length;
+    setOutcome({ playlistId, name, imported: tracks.length, duplicates, missing, streamOnly, capped });
+    toast(`Imported ${tracks.length} ${tracks.length === 1 ? "song" : "songs"} into “${name}”`, "success");
+  }
+
+  async function importYoutube(link: string) {
+    setPhase("reading");
+    setProgress({ done: 0, total: 0 });
+    const res = await fetch("/api/import/youtube", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: link }),
+    });
+    const payload = (await res.json()) as {
+      playlist?: { name: string; tracks: Track[]; capped: boolean };
+      error?: string;
+    };
+    if (!res.ok || !payload.playlist) throw new Error(payload.error || "Could not read that playlist.");
+    if (cancelled.current) return;
+
+    const playlist = payload.playlist;
+    setProgress({ done: playlist.tracks.length, total: playlist.tracks.length });
+    setPhase("saving");
+    save(playlist.name, playlist.tracks, [], 0, playlist.capped);
+  }
+
+  async function importSpotify(link: string) {
+    setPhase("reading");
+    setProgress({ done: 0, total: 0 });
+    const res = await fetch("/api/import/spotify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: link }),
+    });
+    const payload = (await res.json()) as { playlist?: SpotifyPlaylistRef; error?: string };
+    if (!res.ok || !payload.playlist) {
+      throw new Error(payload.error || "Could not read that playlist.");
+    }
+    if (cancelled.current) return;
+
+    const playlist = payload.playlist;
+    const total = playlist.tracks.length;
+    setProgress({ done: 0, total });
+    setPhase("matching");
+
+    const matched: Track[] = [];
+    const missing: string[] = [];
+
+    for (let index = 0; index < total; index += BATCH) {
+      const batch = playlist.tracks.slice(index, index + BATCH);
+      const matchRes = await fetch("/api/import/match", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          tracks: batch.map((track) => ({
+            title: track.title,
+            artist: track.artistLine,
+            duration: track.duration,
+          })),
+        }),
+      });
+      if (!matchRes.ok) throw new Error("Matching songs failed. Try again.");
+      const matchPayload = (await matchRes.json()) as { results?: { matched: Track | null }[] };
+      const results = matchPayload.results ?? [];
+      batch.forEach((track, position) => {
+        const found = results[position]?.matched ?? null;
+        if (found) matched.push(found);
+        else missing.push(`${track.title} — ${track.artistLine || "unknown artist"}`);
+      });
+      if (cancelled.current) return;
+      setProgress({ done: Math.min(index + BATCH, total), total });
+    }
+
+    const seen = new Set<string>();
+    const unique: Track[] = [];
+    for (const track of matched) {
+      if (seen.has(track.id)) continue;
+      seen.add(track.id);
+      unique.push(track);
+    }
+
+    setPhase("saving");
+    save(playlist.name, unique, missing, matched.length - unique.length, playlist.capped);
+  }
+
   async function run() {
     const link = url.trim();
     if (!link || busy) return;
+    const isYoutube = /youtu\.?be|youtube\.com/i.test(link);
+    const isSpotify = /spotify/i.test(link);
+    if (!isYoutube && !isSpotify) {
+      setError("Paste a Spotify or YouTube Music playlist link.");
+      setOutcome(null);
+      return;
+    }
+
     cancelled.current = false;
     setError(null);
     setOutcome(null);
-    setPhase("reading");
-    setProgress({ done: 0, total: 0 });
-
     try {
-      const res = await fetch("/api/import/spotify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: link }),
-      });
-      const payload = (await res.json()) as { playlist?: SpotifyPlaylistRef; error?: string };
-      if (!res.ok || !payload.playlist) {
-        throw new Error(payload.error || "Could not read that playlist.");
-      }
+      if (isYoutube) await importYoutube(link);
+      else await importSpotify(link);
       if (cancelled.current) return;
-
-      const playlist = payload.playlist;
-      const total = playlist.tracks.length;
-      setProgress({ done: 0, total });
-      setPhase("matching");
-
-      const matched: Track[] = [];
-      const missing: string[] = [];
-
-      for (let index = 0; index < total; index += BATCH) {
-        const batch = playlist.tracks.slice(index, index + BATCH);
-        const matchRes = await fetch("/api/import/match", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            tracks: batch.map((track) => ({
-              title: track.title,
-              artist: track.artistLine,
-              duration: track.duration,
-            })),
-          }),
-        });
-        if (!matchRes.ok) throw new Error("Matching songs failed. Try again.");
-        const matchPayload = (await matchRes.json()) as { results?: { matched: Track | null }[] };
-        const results = matchPayload.results ?? [];
-        batch.forEach((track, position) => {
-          const found = results[position]?.matched ?? null;
-          if (found) matched.push(found);
-          else missing.push(`${track.title} — ${track.artistLine || "unknown artist"}`);
-        });
-        if (cancelled.current) return;
-        setProgress({ done: Math.min(index + BATCH, total), total });
-      }
-
-      const seen = new Set<string>();
-      const unique: Track[] = [];
-      for (const track of matched) {
-        if (seen.has(track.id)) continue;
-        seen.add(track.id);
-        unique.push(track);
-      }
-      const duplicates = matched.length - unique.length;
-
-      if (!unique.length) {
-        setOutcome({
-          playlistId: "",
-          name: playlist.name,
-          imported: 0,
-          duplicates,
-          missing,
-          capped: playlist.capped,
-        });
-        setPhase("idle");
-        return;
-      }
-
-      setPhase("saving");
-      const library = useLibrary.getState();
-      const existing = library.playlists.find(
-        (candidate) => candidate.name.trim().toLowerCase() === playlist.name.trim().toLowerCase(),
-      );
-      let playlistId: string;
-      if (existing) {
-        library.addTracks(existing.id, unique);
-        playlistId = existing.id;
-      } else {
-        playlistId = library.createPlaylist(playlist.name, unique);
-      }
-
-      setOutcome({
-        playlistId,
-        name: playlist.name,
-        imported: unique.length,
-        duplicates,
-        missing,
-        capped: playlist.capped,
-      });
       setPhase("idle");
-      toast(`Imported ${unique.length} ${unique.length === 1 ? "song" : "songs"} into “${playlist.name}”`, "success");
     } catch (err) {
       if (cancelled.current) return;
       setError(err instanceof Error ? err.message : "Import failed.");
@@ -144,7 +166,7 @@ export function ImportPlaylistSheet() {
   return (
     <div className="px-3 pb-4">
       <label className="block px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
-        Spotify playlist link
+        Playlist link
       </label>
       <div className="mt-2 flex items-center gap-2 rounded-xl border border-line bg-surface px-3 focus-within:border-[color-mix(in_srgb,var(--accent)_55%,var(--line))]">
         <Link2 size={15} className="shrink-0 text-muted" />
@@ -153,7 +175,7 @@ export function ImportPlaylistSheet() {
           value={url}
           onChange={(event) => setUrl(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && void run()}
-          placeholder="https://open.spotify.com/playlist/…"
+          placeholder="Spotify or YouTube Music link"
           inputMode="url"
           autoCapitalize="none"
           spellCheck={false}
@@ -162,8 +184,9 @@ export function ImportPlaylistSheet() {
         />
       </div>
       <p className="mt-2.5 px-1 text-[11.5px] leading-relaxed text-muted">
-        Share → Copy link to playlist. melo reads the public playlist, matches each song to the catalogue
-        and keeps the playlist name. Nothing is posted to Spotify and no account is needed.
+        Paste a public playlist from Spotify or YouTube Music and melo saves it here with the same name — no
+        account, nothing posted to either service. Spotify songs are matched to the catalogue; YouTube Music
+        playlists keep their exact songs, which stream and can&rsquo;t be downloaded.
       </p>
 
       {error && (
@@ -179,9 +202,7 @@ export function ImportPlaylistSheet() {
           <span>
             {phase === "reading" && "Reading the playlist…"}
             {phase === "matching" &&
-              (progress.total
-                ? `Matching songs… ${progress.done}/${progress.total}`
-                : "Matching songs…")}
+              (progress.total ? `Matching songs… ${progress.done}/${progress.total}` : "Matching songs…")}
             {phase === "saving" && "Saving your playlist…"}
           </span>
         </div>
@@ -196,12 +217,19 @@ export function ImportPlaylistSheet() {
               </span>{" "}
               imported into <span className="font-medium text-ink">“{outcome.name}”</span>.
               {outcome.duplicates > 0 && ` ${outcome.duplicates} already there.`}
-              {outcome.missing.length > 0 && ` ${outcome.missing.length} not found in the catalogue.`}
+              {outcome.missing.length > 0 && ` ${outcome.missing.length} not found.`}
             </p>
           ) : (
             <p>
               <span className="font-medium text-ink">Nothing imported.</span> None of the songs in “{outcome.name}”
-              could be found in the catalogue yet.
+              could be found in a source melo can play.
+            </p>
+          )}
+          {outcome.streamOnly > 0 && (
+            <p className="mt-2 text-[11.5px] text-muted">
+              {outcome.streamOnly === outcome.imported
+                ? "These stream through YouTube Music and can't be downloaded."
+                : `${outcome.streamOnly} of them stream through YouTube Music and can't be downloaded.`}
             </p>
           )}
           {outcome.missing.length > 0 && (
@@ -212,8 +240,7 @@ export function ImportPlaylistSheet() {
           )}
           {outcome.capped && (
             <p className="mt-2 text-[11.5px] text-muted">
-              Spotify only exposes the first 100 songs of a public playlist, so longer playlists import
-              their first 100.
+              This playlist is longer than melo imports in one go, so the later songs were left out.
             </p>
           )}
           {outcome.playlistId && (

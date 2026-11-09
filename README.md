@@ -74,7 +74,7 @@ app/
   settings/                Appearance, backgrounds, player, lyrics, source, storage
   api/
     home | search | track | artist | album     provider-backed JSON
-    import/spotify | import/match              playlist import + song matching
+    import/spotify | import/youtube | import/match   playlist import + song matching
     stream/[provider]/[id]                     ranged audio proxy (Node http)
     image                                      artwork proxy with host allowlist
     lyrics                                     LRCLIB lookup + manual search
@@ -82,6 +82,7 @@ app/
 lib/
   provider/audius.ts       Audius provider — keyless, full-length, real metadata
   spotify.ts               Public Spotify playlist reader (name + tracks, no key)
+  youtube-import.ts        YouTube Music playlist reader — exact videos, no matching
   match-import.ts          Scores an imported song against catalogue search results
   provider/youtube.ts      YouTube Music provider — yt-dlp (metadata + streaming only)
   lyrics.ts                LRC parsing, matching, caching (LRCLIB)
@@ -133,11 +134,13 @@ LRCLIB is queried exact-first, then by a scored search (title/artist/duration). 
 
 ### Importing a playlist
 
-Library → Playlists → **Import** takes a public Spotify playlist link (`open.spotify.com/playlist/…`, the embed link, or a `spotify:playlist:` URI), reads its name and songs without an account or API key, finds each song in the music catalogue, and saves a local playlist with the same name. Re-importing a playlist whose name already exists adds the missing songs to that playlist instead of creating a duplicate.
+Library → Playlists → **Import** takes a public Spotify or YouTube Music playlist link and saves it here with the same name. Re-importing a playlist whose name already exists adds the missing songs to that playlist instead of creating a duplicate. Nothing is posted to either service and no credentials are used.
 
-Matching is deterministic and explainable (`lib/match-import.ts`): normalised title, artist overlap and duration agreement are scored, and a candidate must clear 55/100. Songs that are not in the catalogue are reported by name rather than silently replaced with a wrong track.
+**Spotify** (`open.spotify.com/playlist/…`, the embed link, or a `spotify:playlist:` URI) is read from its public page — no account, no API key. Each song is then matched, catalogue first (Audius) and then, if the catalogue has no confident match and the YouTube Music source works on this host, against YouTube search. Matching is deterministic and explainable (`lib/match-import.ts`): normalised title, artist overlap and duration agreement are scored. YouTube candidates are held to a stricter rule — exact (or prefix) title match and a duration within 20 s when both sides report one — because YouTube search returns every upload that mentions a song. Songs that match nothing are reported by name rather than replaced with a wrong track.
 
-Spotify's public page only exposes the first 100 songs of a playlist, so longer playlists import their first 100 — the app says so in the result. Nothing is posted to Spotify and no Spotify credentials are used.
+**YouTube Music** (`music.youtube.com/playlist?list=…`, any `youtube.com` playlist, a watch link with `list=`, or a bare playlist id) imports the exact videos in the playlist, so there is no matching step and nothing is lost in translation. These songs stream through the YouTube Music source and cannot be downloaded, and reading the playlist needs the same working `yt-dlp` the provider already needs.
+
+Limits, said out loud: Spotify's public page exposes at most the first 100 songs of a playlist, YouTube playlists are read up to 200 songs, and the Spotify → YouTube fallback is skipped automatically on hosts where YouTube can't play (a cloud IP that gets bot-checked), so those imports report fewer matches instead of adding songs that won't play.
 
 ### Downloads and offline
 
@@ -155,7 +158,7 @@ No account, no analytics, no telemetry, no third-party requests from the client 
 - **YouTube Music cannot stream from this cloud host** because YouTube bot-checks datacenter IPs. The provider is complete; it needs cookies or a residential IP. This is reported in-app rather than silently hidden.
 - **Downloads are source-dependent.** Tracks the source marks as downloadable get a real "Download" (permanent offline copy). Other streamable tracks can be saved as a clearly labelled *private offline copy*; melo never claims the artist authorised a download, and nothing from YouTube is downloaded.
 - **LRCLIB coverage is community-sourced.** Many independent tracks have no lyrics; the manual search exists for exactly that reason.
-- **Spotify import is best-effort matching, not a mirror.** Only public playlists can be read, Spotify's public page exposes at most their first 100 songs, and a song is imported only when the catalogue has a confident match. Mainstream major-label catalogues are mostly absent from Audius, so those imports come back as "not found" instead of importing covers or remixes.
+- **Playlist import is best-effort, not a mirror.** Only public playlists can be read. Spotify's public page exposes at most 100 songs and YouTube playlists are read up to 200. Spotify songs come from Audius where possible and from YouTube Music otherwise, so mainstream playlists depend on the YouTube source working on this host; where it doesn't, those songs are reported as not found instead of importing covers or remixes. YouTube-imported songs are stream-only.
 - Audius does not expose an album catalogue for every artist, so some profiles show no albums — melo shows nothing rather than inventing releases.
 
 ## Testing performed
@@ -171,7 +174,8 @@ Exercised in a real browser against the live catalogue, not just rendered:
 - **Storage** — panel reported 8.8 MB in melo (audio/metadata split). Deleting one download confirmed first, then removed the record and *all* its IndexedDB assets, returning storage to 0 B.
 - **Customisation** — accent and light/dark theme applied instantly and persisted across reload.
 - **Search** — live query returned real tracks, artists and result counts.
-- **Spotify import** — reading `open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M` returned the real playlist name and 50 songs in 0.29 s; a batch of 12 mainstream songs correctly matched nothing (they are not in Audius), while 8 of 8 catalogue songs re-imported at score 100, so the matcher is neither guessing nor over-rejecting.
+- **Playlist import** — `open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M` returned its real name and 50 songs in 0.29 s; 8 of 8 catalogue songs re-imported at score 100. A 12-song mainstream batch matched 0/12 against Audius (correctly: those tracks aren't there) and 12/12 through the YouTube fallback with the right artists and durations within a second of Spotify's — e.g. "Housewife / Tate McRae" 209 s → 210 s, "Patient Zero / Taylor Swift" 226 s → 229 s. The fallback's scoring was verified here with the availability gate temporarily bypassed, because this cloud host cannot resolve YouTube audio.
+- **YouTube Music import** — `music.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI` imported 182 unique songs in 3.0 s with correct names, channels, durations and thumbnails ("BELLAKEO" / Peso Pluma / 235 s), reading the playlist's own order.
 - **HTTP** — stream proxy served `206` byte ranges and full downloads (`audio/mpeg`, 9.26 MB); artwork proxy serves Audius creator-node hosts with private/loopback and bare-IP targets refused.
 - **Build** — `npx tsc --noEmit` and `npm run build` both pass; first-load JS ~125 kB.
 

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { cached } from "@/lib/cache";
-import { UpstreamError } from "@/lib/http";
+import { normalise, UpstreamError } from "@/lib/http";
 import type {
   Album,
   Artist,
@@ -46,7 +46,7 @@ function cookieArgs(): string[] {
   return [];
 }
 
-async function ytdlp(args: string[], timeout = 45_000): Promise<string> {
+export async function ytdlp(args: string[], timeout = 45_000): Promise<string> {
   try {
     const { stdout } = await exec(resolveBinary(), [...runtimeArgs(), ...cookieArgs(), "--no-warnings", ...args], {
       timeout,
@@ -107,19 +107,34 @@ function bestThumb(entry: FlatEntry): string | undefined {
   return sorted[0]?.url;
 }
 
-/** "Artist - Song (Official Video)" -> { artist, title } */
-function splitTitle(raw: string): { title: string; artist?: string } {
+/**
+ * "Artist - Song (Official Video)" -> { artist, title }
+ *
+ * Most uploads put the artist first, but some put the song first. When the
+ * channel is known (playlist and search entries carry one) that decides which
+ * half is which, instead of showing "Song - Artist" titles mirrored.
+ */
+export function splitTitle(raw: string, channel?: string): { title: string; artist?: string } {
   const cleaned = raw
-    .replace(/\((?:official|lyrics?|audio|video|visualizer|hd|hq|explicit|music video)[^)]*\)/gi, "")
+    .replace(/\(\s*(?:official|lyrics?|audio|video|visualizer|hd|hq|explicit|music video|performance video)[^)]*\)/gi, "")
     .replace(/\[[^\]]*\]/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
   const m = cleaned.match(/^(.{1,60}?)\s+[-–—]\s+(.+)$/);
-  if (m) return { artist: m[1].trim(), title: m[2].trim() };
+  if (m) {
+    const left = m[1].trim();
+    const right = m[2].trim();
+    const name = channel ? normalise(channel) : "";
+    if (name) {
+      const leftIsName = normalise(left).startsWith(name) || name.startsWith(normalise(left));
+      if (!leftIsName && normalise(right).includes(name)) return { title: left, artist: channel };
+    }
+    return { artist: left, title: right };
+  }
   return { title: cleaned || raw };
 }
 
-function mapEntry(entry: FlatEntry): Track | null {
+export function mapEntry(entry: FlatEntry): Track | null {
   if (!entry.id || entry.ie_key === "YoutubeTab") return null;
   const parsed = splitTitle(entry.title || "");
   const artist = entry.channel || entry.uploader || parsed.artist || "Unknown artist";
@@ -144,6 +159,16 @@ async function searchTracks(query: string, limit: number): Promise<FlatEntry[]> 
   const json = await ytdlp(["--flat-playlist", "-J", `ytsearch${limit}:${query}`]);
   const parsed = JSON.parse(json) as { entries?: FlatEntry[] };
   return parsed.entries || [];
+}
+
+/**
+ * Flat YouTube search with real channel names and durations. Used where the
+ * metadata has to be trusted more than the merged provider search (playlist
+ * imports), where a missing duration or artist would defeat matching.
+ */
+export async function youtubeSearchTracks(query: string, limit: number): Promise<Track[]> {
+  const entries = await searchTracks(query, Math.min(Math.max(limit, 1), 10));
+  return entries.map(mapEntry).filter((track): track is Track => Boolean(track));
 }
 
 async function musicSearch(query: string, limit: number): Promise<{ songs: FlatEntry[]; channels: FlatEntry[] }> {

@@ -108,3 +108,30 @@ export function pickBestMatch(query: MatchQuery, candidates: Track[]): Track | n
   }
   return bestScore >= MATCH_THRESHOLD ? best : null;
 }
+
+/**
+ * YouTube search returns every upload that mentions a song, so this is stricter
+ * than the catalogue matcher: the title must match exactly (or start with the
+ * wanted title) and the duration must agree when both sides report one. It is
+ * better to skip a song than to import the wrong video.
+ */
+export function pickYoutubeMatch(query: MatchQuery, candidates: Track[]): Track | null {
+  const wanted = normalise(query.title);
+  if (!wanted) return null;
+  let best: Track | null = null;
+  let bestScore = 0;
+  for (const candidate of candidates) {
+    if (!candidate.streamable) continue;
+    const title = normalise(candidate.title);
+    const exact = title === wanted;
+    const prefix = title.startsWith(`${wanted} `);
+    if (!exact && !prefix) continue;
+    if (query.duration && candidate.duration && Math.abs(query.duration - candidate.duration) > 20) continue;
+    const score = scoreCandidate(query, candidate) + (exact ? 15 : 0);
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return bestScore >= 60 ? best : null;
+}

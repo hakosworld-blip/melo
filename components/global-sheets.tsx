@@ -49,7 +49,7 @@ export default function GlobalSheets() {
         open={sheet?.type === "importPlaylist"}
         onClose={close}
         title="Import a playlist"
-        description="Paste a Spotify link — songs are matched to the catalogue"
+        description="Paste a Spotify or YouTube Music link — melo keeps the name and songs"
       >
         {sheet?.type === "importPlaylist" && <ImportPlaylistSheet />}
       </Sheet>

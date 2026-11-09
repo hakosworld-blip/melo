@@ -111,7 +111,7 @@ export default function LibraryPage() {
                   description="Build one from any song's menu, or paste a Spotify playlist link to import it. No account, no syncing — it stays here."
                   action={
                     <Button variant="surface" size="sm" onClick={() => openSheet({ type: "importPlaylist" })}>
-                      <Link2 size={14} /> Import from Spotify
+                      <Link2 size={14} /> Import a playlist
                     </Button>
                   }
                 />
