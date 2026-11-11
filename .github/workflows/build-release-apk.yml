@@ -63,6 +63,8 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -83,10 +85,31 @@ jobs:
 
       - name: Stamp version into app.json
         run: |
-          node -e "const fs=require('fs'); const p='app.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.expo.version=process.env.VERSION_NAME; j.expo.android.versionCode=Number(process.env.VERSION_CODE); fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\\n');"
+          node -e "const fs=require('fs'); const p='app.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.expo.version=process.env.VERSION_NAME; j.expo.android.versionCode=Number(process.env.VERSION_CODE); fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');"
         env:
           VERSION_NAME: ${{ inputs.version }}
           VERSION_CODE: ${{ inputs.build_number }}
+
+      - name: Detect changes (code, added & deleted files)
+        # Fails the run if no file changes are present after the version stamp.
+        # Prints added/modified/deleted files so the reason is visible in logs.
+        run: |
+          set -euo pipefail
+          echo "=== git status (porcelain) ==="
+          git status --porcelain
+          echo
+          echo "=== changed files (name-status vs HEAD) ==="
+          git diff --name-status HEAD || true
+          echo
+          echo "=== diff stat ==="
+          git diff --stat HEAD || true
+          echo
+          CHANGED=$(git status --porcelain | wc -l)
+          if [ "$CHANGED" -eq 0 ]; then
+            echo "::error::No file changes detected after the app build/version stamp. Expected at least the version-stamped app.json (and any source changes) to be present. Aborting: nothing to release."
+            exit 1
+          fi
+          echo "Detected $CHANGED changed file(s). Proceeding."
 
       - name: Decode release keystore from secrets
         # Requires repo secret KEYSTORE_BASE64: `base64 -w 0 melo-release.jks`
@@ -128,6 +151,24 @@ jobs:
         run: |
           cd android
           ./gradlew app:assembleRelease -PmeloRequireReleaseSigning=true --stacktrace
+
+      - name: Detect changes after build (code, added & deleted files)
+        # Second check: ensure the Gradle build itself did not leave the tree
+        # clean in a way that hides missing work; fail if nothing changed.
+        run: |
+          set -euo pipefail
+          echo "=== git status (porcelain) ==="
+          git status --porcelain
+          echo
+          echo "=== changed files (name-status vs HEAD) ==="
+          git diff --name-status HEAD || true
+          echo
+          CHANGED=$(git status --porcelain | wc -l)
+          if [ "$CHANGED" -eq 0 ]; then
+            echo "::error::No file changes detected after the Gradle build. Expected version-stamped app.json and any source changes. Aborting: nothing to release."
+            exit 1
+          fi
+          echo "Detected $CHANGED changed file(s) after build. Proceeding."
 
       - name: Verify signature and version of the built APK
         env:
