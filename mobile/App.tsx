@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
@@ -13,7 +13,7 @@ import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-go
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Home, Library, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, Settings, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
 import { fetchGenreTracks, fetchHome, searchAudius } from './src/api';
 import { buildHomeFeed, type HomeFeed } from './src/feed';
-import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PromptModal, RiseIn, SectionTitle, Artwork, TrackRow } from './src/components';
+import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PressableScale, PromptModal, RiseIn, SectionTitle, Artwork, TrackRow, useReduceMotion } from './src/components';
 import { LyricsSheet } from './src/lyrics-view';
 import { useUi } from './src/ui';
 import { addToQueue, clearQueue, currentRepeat, currentVolume, cycleRepeat, initPlayer, playTracks, playlist, seekTo, setVolume, skipNext, skipPrevious, togglePlayback, usePlayer, type RepeatMode } from './src/player';
@@ -106,10 +106,12 @@ function HomeScreen({ navigation }: any) {
           </Pressable>
         </View>
 
-        <Text style={styles.heroTitle}>Listen Now</Text>
-        <Text style={styles.heroDate}>
-          {greeting} · {today}
-        </Text>
+        <RiseIn>
+          <Text style={styles.heroTitle}>Listen Now</Text>
+          <Text style={styles.heroDate}>
+            {greeting} · {today}
+          </Text>
+        </RiseIn>
 
         {error ? <ErrorBanner message={error} /> : null}
 
@@ -145,7 +147,7 @@ function HomeScreen({ navigation }: any) {
                   : 'A fresh set from across the catalogue, every day'
               }
               action={
-                <Pressable
+                <PressableScale
                   style={styles.playPill}
                   onPress={() => playTracks(mix, 0)}
                   accessibilityRole="button"
@@ -153,7 +155,7 @@ function HomeScreen({ navigation }: any) {
                 >
                   <Play size={13} color={colors.accentInk} fill={colors.accentInk} />
                   <Text style={styles.playPillText}>Play</Text>
-                </Pressable>
+                </PressableScale>
               }
             />
             <Text style={styles.mixMeta}>
@@ -183,7 +185,7 @@ function HomeScreen({ navigation }: any) {
             <View style={styles.genreGrid}>
               {feed.genreTiles.map((genre, index) => (
                 <RiseIn key={genre.name} delay={index * 40} style={{ width: '48%' }}>
-                <Pressable
+                <PressableScale
                   style={styles.genreTile}
                   onPress={() => navigation.navigate('Genre', { genre: genre.name })}
                   accessibilityRole="button"
@@ -196,7 +198,7 @@ function HomeScreen({ navigation }: any) {
                   <Text style={styles.genreName} numberOfLines={1}>
                     {genre.name}
                   </Text>
-                </Pressable>
+                </PressableScale>
                 </RiseIn>
               ))}
             </View>
@@ -219,7 +221,7 @@ function HomeScreen({ navigation }: any) {
 function ArtCard({ track, context }: { track: Track; context: Track[] }) {
   return (
     <RiseIn>
-    <Pressable
+    <PressableScale
       style={styles.artCard}
       onPress={() => playTracks(context, Math.max(0, context.findIndex((item) => item.id === track.id)))}
       accessibilityRole="button"
@@ -237,7 +239,7 @@ function ArtCard({ track, context }: { track: Track; context: Track[] }) {
       <Text style={styles.artCardSubtitle} numberOfLines={1}>
         {track.artist}
       </Text>
-    </Pressable>
+    </PressableScale>
     </RiseIn>
   );
 }
@@ -932,7 +934,7 @@ function NowPlayingScreen({ navigation }: any) {
             }}
           >
             {artBox.width > 0 ? (
-              <Artwork source={art} size={Math.max(120, Math.min(artBox.width, artBox.height))} rounded={22} />
+              <ArtSwap key={track.id} uri={art} size={Math.max(120, Math.min(artBox.width, artBox.height))} />
             ) : null}
           </View>
 
@@ -984,14 +986,14 @@ function NowPlayingScreen({ navigation }: any) {
             <Pressable style={styles.nowControl} onPress={skipPrevious} accessibilityRole="button" accessibilityLabel="Previous track">
               <SkipBack size={30} color="#FFFFFF" fill="#FFFFFF" />
             </Pressable>
-            <Pressable
+            <PressableScale
               style={styles.nowPlay}
               onPress={togglePlayback}
               accessibilityRole="button"
               accessibilityLabel={status.playing ? 'Pause' : 'Play'}
             >
               {status.playing ? <Pause size={44} color="#FFFFFF" fill="#FFFFFF" /> : <Play size={44} color="#FFFFFF" fill="#FFFFFF" />}
-            </Pressable>
+            </PressableScale>
             <Pressable style={styles.nowControl} onPress={skipNext} accessibilityRole="button" accessibilityLabel="Next track">
               <SkipForward size={30} color="#FFFFFF" fill="#FFFFFF" />
             </Pressable>
@@ -1047,11 +1049,7 @@ function NowPlayingScreen({ navigation }: any) {
             </Pressable>
           </View>
 
-          {notice ? (
-            <View style={styles.notice} pointerEvents="none">
-              <Text style={styles.noticeText}>{notice}</Text>
-            </View>
-          ) : null}
+          <NoticeToast text={notice} />
         </View>
       </SafeAreaView>
 
@@ -1267,6 +1265,60 @@ export default function App() {
         <LyricsSheet />
       </GestureHandlerRootView>
     </SafeAreaProvider>
+  );
+}
+
+/** The cover fades and settles in whenever the track changes. */
+function ArtSwap({ uri, size }: { uri?: string; size: number }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1.03)).current;
+  const reduce = useReduceMotion();
+
+  useEffect(() => {
+    if (reduce) {
+      opacity.setValue(1);
+      scale.setValue(1);
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 320, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 420, useNativeDriver: true }),
+    ]).start();
+  }, [opacity, scale, reduce]);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ scale }] }}>
+      <Artwork source={uri} size={size} rounded={22} />
+    </Animated.View>
+  );
+}
+
+/** Confirmations slide up into place instead of blinking in. */
+function NoticeToast({ text }: { text: string | null }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const shift = useRef(new Animated.Value(10)).current;
+  const reduce = useReduceMotion();
+
+  useEffect(() => {
+    if (!text) return;
+    if (reduce) {
+      opacity.setValue(1);
+      shift.setValue(0);
+      return;
+    }
+    opacity.setValue(0);
+    shift.setValue(10);
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.timing(shift, { toValue: 0, duration: 240, useNativeDriver: true }),
+    ]).start();
+  }, [text, opacity, shift, reduce]);
+
+  if (!text) return null;
+  return (
+    <Animated.View style={[styles.notice, { opacity, transform: [{ translateY: shift }] }]} pointerEvents="none">
+      <Text style={styles.noticeText}>{text}</Text>
+    </Animated.View>
   );
 }
 

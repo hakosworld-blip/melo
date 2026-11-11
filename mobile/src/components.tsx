@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import { ListPlus, Music2, Pause, Play, Plus, SkipForward, X } from 'lucide-react-native';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import { useNavigation } from '@react-navigation/native';
@@ -72,6 +72,27 @@ export function AmbientBackdrop() {
   );
 }
 
+/** The OS setting wins: motion is skipped, not just shortened, when it's off. */
+export function useReduceMotion() {
+  const [reduce, setReduce] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (active) setReduce(enabled);
+      })
+      .catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  return reduce;
+}
+
 /** Sections rise in, one after another, instead of snapping into place. */
 export function RiseIn({
   children,
@@ -84,15 +105,54 @@ export function RiseIn({
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const shift = useRef(new Animated.Value(16)).current;
+  const reduce = useReduceMotion();
 
   useEffect(() => {
+    if (reduce) {
+      opacity.setValue(1);
+      shift.setValue(0);
+      return;
+    }
     Animated.parallel([
       Animated.timing(opacity, { toValue: 1, duration: 420, delay, useNativeDriver: true }),
       Animated.timing(shift, { toValue: 0, duration: 480, delay, useNativeDriver: true }),
     ]).start();
-  }, [opacity, shift, delay]);
+  }, [opacity, shift, delay, reduce]);
 
   return <Animated.View style={[style, { opacity, transform: [{ translateY: shift }] }]}>{children}</Animated.View>;
+}
+
+/**
+ * Press feedback: a short scale-down on touch and a slower release. Uses the
+ * native driver, so it never waits on the JS thread to feel responsive.
+ */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export function PressableScale({ style, children, disabled, ...rest }: PressableProps & { children?: ReactNode }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const reduce = useReduceMotion();
+
+  const animate = (toValue: number, duration: number) => {
+    Animated.timing(scale, { toValue, duration, useNativeDriver: true }).start();
+  };
+
+  return (
+    <AnimatedPressable
+      {...rest}
+      disabled={disabled}
+      onPressIn={(event) => {
+        if (!reduce && !disabled) animate(0.955, 90);
+        rest.onPressIn?.(event);
+      }}
+      onPressOut={(event) => {
+        if (!reduce) animate(1, 200);
+        rest.onPressOut?.(event);
+      }}
+      style={[style as StyleProp<ViewStyle>, { transform: [{ scale }] }]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
 }
 
 export function Artwork({
@@ -468,7 +528,7 @@ export function MiniPlayer() {
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
       </View>
-      <Pressable
+      <PressableScale
         style={styles.miniPlay}
         onPress={togglePlayback}
         accessibilityRole="button"
@@ -479,7 +539,7 @@ export function MiniPlayer() {
         ) : (
           <Play size={16} color={colors.accentInk} fill={colors.accentInk} />
         )}
-      </Pressable>
+      </PressableScale>
       <Pressable style={styles.iconButton} onPress={skipNext} accessibilityRole="button" accessibilityLabel="Next track">
         <SkipForward size={18} color={colors.text} />
       </Pressable>
