@@ -82,7 +82,7 @@ const defaultSettings: Settings = {
   font: "sans",
   animations: "full",
   motion: "slide",
-  provider: "audius",
+  provider: "youtube",
   backgrounds: {
     app: plainBackground("#0A0A0B"),
     home: plainBackground("#0A0A0B"),
@@ -139,12 +139,13 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "melo-settings",
-      version: 3,
+      version: 4,
       /** v3 is the dark listening room: near-black canvas, white controls. */
       migrate: (persisted, version) => {
         const state = persisted as SettingsState;
         if (version < 2) return { ...state, accent: "ink", radius: 10, theme: "dark" };
         if (version < 3) return { ...state, theme: "dark", radius: 10 };
+        if (version < 4) return { ...state, provider: "youtube" };
         return state;
       },
     },

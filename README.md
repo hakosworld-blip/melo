@@ -116,9 +116,9 @@ Both apps share one system: a dark listening room with dense type and no decorat
 
 Every source implements one interface (`lib/types.ts` → `MusicProvider`): `home`, `search`, `track`, `artist`, `album`, `streamUrl`, `availability`. The UI, queue, player, downloads and offline library only see normalised `Track`/`Artist`/`Album` shapes, so a new source is one file plus a registry entry — no UI changes.
 
-**Audius** (default, works out of the box) — public keyless API. Full-length streams, real play counts, bios, albums, playlists, collaborators and an explicit `is_downloadable` flag per track. Stream-gated tracks are never played and never offered.
+**Audius** — public keyless API. Full-length streams, real play counts, bios, albums, playlists, collaborators and an explicit `is_downloadable` flag per track. Stream-gated tracks are never played and never offered.
 
-**YouTube Music** — implemented through `yt-dlp` (yt-dlp-nightly) for search, YouTube Music metadata (track/artist/album/year), channel-based artist pages sorted by real view counts, and audio resolved on demand. Downloads are disabled for this source because YouTube does not authorise downloading. YouTube blocks datacenter IPs ("confirm you're not a bot"), so on a cloud host the provider reports that clearly and the UI suggests Audius.
+**YouTube Music** (default) — implemented through `yt-dlp` (yt-dlp-nightly) for search, YouTube Music metadata (track/artist/album/year), channel-based artist pages sorted by real view counts, and audio resolved on demand. Downloads are disabled for this source because YouTube does not authorise downloading. YouTube blocks datacenter IPs ("confirm you're not a bot"), so on a cloud host the provider reports that clearly and the UI suggests Audius.
 
 Enable YouTube locally:
 
