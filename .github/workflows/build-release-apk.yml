@@ -3,7 +3,7 @@ name: Build · Test · Release APK
 # Manual trigger: Actions tab -> "Build · Test · Release APK" -> Run workflow.
 # You choose the release tag, version number and whether it is a pre-release.
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       tag:
@@ -83,12 +83,7 @@ jobs:
 
       - name: Stamp version into app.json
         run: |
-          - name: Stamp version into app.json
-        run: |
-          node -e "const fs=require('fs'); const p='app.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.expo.version=process.env.VERSION_NAME; j.expo.android.versionCode=Number(process.env.VERSION_CODE); fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');"
-        env:
-          VERSION_NAME: ${{ inputs.version }}
-          VERSION_CODE: ${{ inputs.build_number }}
+          node -e "const fs=require('fs'); const p='app.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.expo.version=process.env.VERSION_NAME; j.expo.android.versionCode=Number(process.env.VERSION_CODE); fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\\n');"
         env:
           VERSION_NAME: ${{ inputs.version }}
           VERSION_CODE: ${{ inputs.build_number }}
