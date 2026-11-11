@@ -8,6 +8,7 @@ import NowPlaying from "@/components/now-playing";
 import GlobalSheets from "@/components/global-sheets";
 import PageTransition from "@/components/page-transition";
 import SectionBackground from "@/components/section-background";
+import AmbientBackdrop from "@/components/ambient-backdrop";
 import { usePlayer } from "@/store/player";
 import { toast } from "@/store/toast";
 
@@ -24,6 +25,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex h-dvh overflow-hidden">
       <SectionBackground section="app" />
+      <AmbientBackdrop />
       <Sidebar />
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <main

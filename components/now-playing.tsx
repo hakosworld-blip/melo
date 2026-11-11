@@ -169,7 +169,7 @@ export default function NowPlaying() {
                   {settings.nowPlaying.glow && (
                     <div
                       aria-hidden="true"
-                      className="absolute -inset-8 -z-10 rounded-[40px] bg-white/6 blur-3xl"
+                      className="anim-glow absolute -inset-8 -z-10 rounded-[40px] bg-white/6 blur-3xl"
                     />
                   )}
                   <div key={track.id} className="anim-scale">
@@ -254,7 +254,7 @@ export default function NowPlaying() {
                     <button
                       onClick={() => openSheet({ type: "trackMenu", track })}
                       aria-label="More options"
-                      className="press focus-ring glass flex h-9 w-9 items-center justify-center rounded-full text-white/85 hover:text-white"
+                      className="press focus-ring glass icon-btn h-9 w-9 text-white/85 hover:text-white"
                     >
                       <IconMore size={18} />
                     </button>
@@ -381,7 +381,7 @@ function DockButton({
       title={label}
       aria-pressed={active}
       className={cn(
-        "press focus-ring relative flex h-11 w-11 items-center justify-center rounded-full transition-colors",
+        "press focus-ring icon-btn relative h-11 w-11 transition-colors",
         active ? "text-white" : "text-white/65 hover:bg-white/10 hover:text-white",
       )}
     >

@@ -13,7 +13,7 @@ const buttonBase =
 
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-accent text-accentink hover:brightness-95",
-  surface: "bg-surface2 text-ink border border-line hover:bg-[color-mix(in_srgb,var(--ink)_10%,var(--surface-2))]",
+  surface: "glass text-ink hover:border-[color-mix(in_srgb,var(--ink)_24%,transparent)] hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]",
   ghost: "text-ink/80 hover:text-ink hover:bg-[color-mix(in_srgb,var(--ink)_7%,transparent)]",
   danger: "bg-[#c0453a] text-white hover:brightness-110",
 };
@@ -56,7 +56,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        "press focus-ring inline-flex items-center justify-center rounded-full transition-colors",
+        "press focus-ring icon-btn",
         dimensions,
         active
           ? "text-accent bg-[color-mix(in_srgb,var(--accent)_14%,transparent)]"
@@ -140,7 +140,7 @@ export function Sheet({
           "mx-0 sm:mx-6",
           wide ? "sm:max-w-2xl" : "sm:max-w-md",
           "max-h-[88vh] sm:max-h-[82vh] flex flex-col",
-          "rounded-t-[20px] sm:rounded-[16px] border border-transparent sm:border-line",
+          "rounded-t-[20px] sm:rounded-[16px] border border-transparent sm:border-[var(--glass-line)]",
           "glass-strong shadow-[0_-24px_60px_-30px_rgba(0,0,0,0.8)] sm:shadow-[var(--shadow-soft)]",
           "pb-[max(env(safe-area-inset-bottom),14px)] sm:pb-0",
         )}

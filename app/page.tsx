@@ -200,7 +200,7 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="mt-2 divide-y divide-[color-mix(in_srgb,var(--ink)_6%,transparent)]">
+            <div className="glass-card rise-list mt-2 divide-y divide-[color-mix(in_srgb,var(--ink)_6%,transparent)] rounded-[18px] px-1.5 py-1">
               {(mixOpen ? mixTracks : mixTracks.slice(0, MIX_PREVIEW)).map((track, index) => (
                 <TrackRow key={`mix-${track.id}`} track={track} index={index} context={mixTracks} />
               ))}
@@ -227,7 +227,7 @@ export default function HomePage() {
         {genres.length > 0 && (
           <section className="anim-fade mt-8">
             <SectionTitle title="Genres" subtitle="Browse the catalogue by sound" />
-            <div className="mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="rise-list mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {genres.map((genre) => (
                 <Link
                   key={genre.name}
@@ -325,7 +325,7 @@ function ShelfSection({ section, index }: { section: HomeSection; index: number 
 }
 
 function Shelf({ children }: { children: React.ReactNode }) {
-  return <div className="shelf no-scrollbar mt-1">{children}</div>;
+  return <div className="shelf rise-list no-scrollbar mt-1">{children}</div>;
 }
 
 function shuffle(tracks: Track[]): Track[] {

@@ -47,7 +47,7 @@ export default function AppBar({
     <div
       ref={ref}
       data-scrolled={scrolled}
-      className={cn("appbar chrome sticky top-0 z-30 pt-[env(safe-area-inset-top)]", className)}
+      className={cn("appbar chrome sticky top-0 z-30 pt-[env(safe-area-inset-top)] backdrop-saturate-150", className)}
     >
       <div className="flex min-h-[58px] items-center gap-2 pb-1.5 pt-1">
         {backHref && (

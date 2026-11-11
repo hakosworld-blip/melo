@@ -27,7 +27,7 @@ export default function MiniPlayer() {
 
   return (
     <div className="fixed inset-x-0 bottom-[calc(75px+env(safe-area-inset-bottom))] z-40 px-3 lg:bottom-2 lg:left-[248px] lg:px-2">
-      <div className="glass-strong relative mx-auto flex h-[58px] max-w-4xl items-center gap-1.5 overflow-hidden rounded-[16px] px-2 shadow-[0_20px_50px_-26px_rgba(0,0,0,0.9)]">
+      <div className="glass-strong relative mx-auto flex h-[58px] max-w-4xl items-center gap-1.5 overflow-hidden rounded-[18px] px-2">
         <div className="absolute inset-x-0 bottom-0 h-[2px] bg-[color-mix(in_srgb,var(--ink)_9%,transparent)]">
           <div className="h-full bg-accent transition-[width] duration-300 ease-linear" style={{ width: `${pct}%` }} />
         </div>
@@ -54,21 +54,21 @@ export default function MiniPlayer() {
         <button
           onClick={() => openSheet({ type: "queue" })}
           aria-label="Up next"
-          className="press focus-ring hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink/70 hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink sm:flex"
+          className="press focus-ring icon-btn hidden h-9 w-9 shrink-0 text-ink/70 hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink sm:flex"
         >
           <IconQueue size={18} />
         </button>
         <button
           onClick={toggle}
           aria-label={progress.playing ? "Pause" : "Play"}
-          className="press focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)]"
+          className="press focus-ring icon-btn h-10 w-10 shrink-0 text-ink hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)]"
         >
           {progress.playing ? <IconPause size={19} /> : <IconPlay size={19} />}
         </button>
         <button
           onClick={() => next()}
           aria-label="Next track"
-          className="press focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink/85 hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink"
+          className="press focus-ring icon-btn h-10 w-10 shrink-0 text-ink/85 hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink"
         >
           <IconNext size={19} />
         </button>

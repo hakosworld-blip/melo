@@ -23,7 +23,7 @@ export default function Sidebar() {
   const { available: canInstall, install } = useInstallPrompt();
 
   return (
-    <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-line/70 bg-[color-mix(in_srgb,var(--bg)_72%,transparent)] lg:flex">
+    <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-[var(--glass-line)] bg-[var(--glass)] backdrop-blur-2xl backdrop-saturate-150 lg:flex">
       <div className="px-6 pb-6 pt-7">
         <Link href="/" className="group inline-flex items-baseline gap-1.5">
           <span className="font-display text-[26px] leading-none tracking-[-0.055em]">melo</span>
@@ -40,8 +40,8 @@ export default function Sidebar() {
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "press relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors",
-                active ? "bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] text-ink" : "text-muted hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] hover:text-ink",
+                "press isolate relative flex items-center gap-3 rounded-full px-3 py-2.5 text-[13.5px] font-medium transition-colors",
+                active ? "nav-active text-ink" : "text-muted hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] hover:text-ink",
               )}
             >
               <Icon size={19} strokeWidth={active ? 2 : 1.7} filled={href === "/" ? active : undefined} />
@@ -56,7 +56,7 @@ export default function Sidebar() {
         <button
           onClick={() => openSheet({ type: "createPlaylist" })}
           aria-label="New playlist"
-          className="press focus-ring flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink"
+          className="press focus-ring icon-btn h-7 w-7 text-muted hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] hover:text-ink"
         >
           <IconPlus size={14} />
         </button>
@@ -76,8 +76,8 @@ export default function Sidebar() {
               key={playlist.id}
               href={`/playlist/${playlist.id}`}
               className={cn(
-                "press group flex items-center gap-3 rounded-lg px-2 py-1.5",
-                pathname === `/playlist/${playlist.id}` ? "bg-[color-mix(in_srgb,var(--ink)_9%,transparent)]" : "hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]",
+                "press isolate group flex items-center gap-3 rounded-full px-2 py-1.5",
+                pathname === `/playlist/${playlist.id}` ? "nav-active" : "hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]",
               )}
             >
               <Artwork
@@ -105,7 +105,7 @@ export default function Sidebar() {
                 <Link
                   key={artist.id}
                   href={`/artist/${encodeURIComponent(artist.id)}`}
-                  className="press flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]"
+                  className="press flex items-center gap-3 rounded-full px-2 py-1.5 hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)]"
                 >
                   <Artwork
                     src={artist.artwork}
@@ -126,7 +126,7 @@ export default function Sidebar() {
         {canInstall && (
           <button
             onClick={() => void install()}
-            className="press focus-ring mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-ink"
+            className="press focus-ring mb-1 flex w-full items-center gap-3 rounded-full px-3 py-2.5 text-[13px] font-medium text-ink"
           >
             <IconDownload size={19} /> Install melo
           </button>
@@ -134,8 +134,8 @@ export default function Sidebar() {
         <Link
           href="/settings"
           className={cn(
-            "press flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors",
-            pathname.startsWith("/settings") ? "bg-[color-mix(in_srgb,var(--ink)_9%,transparent)] text-ink" : "text-muted hover:text-ink",
+            "press isolate flex items-center gap-3 rounded-full px-3 py-2.5 text-[13px] font-medium transition-colors",
+            pathname.startsWith("/settings") ? "nav-active text-ink" : "text-muted hover:text-ink",
           )}
         >
           <IconSettings size={19} strokeWidth={pathname.startsWith("/settings") ? 2 : 1.7} />
