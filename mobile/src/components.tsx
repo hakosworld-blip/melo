@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { ListPlus, Music2, Pause, Play, Plus, SkipForward, X } from 'lucide-react-native';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import { useNavigation } from '@react-navigation/native';
@@ -29,6 +29,10 @@ export const colors = {
   paleGreen: '#10201A',
   paleYellow: '#241D0F',
   stage: '#121114',
+  glass: 'rgba(255,255,255,0.055)',
+  glassStrong: 'rgba(22,22,28,0.9)',
+  glassLine: 'rgba(255,255,255,0.13)',
+  glassHighlight: 'rgba(255,255,255,0.10)',
 };
 
 export const fonts = {
@@ -45,6 +49,50 @@ export function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * The room's light.
+ *
+ * Glass only reads as glass when something sits behind it. Two soft colour
+ * pools per hue are stacked (large + faint, then smaller + slightly brighter)
+ * so they fade like blurred light without pulling in a native blur module.
+ * Decorative only.
+ */
+export function AmbientBackdrop() {
+  return (
+    <View pointerEvents="none" style={styles.ambient}>
+      <View style={[styles.orb, styles.orbOuter, { top: -240, left: -200, backgroundColor: '#4F7DFF' }]} />
+      <View style={[styles.orb, styles.orbInner, { top: -160, left: -120, backgroundColor: '#4F7DFF' }]} />
+      <View style={[styles.orb, styles.orbOuter, { top: 80, right: -240, backgroundColor: '#A855F7' }]} />
+      <View style={[styles.orb, styles.orbInner, { top: 150, right: -160, backgroundColor: '#A855F7' }]} />
+      <View style={[styles.orb, styles.orbOuter, { bottom: -320, left: 10, backgroundColor: '#1FA97A' }]} />
+      <View style={[styles.orb, styles.orbInner, { bottom: -240, left: 70, backgroundColor: '#1FA97A' }]} />
+    </View>
+  );
+}
+
+/** Sections rise in, one after another, instead of snapping into place. */
+export function RiseIn({
+  children,
+  delay = 0,
+  style,
+}: {
+  children: ReactNode;
+  delay?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const shift = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 420, delay, useNativeDriver: true }),
+      Animated.timing(shift, { toValue: 0, duration: 480, delay, useNativeDriver: true }),
+    ]).start();
+  }, [opacity, shift, delay]);
+
+  return <Animated.View style={[style, { opacity, transform: [{ translateY: shift }] }]}>{children}</Animated.View>;
 }
 
 export function Artwork({
@@ -149,6 +197,7 @@ export function TrackRow({
   const status = useAudioPlaylistStatus(playlist);
   const isCurrent = queue[status.currentIndex]?.id === track.id;
   return (
+    <RiseIn delay={((index ?? 0) % 10) * 35}>
     <View style={styles.trackRow}>
       <Pressable
         style={styles.trackMain}
@@ -202,6 +251,7 @@ export function TrackRow({
       ) : null}
       {index !== undefined ? <Text style={styles.index}>{index + 1}</Text> : null}
     </View>
+    </RiseIn>
   );
 }
 
@@ -438,6 +488,25 @@ export function MiniPlayer() {
 }
 
 export const styles = StyleSheet.create({
+  ambient: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  orb: { position: 'absolute', borderRadius: 999 },
+  orbOuter: { width: 620, height: 620, borderRadius: 310, opacity: 0.05 },
+  orbInner: { width: 380, height: 380, borderRadius: 190, opacity: 0.1 },
+  glassPanel: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.glassLine,
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  glassTile: {
+    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 7,
+  },
   artwork: { backgroundColor: colors.surfaceRaised },
   artworkFallback: { backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   label: {
@@ -514,12 +583,17 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surfaceRaised,
-    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.glassStrong,
+    borderColor: colors.glassLine,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
     paddingHorizontal: 8,
     paddingVertical: 7,
+    shadowColor: '#000000',
+    shadowOpacity: 0.45,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 14,
   },
   miniText: { flex: 1, minWidth: 0 },
   miniTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13 },

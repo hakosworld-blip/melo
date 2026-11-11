@@ -13,7 +13,7 @@ import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-go
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Home, Library, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, Settings, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
 import { fetchGenreTracks, fetchHome, searchAudius } from './src/api';
 import { buildHomeFeed, type HomeFeed } from './src/feed';
-import { AddToPlaylistSheet, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PromptModal, SectionTitle, Artwork, TrackRow } from './src/components';
+import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PromptModal, RiseIn, SectionTitle, Artwork, TrackRow } from './src/components';
 import { LyricsSheet } from './src/lyrics-view';
 import { useUi } from './src/ui';
 import { addToQueue, clearQueue, currentRepeat, currentVolume, cycleRepeat, initPlayer, playTracks, playlist, seekTo, setVolume, skipNext, skipPrevious, togglePlayback, usePlayer, type RepeatMode } from './src/player';
@@ -160,9 +160,11 @@ function HomeScreen({ navigation }: any) {
               {mix.length} songs · {mixMinutes} min
               {feed?.personalised ? ' · from your plays on this device' : ''}
             </Text>
-            {(showAllMix ? mix : mix.slice(0, 5)).map((track, index) => (
-              <TrackRow key={track.id} track={track} context={mix} index={index} />
-            ))}
+            <View style={styles.glassPanel}>
+              {(showAllMix ? mix : mix.slice(0, 5)).map((track, index) => (
+                <TrackRow key={track.id} track={track} context={mix} index={index} />
+              ))}
+            </View>
             {mix.length > 5 ? (
               <Pressable
                 style={styles.linkButton}
@@ -179,9 +181,9 @@ function HomeScreen({ navigation }: any) {
           <View>
             <SectionTitle title="Genres" subtitle="Browse the catalogue by sound" />
             <View style={styles.genreGrid}>
-              {feed.genreTiles.map((genre) => (
+              {feed.genreTiles.map((genre, index) => (
+                <RiseIn key={genre.name} delay={index * 40} style={{ width: '48%' }}>
                 <Pressable
-                  key={genre.name}
                   style={styles.genreTile}
                   onPress={() => navigation.navigate('Genre', { genre: genre.name })}
                   accessibilityRole="button"
@@ -195,6 +197,7 @@ function HomeScreen({ navigation }: any) {
                     {genre.name}
                   </Text>
                 </Pressable>
+                </RiseIn>
               ))}
             </View>
           </View>
@@ -215,6 +218,7 @@ function HomeScreen({ navigation }: any) {
 /** Square artwork with a play affordance, as on the phone app's home. */
 function ArtCard({ track, context }: { track: Track; context: Track[] }) {
   return (
+    <RiseIn>
     <Pressable
       style={styles.artCard}
       onPress={() => playTracks(context, Math.max(0, context.findIndex((item) => item.id === track.id)))}
@@ -234,6 +238,7 @@ function ArtCard({ track, context }: { track: Track; context: Track[] }) {
         {track.artist}
       </Text>
     </Pressable>
+    </RiseIn>
   );
 }
 
@@ -1204,8 +1209,8 @@ function MainTabs() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.line,
+            backgroundColor: 'rgba(16,16,20,0.94)',
+            borderTopColor: 'rgba(255,255,255,0.10)',
             borderTopWidth: StyleSheet.hairlineWidth,
             height: 64,
             paddingTop: 7,
@@ -1246,9 +1251,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={styles.root}>
+        <AmbientBackdrop />
         <NavigationContainer>
           <StatusBar style="light" />
-          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Playlist" component={PlaylistScreen} />
             <Stack.Screen name="Import" component={ImportScreen} options={{ presentation: 'modal' }} />
@@ -1266,7 +1272,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  screen: { flex: 1, backgroundColor: colors.bg },
+  screen: { flex: 1 },
 
   // --- shared page furniture ---------------------------------------------
   page: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 170 },
@@ -1363,6 +1369,14 @@ const styles = StyleSheet.create({
 
   // --- home ---------------------------------------------------------------
   homePage: { paddingHorizontal: 18, paddingTop: 2, paddingBottom: 190 },
+  glassPanel: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
   homeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   wordmark: { color: colors.text, fontFamily: fonts.sansBold, fontSize: 20, letterSpacing: -0.8 },
   avatar: {
@@ -1371,8 +1385,8 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.glass,
+    borderColor: colors.glassLine,
     borderWidth: 1,
   },
   heroTitle: { color: colors.text, fontFamily: fonts.sansBold, fontSize: 36, letterSpacing: -1.6, marginTop: 10 },
@@ -1423,12 +1437,14 @@ const styles = StyleSheet.create({
   linkText: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 12.5, textDecorationLine: 'underline' },
   genreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   genreTile: {
-    width: '48%',
+    width: '100%',
     height: 84,
-    borderRadius: 10,
+    borderRadius: 12,
     overflow: 'hidden',
     justifyContent: 'flex-end',
     backgroundColor: colors.surfaceRaised,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
   },
   genreScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,11,0.46)' },
   genreName: { color: '#FFFFFF', fontFamily: fonts.sansBold, fontSize: 15, letterSpacing: -0.3, padding: 10 },
