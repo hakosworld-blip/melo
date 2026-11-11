@@ -11,7 +11,7 @@ import type { Track } from './types';
 /**
  * A listening room, not a document: near-black canvas, raised charcoal
  * surfaces, hairline rules and one white accent. Display type is the same tight
- * grotesque as the web build, and colour only ever comes from artwork.
+ * grotesque as the desktop app, and colour only ever comes from artwork.
  */
 
 export const colors = {

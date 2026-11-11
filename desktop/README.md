@@ -1,28 +1,68 @@
 # melo desktop
 
-Electron wrapper around the melo Next.js app, packaged for Linux and Windows 10/11.
+A standalone Electron app for Linux and Windows 10/11. It has **no web
+framework at runtime**: the UI is a Vite + React renderer, and the app ships its
+own local engine — a small `node:http` server — which serves both the built
+renderer and every `/api` route on a loopback port.
 
-The app runs the same UI and the same local API routes as the web build: the Next
-standalone server is bundled inside the installer and started on a free loopback
-port when melo opens. Nothing is served to the network, and no account or
-telemetry is involved.
+Nothing is exposed to the network by default, and there is no account or
+telemetry.
+
+## Layout
+
+```
+main.js              Electron entry: starts the engine, then opens the window
+engine/index.ts      Local engine: /api routes + static renderer, on node:http
+src/                 Renderer
+  main.tsx           Entry and route table
+  lib/router.tsx     Link / usePathname / useRouter / useParams
+  lib/               providers, feed, lyrics, spotify, imports, storage, player engine
+  store/             player, downloads, library, settings (zustand)
+  pages/             Home, Search, Library, Settings, artist, album, playlist, genre
+  components/        Now Playing, lyrics, queue, sheets, rows, cards, UI primitives
+index.html           Vite entry (carries the theme boot script)
+vite.config.ts       @ alias, Tailwind plugin, dev API proxy
+```
 
 ## Build locally
 
 ```bash
-# from the repository root
-npm ci
-MELO_DESKTOP_BUILD=1 npm run build     # Windows PowerShell: $env:MELO_DESKTOP_BUILD="1"
-node scripts/prepare-desktop.mjs
-
 cd desktop
 npm ci
-npm run build:linux     # AppImage -> desktop/dist
-npm run build:windows   # NSIS installer -> desktop/dist (best run on Windows or CI)
+npm run dev            # renderer only, hot reload, /api proxied to :3210
+npm run build          # engine bundle + renderer build
+npm start              # build, then launch the Electron window
+npm run build:linux    # AppImage -> desktop/dist
+npm run build:windows  # NSIS installer -> desktop/dist (Windows or CI)
 ```
 
-`npm start` in `desktop/` launches the packaged entry point against the bundle in
-`../.next/standalone`, which is handy while working on the shell.
+To work on the UI with hot reload, run the engine in one terminal and Vite in
+another:
+
+```bash
+# terminal 1 — the engine the renderer talks to
+npm run build:engine
+PORT=3210 node engine/server.cjs
+
+# terminal 2 — the renderer
+npm run dev
+```
+
+Then `MELO_DEV_URL=http://localhost:5173 npx electron .` if you want the Electron
+window pointed at the dev server instead of the built shell.
+
+## Letting a phone reach it
+
+The Android app can use this engine for YouTube playlist import and playback.
+The engine binds loopback by default, so opt in explicitly:
+
+```bash
+npm run build:engine
+MELO_ENGINE_HOST=0.0.0.0 PORT=3000 node engine/server.cjs
+```
+
+Then put `http://<your-computer-LAN-ip>:3000` in the phone's **Settings → Melo
+server**. Only do this on a network you trust.
 
 ## Releases
 
@@ -49,7 +89,12 @@ Artifacts per platform:
 | Linux x64 | `melo-<version>-linux-x64.AppImage` |
 | Windows 10/11 x64 | `melo-<version>-windows-x64-setup.exe` |
 
-The Windows installer is unsigned, so Windows SmartScreen will show an
-"unknown publisher" prompt until the build is signed with a code-signing
-certificate. The Linux AppImage is unsigned in the same way; most desktops run it
-directly after `chmod +x`.
+The installers are unsigned, so Windows SmartScreen shows an "unknown publisher"
+prompt until the build is signed with a code-signing certificate. The Linux
+AppImage is unsigned in the same way; most desktops run it after `chmod +x`.
+
+## Bundled tools
+
+`bin/yt-dlp` is packaged next to the engine (`extraResources`) and resolved
+relative to the engine's working directory. If it is absent, the YouTube Music
+source reports that clearly instead of failing silently; Audius needs nothing.

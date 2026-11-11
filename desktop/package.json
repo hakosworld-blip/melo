@@ -2,17 +2,40 @@
   "name": "melo-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "melo desktop — the same free, ad-free music app, packaged for Linux and Windows.",
+  "description": "melo desktop — the same free, ad-free music app, standalone for Linux and Windows.",
   "homepage": "https://github.com/hakosworld-blip/melo",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "build:linux": "electron-builder --linux",
-    "build:windows": "electron-builder --win",
-    "pack:dir": "electron-builder --dir"
+    "dev": "vite",
+    "build:engine": "esbuild engine/index.ts --bundle --platform=node --format=cjs --target=node22 --outfile=engine/server.cjs --alias:@=./src",
+    "build:renderer": "vite build",
+    "build": "npm run build:engine && npm run build:renderer",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "build:linux": "npm run build && electron-builder --linux",
+    "build:windows": "npm run build && electron-builder --win",
+    "pack:dir": "npm run build && electron-builder --dir"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/newsreader": "^5.3.0",
+    "idb-keyval": "^6.2.1",
+    "lucide-react": "^0.469.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
     "electron": "45.2.3",
-    "electron-builder": "26.18.0"
+    "electron-builder": "26.18.0",
+    "esbuild": "^0.24.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
   }
 }

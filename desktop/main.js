@@ -5,7 +5,7 @@ const net = require('node:net');
 const path = require('node:path');
 
 const APP_ID = 'com.hakosworld.melo';
-const WINDOW_BACKGROUND = '#11100F';
+const WINDOW_BACKGROUND = '#0a0a0b';
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let serverProcess = null;
@@ -15,35 +15,15 @@ let serverOrigin = null;
 
 const isDev = !app.isPackaged;
 
-function bundledAppDirectory() {
-  // Packaged: extraResources copies .next/standalone to resources/app.
-  // Dev: run from the repository checkout.
+/** The engine is a plain Node script, bundled by esbuild at build time. */
+function engineEntry() {
   return isDev
-    ? path.join(__dirname, '..', '.next', 'standalone')
-    : path.join(process.resourcesPath, 'app');
+    ? path.join(__dirname, 'engine', 'server.cjs')
+    : path.join(process.resourcesPath, 'engine', 'server.cjs');
 }
 
-/**
- * The server needs a writable directory (Next writes caches into .next), and
- * AppImage mounts its bundle read-only, so copy the runtime into userData once
- * per app version.
- */
-async function ensureRuntimeDirectory() {
-  const runtimeRoot = path.join(app.getPath('userData'), 'runtime');
-  const target = path.join(runtimeRoot, app.getVersion());
-  const marker = path.join(target, 'server.js');
-
-  if (fs.existsSync(marker)) return target;
-
-  const bundled = bundledAppDirectory();
-  if (!fs.existsSync(path.join(bundled, 'server.js'))) {
-    throw new Error(`The melo server bundle is missing at ${bundled}.`);
-  }
-
-  await fs.promises.rm(runtimeRoot, { recursive: true, force: true });
-  await fs.promises.mkdir(runtimeRoot, { recursive: true });
-  await fs.promises.cp(bundled, target, { recursive: true });
-  return target;
+function rendererDirectory() {
+  return isDev ? path.join(__dirname, 'dist-renderer') : path.join(process.resourcesPath, 'renderer');
 }
 
 function portFilePath() {
@@ -95,9 +75,9 @@ function findFreePort() {
 }
 
 /**
- * Keep the same origin between launches. The web build keeps playlists,
- * downloads and settings in origin-scoped storage, so a random port each run
- * would hand the user an empty app every time.
+ * Keep the same origin between launches. Playlists, downloads and settings live
+ * in origin-scoped storage, so a random port each run would hand the user an
+ * empty app every time.
  */
 async function resolveStablePort() {
   const saved = readSavedPort();
@@ -107,9 +87,14 @@ async function resolveStablePort() {
   return port;
 }
 
-function startServer(directory, port) {
-  serverProcess = spawn(process.execPath, [path.join(directory, 'server.js')], {
-    cwd: directory,
+function startServer(port) {
+  const entry = engineEntry();
+  if (!fs.existsSync(entry)) {
+    throw new Error(`The melo engine is missing at ${entry}. Run npm run build first.`);
+  }
+  serverProcess = spawn(process.execPath, [entry], {
+    // The engine resolves bundled tools (bin/yt-dlp) relative to its cwd.
+    cwd: isDev ? __dirname : process.resourcesPath,
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
@@ -118,7 +103,7 @@ function startServer(directory, port) {
       NODE_ENV: 'production',
       HOSTNAME: '127.0.0.1',
       PORT: String(port),
-      NEXT_TELEMETRY_DISABLED: '1',
+      MELO_RENDERER_DIR: rendererDirectory(),
     },
   });
 
@@ -199,16 +184,17 @@ function createWindow() {
     }
   });
 
-  void window.loadURL(serverOrigin ?? 'about:blank');
+  void window.loadURL(process.env.MELO_DEV_URL || serverOrigin || 'about:blank');
   return window;
 }
 
 async function boot() {
   nativeTheme.themeSource = 'dark';
-  const directory = await ensureRuntimeDirectory();
-  const port = await resolveStablePort();
+  const port = isDev
+    ? Number(process.env.MELO_ENGINE_PORT || 3210)
+    : await resolveStablePort();
   serverOrigin = `http://127.0.0.1:${port}`;
-  startServer(directory, port);
+  startServer(port);
   await waitForServer(serverOrigin);
   mainWindow = createWindow();
   mainWindow.on('closed', () => {

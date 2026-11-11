@@ -1,7 +1,7 @@
 import type { Track } from './types';
 
 /**
- * Lyrics from LRCLIB — the same community source the web build uses.
+ * Lyrics from LRCLIB — the same community source the desktop app uses.
  * Synced lyrics are only claimed when the record actually carries timestamps;
  * otherwise the plain text is shown and labelled as not time-synced.
  */

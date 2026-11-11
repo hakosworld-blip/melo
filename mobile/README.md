@@ -11,7 +11,7 @@ npm run android:release
 
 ## Design and lyrics
 
-The app follows the same system as the web build: a near-black listening room (`#0A0A0B`), raised charcoal surfaces, hairline rules, Manrope for everything and tight display tracking. Colour only ever comes from artwork; there are no gradients, shadows or decorative borders.
+The app follows the same system as the desktop app: a near-black listening room (`#0A0A0B`), raised charcoal surfaces, hairline rules, Manrope for everything and tight display tracking. Colour only ever comes from artwork; there are no gradients, shadows or decorative borders.
 
 Now Playing is the dark stage from the phone mock it was designed against: the artwork is drawn full-screen with `blurRadius` behind a scrim, with a large rounded cover, title and `artist · album`, a **Pin** star, a `…` sheet, elapsed/total time, transport, a volume slider and a dock (Lyrics, Repeat, Up next). **Up next** lists the next 15 songs in order, with save-as-playlist and a confirmed clear.
 
@@ -27,8 +27,8 @@ Playlists live on the phone, in a JSON file in the app's private storage: create
 
 **Import** (`Library → Import`) accepts a public playlist link:
 
-- **Spotify** is read and matched entirely on the device — the public embed page gives the playlist's name and songs, each song is then searched in Audius with the same scoring rules as the web app (`src/importing.ts`). The playlist is saved with Spotify's name; songs that aren't in the catalogue are listed as skipped instead of being replaced.
-- **YouTube Music** needs a melo server on the same network, because reading a YouTube playlist requires `yt-dlp`, which can't run inside the app. Run the web/desktop app on a computer (`npm run dev`), then put that address (e.g. `http://192.168.1.20:3000`) in **Settings → Melo server**. YouTube-imported songs also play through that server, so they only work while it is reachable; Spotify songs never need it.
+- **Spotify** is read and matched entirely on the device — the public embed page gives the playlist's name and songs, each song is then searched in Audius with the same scoring rules as the desktop app (`src/importing.ts`). The playlist is saved with Spotify's name; songs that aren't in the catalogue are listed as skipped instead of being replaced.
+- **YouTube Music** needs a melo server on the same network, because reading a YouTube playlist requires `yt-dlp`, which can't run inside the app. Run the desktop app, or start its engine on the LAN (`MELO_ENGINE_HOST=0.0.0.0 PORT=3000 node desktop/engine/server.cjs`), then put that address (e.g. `http://192.168.1.20:3000`) in **Settings → Melo server**. YouTube-imported songs also play through that server, so they only work while it is reachable; Spotify songs never need it.
 
 The manifest allows cleartext HTTP so a plain `http://` server on your LAN works. If you rerun `expo prebuild`, add `android:usesCleartextTraffic="true"` to `<application>` again.
 

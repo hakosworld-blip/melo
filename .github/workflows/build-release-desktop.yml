@@ -90,31 +90,26 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: desktop/package-lock.json
 
-      - name: Install web dependencies
+      - name: Install dependencies
+        working-directory: desktop
         run: npm ci
 
-      - name: Stamp version into package manifests
+      - name: Stamp version into the package manifest
         shell: bash
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          node -e "const fs=require('fs');for(const p of ['package.json','desktop/package.json']){const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.VERSION;fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');}"
-          node -e "console.log('web version', require('./package.json').version, '| desktop version', require('./desktop/package.json').version)"
+          node -e "const fs=require('fs');const p='desktop/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.VERSION;fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');console.log('desktop version', j.version);"
 
-      - name: Build self-contained web bundle
-        env:
-          MELO_DESKTOP_BUILD: '1'
-          NEXT_TELEMETRY_DISABLED: '1'
-        run: npm run build
-
-      - name: Add static assets to the bundle
-        run: node scripts/prepare-desktop.mjs
-
-      - name: Install desktop dependencies
+      - name: Typecheck the renderer and engine
         working-directory: desktop
-        run: npm ci
+        run: npm run typecheck
+
+      - name: Build the renderer and the local engine
+        working-directory: desktop
+        run: npm run build
 
       - name: Package with electron-builder
         working-directory: desktop

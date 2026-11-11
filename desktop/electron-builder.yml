@@ -6,15 +6,22 @@ directories:
   output: dist
   buildResources: build
 
-# Only the Electron entry point lives in the asar; the Next server is added
-# as an unpacked resource so it can be executed and read at runtime.
+# Only the Electron entry point lives in the asar. The engine is executed as a
+# Node process, so it and the built renderer ship as unpacked resources.
 files:
   - main.js
   - package.json
 
 extraResources:
-  - from: ../.next/standalone
-    to: app
+  - from: engine/server.cjs
+    to: engine/server.cjs
+  - from: dist-renderer
+    to: renderer
+  # Optional: a bundled yt-dlp, if the release build provides one.
+  - from: bin
+    to: bin
+    filter:
+      - "**/*"
 
 asar: true
 compression: normal

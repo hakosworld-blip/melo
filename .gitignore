@@ -14,3 +14,6 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 .tmp/
 artifacts/
+desktop/dist-renderer/
+desktop/engine/server.cjs
+desktop/dist/

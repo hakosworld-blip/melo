@@ -5,7 +5,7 @@ import type { Track } from './types';
 /**
  * Playlists on the phone, kept in a JSON file in the app's private storage.
  * There is no account and no sync, so a playlist lives exactly as long as the
- * app is installed — the same promise the web build makes.
+ * app is installed — the same promise the desktop app makes.
  */
 
 export interface LocalPlaylist {

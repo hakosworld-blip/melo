@@ -18,16 +18,17 @@ It ships as a **desktop app** (Electron with its own bundled engine) and a **nat
 
 ## Quick start
 
-The desktop app is the shipped build: download the installer for Linux or Windows from the latest GitHub Release and run it. It carries its own local engine, so nothing else is needed — no browser and no hosted site.
+The desktop app is the shipped build: download the installer for Linux or Windows from the latest GitHub Release and run it. It carries its own local engine — no browser, no website, no external server — so a download and a double-click is the whole install.
 
 To build it yourself:
 
 ```bash
-npm install
-npm run dev                                  # development content for the desktop window
-npm run build                                # self-contained engine bundle
-node scripts/prepare-desktop.mjs             # add static assets to the bundle
-cd desktop && npm ci && npm run build:linux  # or build:windows
+cd desktop
+npm ci
+npm run dev          # renderer dev server with hot reload (run the engine alongside it)
+npm run build        # build the renderer and bundle the local engine
+npm run start        # build, then launch the Electron window
+npm run build:linux  # AppImage  (or build:windows)
 ```
 
 Optional, only for the YouTube Music source (see below):
@@ -57,7 +58,7 @@ GitHub Actions workflow (`.github/workflows/build-release-apk.yml`) typechecks t
 
 ### Desktop app (Linux + Windows 10/11)
 
-The desktop build lives in [`desktop/`](desktop): Electron packaging the melo UI with its own local engine — no browser, no hosted site, no accounts or telemetry. The engine is bundled inside the installer and started on a loopback port at launch, so a download and a double-click is all it takes.
+The desktop build lives in [`desktop/`](desktop): Electron hosting a Vite + React renderer and a small local engine (`node:http`, no framework) that serves every `/api` route and the app shell on a loopback port. Nothing in the running app depends on Next.js or a hosted site, and there are no accounts and no telemetry.
 
 ```bash
 cd desktop
@@ -73,36 +74,20 @@ npm run build:windows   # NSIS installer (use Windows or CI)
 ## Architecture
 
 ```
-app/
-  page.tsx                 Home — trending, genres, recently played, local top tracks
-  search/                  Live catalogue search (songs / artists / albums)
-  library/                 Playlists, followed artists, history, downloads
-  artist/[id]              Real artist profile: bio, top songs by play count, releases
-  album/[id]               Album / playlist detail
-  playlist/[id]            Local playlist editing, reordering, offline saving
-  settings/                Appearance, backgrounds, player, lyrics, source, storage
-  api/
-    home | search | track | artist | album     provider-backed JSON
-    import/spotify | import/youtube | import/match   playlist import + song matching
-    stream/[provider]/[id]                     ranged audio proxy (Node http)
-    image                                      artwork proxy with host allowlist
-    lyrics                                     LRCLIB lookup + manual search
-    providers                                  live source availability check
-lib/
-  provider/audius.ts       Audius provider — keyless, full-length, real metadata
-  spotify.ts               Public Spotify playlist reader (name + tracks, no key)
-  youtube-import.ts        YouTube Music playlist reader — exact videos, no matching
-  match-import.ts          Scores an imported song against catalogue search results
-  provider/youtube.ts      YouTube Music provider — yt-dlp (metadata + streaming only)
-  lyrics.ts                LRC parsing, matching, caching (LRCLIB)
-  player-engine.ts         HTMLAudioElement, Media Session, artwork metadata
-  storage.ts               IndexedDB assets, byte accounting, deletion
-store/
-  player.ts                Queue, repeat/shuffle, persistence, resume position
-  downloads.ts             Download queue, progress, retry, dedupe, refcount deletion
-  library.ts               Playlists, follows, history, local play counts
-  settings.ts              Every customisation, persisted to localStorage
-components/                Now Playing, lyrics, queue, sheets, rows, cards, UI primitives
+desktop/
+  main.js                  Electron entry: starts the engine, then opens the window
+  engine/index.ts          Local engine — every /api route plus the app shell, on node:http
+  src/
+    main.tsx               Renderer entry and the route table
+    lib/router.tsx         Link / usePathname / useRouter / useParams
+    lib/provider/          audius.ts, youtube.ts and the provider registry
+    lib/                   feed, lyrics, spotify, youtube-import, match-import, storage, player-engine
+    store/                 player, downloads, library, settings (zustand)
+    pages/                 Home, Search, Library, Settings, artist, album, playlist, genre
+    components/            Now Playing, lyrics, queue, sheets, rows, cards, UI primitives
+  index.html               Vite entry, carries the theme boot script
+  vite.config.ts           @ alias, Tailwind plugin, dev API proxy
+mobile/                    React Native + Expo Android app
 ```
 
 ### Design language
@@ -173,7 +158,7 @@ No account, no analytics, no telemetry, no third-party requests from the client 
 
 ## Honest limitations
 
-- **The desktop app and the native Android app are separate builds.** The repo ships an Electron desktop app under `desktop/` (self-contained: the engine is bundled into the installer) and a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The desktop build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing (with the blurred-artwork stage and synced lyrics), local playlists, playlist import and source checks are implemented; downloaded/offline files, artist/album detail pages, and the full settings surface are still to be ported.
+- **The desktop app and the native Android app are separate builds.** The repo ships an Electron desktop app under `desktop/` — a Vite + React renderer with its own bundled Node engine and no web framework at runtime — and a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The desktop build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the desktop app: home, search, queue, Now Playing (with the blurred-artwork stage and synced lyrics), local playlists, playlist import and source checks are implemented; downloaded/offline files, artist/album detail pages, and the full settings surface are still to be ported.
 - **YouTube import on Android needs a melo server.** Reading a YouTube playlist requires yt-dlp, which can't run inside the app, so the YouTube path (and playback of the songs it imports) uses an optional melo server address set in Settings. Spotify import, playlists and search work with no server at all.
 - **YouTube Music cannot stream from this cloud host** because YouTube bot-checks datacenter IPs. The provider is complete; it needs cookies or a residential IP. This is reported in-app rather than silently hidden.
 - **Downloads are source-dependent.** Tracks the source marks as downloadable get a real "Download" (permanent offline copy). Other streamable tracks can be saved as a clearly labelled *private offline copy*; melo never claims the artist authorised a download, and nothing from YouTube is downloaded.
@@ -202,10 +187,10 @@ Exercised in a real browser against the live catalogue, not just rendered:
 
 Not verified here: real airplane-mode testing (network was blocked at the page instead), OS lock-screen buttons on a physical device, and the signed Android APK on a real device. The mobile app typecheck and Expo config pass; Gradle signing happens in GitHub Actions with the secrets described in `mobile/android/key.properties.example`.
 
-For the desktop app, `MELO_DESKTOP_BUILD=1 npm run build`, `scripts/prepare-desktop.mjs`, and `electron-builder --linux` were all run successfully, producing a 160 MB AppImage whose bundled Next server answered `200` on `/`, `/_next/static/css/*`, and `/api/home`. The Electron window itself could not be launched in this container (missing Chromium system libraries and no root to install them), and the Windows installer was not built here.
+For the desktop app, the renderer was built with Vite and the engine bundled with esbuild; the engine was then run directly and answered `200` on `/` (app shell), on deep links, and on `/api/home`, `/api/search`, `/api/providers`, `/api/lyrics`, `/api/image` and `/api/import/spotify`, plus a ranged `/api/stream/...` request (`206`, `audio/mpeg`). `electron-builder` was not run here and the Electron window itself cannot be launched in this container (no Chromium system libraries, no root to install them), so the packaged installers and the window remain unverified.
 
 ## Legal
 
 melo is a client for sources you are authorised to use. It does not bypass DRM, paywalls, gated content or access controls, and it does not claim ownership of any music or lyrics. Lyrics are provided by LRCLIB; catalogue data and streams belong to the selected source. Respect the terms of the sources you configure.
 
-MIT licensed. Built with Next.js, React, Zustand, Tailwind CSS, React Native, Expo, LRCLIB, Audius and yt-dlp.
+MIT licensed. Built with React, Vite, Electron, Zustand, Tailwind CSS, React Native, Expo, LRCLIB, Audius and yt-dlp.
