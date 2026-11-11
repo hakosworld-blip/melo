@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Artwork } from "@/components/artwork";
-import { IconDownload, IconHome, IconLibrary, IconPlus, IconSearch, IconSettings } from "@/components/ui/icons";
+import { IconHome, IconLibrary, IconPlus, IconSearch, IconSettings } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { useInstallPrompt } from "@/lib/use-install-prompt";
 import { useLibrary } from "@/store/library";
 import { useUi } from "@/store/ui";
 
@@ -20,7 +19,6 @@ export default function Sidebar() {
   const playlists = useLibrary((s) => s.playlists);
   const followed = useLibrary((s) => s.followedArtists);
   const openSheet = useUi((s) => s.openSheet);
-  const { available: canInstall, install } = useInstallPrompt();
 
   return (
     <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-[var(--glass-line)] bg-[var(--glass)] backdrop-blur-2xl backdrop-saturate-150 lg:flex">
@@ -123,14 +121,6 @@ export default function Sidebar() {
       </div>
 
       <div className="border-t border-line/70 p-3">
-        {canInstall && (
-          <button
-            onClick={() => void install()}
-            className="press focus-ring mb-1 flex w-full items-center gap-3 rounded-full px-3 py-2.5 text-[13px] font-medium text-ink"
-          >
-            <IconDownload size={19} /> Install melo
-          </button>
-        )}
         <Link
           href="/settings"
           className={cn(

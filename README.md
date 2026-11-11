@@ -12,17 +12,22 @@ No subscriptions. No ads. No mandatory accounts. No artificial restrictions.
 
 melo is a full music application, not a mock-up. It streams real catalogue audio, searches a live catalogue, shows real artist bios and play counts when the source provides them, syncs lyrics from LRCLIB, stores downloads on-device (audio + artwork + metadata + lyrics), and works without a connection once you've downloaded tracks.
 
-It runs as a **Next.js app / installable PWA**. On Android it installs to the home screen and keeps playing in the background with lock-screen controls through the platform Media Session (title, artist, artwork, play/pause, next/previous, seek).
+It ships as a **desktop app** (Electron with its own bundled engine) and a **native Android app**. The desktop installer is downloaded once and runs itself — no browser, no website, no external server. On Android it installs to the home screen and keeps playing in the background with lock-screen controls through the platform Media Session (title, artist, artwork, play/pause, next/previous, seek).
 
 ---
 
 ## Quick start
 
+The desktop app is the shipped build: download the installer for Linux or Windows from the latest GitHub Release and run it. It carries its own local engine, so nothing else is needed — no browser and no hosted site.
+
+To build it yourself:
+
 ```bash
 npm install
-npm run dev          # http://localhost:3000
-npm run build        # production build
-npm start            # production server
+npm run dev                                  # development content for the desktop window
+npm run build                                # self-contained engine bundle
+node scripts/prepare-desktop.mjs             # add static assets to the bundle
+cd desktop && npm ci && npm run build:linux  # or build:windows
 ```
 
 Optional, only for the YouTube Music source (see below):
@@ -52,7 +57,7 @@ GitHub Actions workflow (`.github/workflows/build-release-apk.yml`) typechecks t
 
 ### Desktop app (Linux + Windows 10/11)
 
-The desktop build lives in [`desktop/`](desktop) and packages this same Next.js app with Electron — same UI, same local API routes, no accounts or telemetry. The Next server is bundled inside the installer and started on a loopback port at launch.
+The desktop build lives in [`desktop/`](desktop): Electron packaging the melo UI with its own local engine — no browser, no hosted site, no accounts or telemetry. The engine is bundled inside the installer and started on a loopback port at launch, so a download and a double-click is all it takes.
 
 ```bash
 cd desktop
@@ -98,7 +103,6 @@ store/
   library.ts               Playlists, follows, history, local play counts
   settings.ts              Every customisation, persisted to localStorage
 components/                Now Playing, lyrics, queue, sheets, rows, cards, UI primitives
-public/sw.js               Offline app shell + artwork cache (audio stays in IndexedDB)
 ```
 
 ### Design language
@@ -169,7 +173,7 @@ No account, no analytics, no telemetry, no third-party requests from the client 
 
 ## Honest limitations
 
-- **The web build is still an installable PWA; the native Android app is separate.** The repo now includes a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The web build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing (with the blurred-artwork stage and synced lyrics), local playlists, playlist import and source checks are implemented; downloaded/offline files, artist/album detail pages, and the full settings surface are still to be ported.
+- **The desktop app and the native Android app are separate builds.** The repo ships an Electron desktop app under `desktop/` (self-contained: the engine is bundled into the installer) and a React Native + Expo Android app under `mobile/` with a Gradle-signed APK workflow. The desktop build keeps its Media Session playback experience; the mobile build uses Expo Audio with background playback and lock-screen controls. The mobile app is an MVP of the web app: home, search, queue, Now Playing (with the blurred-artwork stage and synced lyrics), local playlists, playlist import and source checks are implemented; downloaded/offline files, artist/album detail pages, and the full settings surface are still to be ported.
 - **YouTube import on Android needs a melo server.** Reading a YouTube playlist requires yt-dlp, which can't run inside the app, so the YouTube path (and playback of the songs it imports) uses an optional melo server address set in Settings. Spotify import, playlists and search work with no server at all.
 - **YouTube Music cannot stream from this cloud host** because YouTube bot-checks datacenter IPs. The provider is complete; it needs cookies or a residential IP. This is reported in-app rather than silently hidden.
 - **Downloads are source-dependent.** Tracks the source marks as downloadable get a real "Download" (permanent offline copy). Other streamable tracks can be saved as a clearly labelled *private offline copy*; melo never claims the artist authorised a download, and nothing from YouTube is downloaded.

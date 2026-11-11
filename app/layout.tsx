@@ -13,9 +13,7 @@ export const metadata: Metadata = {
   description:
     "melo is a free, ad-free music player with synced lyrics, offline downloads, playlists and deep customisation. No account, no subscription, no tracking.",
   applicationName: "melo",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "melo" },
-  icons: { icon: "/icons/icon.svg", apple: "/icons/icon.svg" },
+  icons: { icon: "/icons/icon.svg" },
   formatDetection: { telephone: false },
 };
 

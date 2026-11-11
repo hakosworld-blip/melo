@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
 
-// The desktop build ships the Next server inside Electron, so it needs the
-// self-contained standalone output. Web builds are unchanged.
-const isDesktopBuild = process.env.MELO_DESKTOP_BUILD === "1";
-
+// The app ships as the desktop build: Electron bundles this server and runs it
+// on a loopback port, so the production output is always self-contained.
 const nextConfig: NextConfig = {
-  ...(isDesktopBuild ? { output: "standalone" as const } : {}),
+  output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
   images: {
