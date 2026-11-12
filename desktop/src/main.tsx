@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Suspense, lazy, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/newsreader";
 import "./styles.css";
@@ -8,14 +8,17 @@ import PlayerBootstrap from "@/components/player-bootstrap";
 import ThemeApplier from "@/components/theme-applier";
 import Toaster from "@/components/toaster";
 import { RouteContext, usePathname } from "@/lib/router";
-import AlbumPage from "@/pages/AlbumPage";
-import ArtistPage from "@/pages/ArtistPage";
-import GenrePage from "@/pages/GenrePage";
 import HomePage from "@/pages/HomePage";
-import LibraryPage from "@/pages/LibraryPage";
-import PlaylistPage from "@/pages/PlaylistPage";
-import SearchPage from "@/pages/SearchPage";
-import SettingsPage from "@/pages/SettingsPage";
+
+// Home ships with the shell; every other view is its own chunk, so opening the
+// app parses the home screen only and a page downloads when it is first opened.
+const SearchPage = lazy(() => import("@/pages/SearchPage"));
+const LibraryPage = lazy(() => import("@/pages/LibraryPage"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const GenrePage = lazy(() => import("@/pages/GenrePage"));
+const ArtistPage = lazy(() => import("@/pages/ArtistPage"));
+const AlbumPage = lazy(() => import("@/pages/AlbumPage"));
+const PlaylistPage = lazy(() => import("@/pages/PlaylistPage"));
 
 /**
  * Route table.
@@ -60,7 +63,21 @@ function NotFound() {
 function Routes() {
   const pathname = usePathname();
   const { params, element } = useMemo(() => resolve(pathname), [pathname]);
-  return <RouteContext.Provider value={{ params }}>{element}</RouteContext.Provider>;
+  return (
+    <RouteContext.Provider value={{ params }}>
+      <Suspense
+        fallback={
+          <div className="page-pad flex flex-col gap-4 pt-10">
+            <div className="skeleton h-9 w-48" />
+            <div className="skeleton h-4 w-64" />
+            <div className="skeleton mt-4 h-24 w-full" />
+          </div>
+        }
+      >
+        {element}
+      </Suspense>
+    </RouteContext.Provider>
+  );
 }
 
 createRoot(document.getElementById("root") as HTMLElement).render(

@@ -27,9 +27,12 @@ export default function MiniPlayer() {
 
   return (
     <div className="fixed inset-x-0 bottom-[calc(75px+env(safe-area-inset-bottom))] z-40 px-3 lg:bottom-2 lg:left-[248px] lg:px-2">
-      <div className="glass-strong relative mx-auto flex h-[58px] max-w-4xl items-center gap-1.5 overflow-hidden rounded-[18px] px-2">
+      <div className="glass-strong anim-player-in relative mx-auto flex h-[58px] max-w-4xl items-center gap-1.5 overflow-hidden rounded-[18px] px-2">
         <div className="absolute inset-x-0 bottom-0 h-[2px] bg-[color-mix(in_srgb,var(--ink)_9%,transparent)]">
-          <div className="h-full bg-accent transition-[width] duration-300 ease-linear" style={{ width: `${pct}%` }} />
+          <div
+            className="h-full origin-left bg-accent transition-transform duration-300 ease-linear"
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
 
         <button
@@ -63,7 +66,9 @@ export default function MiniPlayer() {
           aria-label={progress.playing ? "Pause" : "Play"}
           className="press focus-ring icon-btn h-10 w-10 shrink-0 text-ink hover:bg-[color-mix(in_srgb,var(--ink)_9%,transparent)]"
         >
-          {progress.playing ? <IconPause size={19} /> : <IconPlay size={19} />}
+          <span key={progress.playing ? "pause" : "play"} className="anim-icon inline-flex">
+            {progress.playing ? <IconPause size={19} /> : <IconPlay size={19} />}
+          </span>
         </button>
         <button
           onClick={() => next()}

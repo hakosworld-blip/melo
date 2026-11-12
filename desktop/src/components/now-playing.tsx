@@ -119,7 +119,9 @@ export default function NowPlaying() {
       }}
     >
       <div className="absolute inset-0" aria-hidden="true">
-        {artworkUrl && <div className="stage-art" style={{ backgroundImage: `url("${artworkUrl}")` }} />}
+        {artworkUrl && (
+          <div key={artworkUrl} className="stage-art anim-fade" style={{ backgroundImage: `url("${artworkUrl}")` }} />
+        )}
         <div className="stage-scrim" />
         <div className="stage-grain" />
       </div>
@@ -289,13 +291,18 @@ export default function NowPlaying() {
                     aria-label={progress.playing ? "Pause" : "Play"}
                     className="press focus-ring flex h-[68px] w-[68px] items-center justify-center rounded-full text-white"
                   >
-                    {progress.loading && !progress.playing ? (
-                      <IconSpinner size={40} />
-                    ) : progress.playing ? (
-                      <IconPause size={50} />
-                    ) : (
-                      <IconPlay size={50} className="ml-1" />
-                    )}
+                    <span
+                      key={progress.loading && !progress.playing ? "loading" : progress.playing ? "pause" : "play"}
+                      className="anim-icon inline-flex"
+                    >
+                      {progress.loading && !progress.playing ? (
+                        <IconSpinner size={40} />
+                      ) : progress.playing ? (
+                        <IconPause size={50} />
+                      ) : (
+                        <IconPlay size={50} className="ml-1" />
+                      )}
+                    </span>
                   </button>
                   <button
                     onClick={() => next()}

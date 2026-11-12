@@ -233,8 +233,8 @@ export function Switch({
     >
       <span
         className={cn(
-          "absolute top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full shadow transition-all duration-200",
-          checked ? "left-[24px] bg-accentink" : "left-[3px] bg-ink/80",
+          "absolute left-[3px] top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full shadow transition-transform duration-200",
+          checked ? "translate-x-[21px] bg-accentink" : "translate-x-0 bg-ink/80",
         )}
       />
     </button>
@@ -263,7 +263,7 @@ export function EmptyState({
   return (
     <div className={cn("flex flex-col items-center justify-center text-center", compact ? "py-10" : "py-16", className)}>
       {icon && (
-        <div className="glass mb-4 flex h-12 w-12 items-center justify-center rounded-full text-muted">{icon}</div>
+        <div className="glass empty-icon mb-4 flex h-12 w-12 items-center justify-center rounded-full text-muted">{icon}</div>
       )}
       <h3 className="text-[16px] font-semibold tracking-[-0.01em]">{title}</h3>
       {description && <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted">{description}</p>}

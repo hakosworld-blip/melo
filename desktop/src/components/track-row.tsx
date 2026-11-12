@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Artwork } from "@/components/artwork";
 import { IconCheck, IconDownload, IconMore, IconPlay } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -29,7 +30,7 @@ export function Equalizer({ playing }: { playing: boolean }) {
   );
 }
 
-export default function TrackRow({
+function TrackRow({
   track,
   index,
   context,
@@ -90,7 +91,10 @@ export default function TrackRow({
             <Artwork
               src={artworkUrl}
               alt={track.title}
-              className={cn("h-11 w-11", dense && "h-10 w-10")}
+              className={cn(
+                "h-11 w-11 transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)] group-hover:scale-[1.04]",
+                dense && "h-10 w-10",
+              )}
               rounded="rounded-[6px]"
               iconSize={16}
             />
@@ -154,3 +158,7 @@ export default function TrackRow({
     </div>
   );
 }
+
+// Long playlists re-render as a block; a row whose props did not change has no
+// business repainting.
+export default memo(TrackRow);

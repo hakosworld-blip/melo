@@ -93,8 +93,8 @@ export default function SeekBar({
         }}
       >
         <div className="seek-rail" ref={railRef}>
-          <div className="seek-buffer" style={{ width: `${bufferedPct}%` }} />
-          <div className="seek-fill" style={{ width: `${pct}%` }} />
+          <div className="seek-buffer" style={{ transform: `scaleX(${bufferedPct / 100})` }} />
+          <div className="seek-fill" style={{ transform: `scaleX(${pct / 100})` }} />
         </div>
         <div className="seek-knob" style={{ left: `${pct}%` }} />
       </div>

@@ -376,6 +376,57 @@ nav {
   animation: melo-spin 1s linear infinite;
 }
 
+/* Chrome arrives instead of appearing: the nav lozenge glides in, the player
+   capsule rises once when the first song starts, and icons hand over on press. */
+@keyframes melo-nav-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-7px, 0, 0) scaleX(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleX(1);
+  }
+}
+@keyframes melo-player-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes melo-icon-swap {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes melo-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -4px, 0);
+  }
+}
+.anim-player-in {
+  animation: melo-player-in 0.44s var(--ease-out-expo) both;
+}
+.anim-icon {
+  animation: melo-icon-swap 0.18s var(--ease-out-quint) both;
+}
+.empty-icon {
+  animation: melo-float 6s ease-in-out infinite;
+}
+
 /* Lists and shelves rise in sequence instead of all at once. */
 .rise-list > * {
   animation: melo-rise 0.55s var(--ease-out-expo) both;
@@ -451,15 +502,20 @@ nav {
 .seek-track[data-dragging="true"] .seek-rail {
   height: 6px;
 }
+/* Progress is drawn with a transform so the browser composites it instead of
+   re-laying out the rail on every timeupdate. */
 .seek-fill {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 0;
+  transform-origin: left center;
   background: color-mix(in srgb, var(--ink) 82%, transparent);
   border-radius: 999px;
+  will-change: transform;
 }
 .seek-buffer {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 0;
+  transform-origin: left center;
   background: color-mix(in srgb, var(--ink) 22%, transparent);
   border-radius: 999px;
 }
@@ -602,6 +658,9 @@ nav {
 [data-animations="reduced"] .anim-rise,
 [data-animations="reduced"] .anim-scale,
 [data-animations="reduced"] .anim-sheet,
+[data-animations="reduced"] .anim-player-in,
+[data-animations="reduced"] .anim-icon,
+[data-animations="reduced"] .empty-icon,
 [data-animations="reduced"] .view-in,
 [data-animations="reduced"] .marquee-track {
   animation: none !important;
@@ -651,8 +710,8 @@ nav {
     ),
     var(--glass-card);
   border: 1px solid var(--glass-line);
-  backdrop-filter: saturate(150%) blur(16px);
-  -webkit-backdrop-filter: saturate(150%) blur(16px);
+  backdrop-filter: saturate(150%) blur(10px);
+  -webkit-backdrop-filter: saturate(150%) blur(10px);
   box-shadow: inset 0 1px 0 var(--glass-highlight), 0 16px 36px -26px rgba(0, 0, 0, 0.65);
   transition: transform 0.4s var(--ease-out-expo), box-shadow 0.4s var(--ease-out-expo),
     border-color 0.3s ease, background-color 0.3s ease;
@@ -722,7 +781,7 @@ nav {
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  animation: melo-fade 0.28s ease both;
+  animation: melo-nav-in 0.34s var(--ease-out-expo) both;
   z-index: -1;
 }
 
@@ -789,10 +848,11 @@ nav {
   );
 }
 
+/* No will-change here: a lyric sheet can hold hundreds of nodes and promoting
+   every one of them costs far more than the filter it tries to speed up. */
 .lyric {
   transition: color 0.45s ease, opacity 0.45s ease, filter 0.55s ease, transform 0.55s var(--ease-out-expo);
   transform-origin: left center;
-  will-change: filter, opacity;
 }
 .lyric[data-focus="far"] {
   filter: blur(3.2px);

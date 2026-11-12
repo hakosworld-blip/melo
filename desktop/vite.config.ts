@@ -12,6 +12,10 @@ export default defineConfig({
   build: {
     outDir: "dist-renderer",
     emptyOutDir: true,
+    // Electron 45 embeds a current Chromium, so no legacy transpilation or
+    // polyfills are shipped. Size reporting is off: it only slows the build.
+    target: "chrome126",
+    reportCompressedSize: false,
   },
   server: {
     port: 5173,
