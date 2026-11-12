@@ -104,6 +104,8 @@ function startServer(port) {
       HOSTNAME: '127.0.0.1',
       PORT: String(port),
       MELO_RENDERER_DIR: rendererDirectory(),
+      // The installed app's version, so Settings reports what is actually running.
+      MELO_APP_VERSION: app.getVersion(),
     },
   });
 

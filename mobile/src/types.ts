@@ -1,5 +1,5 @@
-/** Audius plays directly; YouTube songs come from a melo server (see src/import.ts). */
-export type ProviderId = 'audius' | 'youtube';
+/** One source: YouTube Music, read and streamed through a melo server. */
+export type ProviderId = 'youtube';
 
 export interface Track {
   id: string;

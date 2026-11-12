@@ -97,4 +97,4 @@ AppImage is unsigned in the same way; most desktops run it after `chmod +x`.
 
 `bin/yt-dlp` is packaged next to the engine (`extraResources`) and resolved
 relative to the engine's working directory. If it is absent, the YouTube Music
-source reports that clearly instead of failing silently; Audius needs nothing.
+source reports that clearly instead of failing silently. There is no second source to switch to.

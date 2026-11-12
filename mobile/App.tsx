@@ -10,14 +10,15 @@ import { useAudioPlaylistStatus } from 'expo-audio';
 import Slider from '@react-native-community/slider';
 import { useFonts } from 'expo-font';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-google-fonts/manrope';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Home, Library, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, Settings, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
-import { fetchGenreTracks, fetchHome, searchAudius } from './src/api';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Cog, Home, Library, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
+import { fetchCharts, fetchGenreTracks, searchCatalogue, type ChartArtist } from './src/api';
 import { buildHomeFeed, type HomeFeed } from './src/feed';
 import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PressableScale, PromptModal, RiseIn, SectionTitle, Artwork, TrackRow, useReduceMotion } from './src/components';
 import { LyricsSheet } from './src/lyrics-view';
 import { useUi } from './src/ui';
 import { addToQueue, clearQueue, currentRepeat, currentVolume, cycleRepeat, initPlayer, playTracks, playlist, seekTo, setVolume, skipNext, skipPrevious, togglePlayback, usePlayer, type RepeatMode } from './src/player';
 import { findPlaylistByName, hydrateLibrary, useLibrary } from './src/library';
+import appConfig from './app.json';
 import { hydrateSettings, useSettings } from './src/settings';
 import { importPlaylist, type ImportProgress, type ImportResult } from './src/import';
 import type { AlbumSummary, ArtistSummary, HomeSection, SearchResults, Track } from './src/types';
@@ -50,11 +51,17 @@ function HomeScreen({ navigation }: any) {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showAllMix, setShowAllMix] = useState(false);
+  const [charts, setCharts] = useState<ChartArtist[]>([]);
   const recent = useLibrary((s) => s.recent);
   const pinned = useLibrary((s) => s.pinned);
 
   const load = useCallback(async (force = false) => {
     setError(null);
+    // Charts are independent of the catalogue: they still load when YouTube
+    // itself is unreachable on this server.
+    const chartsPromise = fetchCharts(5)
+      .then((payload) => payload.artists)
+      .catch(() => [] as ChartArtist[]);
     try {
       setFeed(await buildHomeFeed(force));
     } catch (e) {
@@ -63,6 +70,7 @@ function HomeScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
+    setCharts(await chartsPromise);
   }, []);
 
   useEffect(() => {
@@ -102,7 +110,7 @@ function HomeScreen({ navigation }: any) {
             accessibilityRole="button"
             accessibilityLabel="Settings"
           >
-            <Settings size={17} color={colors.text} />
+            <Cog size={17} color={colors.text} />
           </Pressable>
         </View>
 
@@ -176,6 +184,37 @@ function HomeScreen({ navigation }: any) {
                 <Text style={styles.linkText}>{showAllMix ? 'Show less' : `Show all ${mix.length}`}</Text>
               </Pressable>
             ) : null}
+          </View>
+        ) : null}
+
+        {charts.length ? (
+          <View>
+            <SectionTitle
+              title="Worldwide charts"
+              subtitle="Artist rankings by monthly listeners · Spotify data from kworb.net"
+              action={
+                <Pressable onPress={() => navigation.navigate('Charts')} accessibilityRole="button" hitSlop={8}>
+                  <Text style={styles.linkText}>See all</Text>
+                </Pressable>
+              }
+            />
+            <View style={styles.glassPanel}>
+              {charts.map((artist) => (
+                <View key={artist.name} style={styles.chartRow}>
+                  <Text style={styles.chartRank}>{artist.rank}</Text>
+                  <View style={styles.chartMeta}>
+                    <Text style={styles.trackTitle} numberOfLines={1}>
+                      {artist.name}
+                    </Text>
+                    <Text style={styles.trackSubtitle} numberOfLines={1}>
+                      {formatCompact(artist.monthlyListeners)} monthly · {artist.dailyChange >= 0 ? '+' : '−'}
+                      {formatCompact(Math.abs(artist.dailyChange))} today
+                    </Text>
+                  </View>
+                  <Text style={styles.chartMetric}>{artist.worldwide ? `#${artist.worldwide.position}` : '—'}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         ) : null}
 
@@ -309,7 +348,7 @@ function SearchScreen() {
     }
     setLoading(true);
     const id = setTimeout(() => {
-      searchAudius(term)
+      searchCatalogue(term)
         .then((res) => { setResults(res); setError(null); })
         .catch((e) => setError(e instanceof Error ? e.message : 'Search failed.'))
         .finally(() => setLoading(false));
@@ -325,7 +364,7 @@ function SearchScreen() {
         <TextInput value={query} onChangeText={setQuery} placeholder="Search songs, artists, albums" placeholderTextColor={colors.muted} style={styles.input} autoCapitalize="none" returnKeyType="search" />
         {loading ? <View style={styles.center}><ActivityIndicator color={colors.accent} /></View> : null}
         {error ? <ErrorBanner message={error} /> : null}
-        {!query && !loading ? <EmptyState>Search the live Audius catalogue.</EmptyState> : null}
+        {!query && !loading ? <EmptyState>Search YouTube Music. Add your melo server in Settings first.</EmptyState> : null}
         {results.tracks.length ? <SectionTitle title="Songs" /> : null}
         {results.tracks.map((track, index) => <TrackRow key={track.id} track={track} context={results.tracks} index={index} />)}
         {results.artists.length ? <SectionTitle title="Artists" /> : null}
@@ -738,9 +777,9 @@ function ImportScreen({ navigation }: any) {
   );
 }
 
-function SettingsScreen() {
-  const [result, setResult] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+function SettingsScreen({ navigation }: any) {
+  // app.json is what the release workflow stamps, so this is the installed version.
+  const appVersion = appConfig.expo?.version ?? '1.0.0';
   const savedServer = useSettings((s) => s.serverUrl);
   const setServerUrl = useSettings((s) => s.setServerUrl);
   const [serverDraft, setServerDraft] = useState(savedServer);
@@ -782,37 +821,33 @@ function SettingsScreen() {
     }
   };
 
-  const testSources = async () => {
-    setBusy(true);
-    setResult(null);
-    try {
-      const sections = await fetchHome();
-      setResult(`Audius is reachable. ${sections.length} home sections loaded.`);
-    } catch (e) {
-      setResult(e instanceof Error ? e.message : 'Source check failed.');
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.page}>
         <Text style={styles.pageTitle}>Settings</Text>
-        <Text style={styles.pageSubtitle}>melo Android · React Native + Expo</Text>
-        <SectionTitle title="Music source" />
+        <Text style={styles.pageSubtitle}>melo {appVersion} · Android · React Native + Expo</Text>
+        <SectionTitle title="Music source" subtitle="One source, no switching" />
         <View style={styles.settingRow}>
           <View style={styles.settingText}>
-            <Text style={styles.trackTitle}>Audius</Text>
-            <Text style={styles.trackSubtitle}>Default keyless catalogue source.</Text>
+            <Text style={styles.trackTitle}>YouTube Music</Text>
+            <Text style={styles.trackSubtitle}>
+              Streaming only, through your melo server. There is no second catalogue.
+            </Text>
           </View>
-          <Pressable style={styles.secondaryButton} onPress={() => void testSources()} disabled={busy} accessibilityRole="button">
-            <RefreshCw size={16} color={colors.text} />
-            <Text style={styles.secondaryButtonText}>{busy ? 'Testing…' : 'Test source'}</Text>
-          </Pressable>
         </View>
-        {result ? <Text style={styles.result}>{result}</Text> : null}
 
-        <SectionTitle title="Melo server" subtitle="Optional. Needed for YouTube playlists and YouTube playback." />
+        <SectionTitle title="Charts" subtitle="Artist rankings, daily streams and worldwide positions" />
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() => navigation.navigate('Charts')}
+          accessibilityRole="button"
+          accessibilityLabel="Open worldwide charts"
+        >
+          <ChevronRight size={16} color={colors.text} />
+          <Text style={styles.secondaryButtonText}>Open worldwide charts</Text>
+        </Pressable>
+
+        <SectionTitle title="Melo server" subtitle="Required. Every song is read and streamed through it." />
         <TextInput
           value={serverDraft}
           onChangeText={setServerDraft}
@@ -857,6 +892,73 @@ function SettingsScreen() {
           background playback and lock-screen controls. Lyrics come from LRCLIB, and the credit under a song always
           names the record that was matched.
         </Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function formatCompact(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(Math.round(value));
+}
+
+/**
+ * Worldwide charts.
+ *
+ * kworb.net's Spotify leaderboard: rank by monthly listeners, the day's change,
+ * and the artist's best position on the global daily chart. It is a read of
+ * public statistics, not melo's own play data.
+ */
+function ChartsScreen({ navigation }: any) {
+  const [data, setData] = useState<{ source: string; updated: string | null; artists: ChartArtist[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchCharts(25)
+      .then((payload) => setData(payload))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load charts.'));
+  }, []);
+
+  return (
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.page}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          style={{ alignSelf: 'flex-start', paddingVertical: 4 }}
+        >
+          <ChevronRight size={20} color={colors.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+        </Pressable>
+        <Text style={styles.pageTitle}>Worldwide charts</Text>
+        <Text style={styles.pageSubtitle}>
+          Ranked by monthly listeners · Spotify data from kworb.net
+          {data?.updated ? ` · ${data.updated}` : ''}
+        </Text>
+        {error ? <ErrorBanner message={error} /> : null}
+        {!data && !error ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : null}
+        {data?.artists.map((artist) => (
+          <View key={artist.name} style={styles.settingRow}>
+            <Text style={{ width: 26, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted }}>{artist.rank}</Text>
+            <View style={styles.settingText}>
+              <Text style={styles.trackTitle} numberOfLines={1}>
+                {artist.name}
+              </Text>
+              <Text style={styles.trackSubtitle}>
+                {formatCompact(artist.monthlyListeners)} monthly · {artist.dailyChange >= 0 ? '+' : '−'}
+                {formatCompact(Math.abs(artist.dailyChange))} today
+                {artist.worldwide ? ` · #${artist.worldwide.position} worldwide` : ''}
+              </Text>
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1222,7 +1324,7 @@ function MainTabs() {
         <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: ({ color }) => <Home size={21} color={color} /> }} />
         <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarIcon: ({ color }) => <Search size={21} color={color} /> }} />
         <Tab.Screen name="Library" component={LibraryScreen} options={{ tabBarIcon: ({ color }) => <Library size={21} color={color} /> }} />
-        <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarIcon: ({ color }) => <Settings size={21} color={color} /> }} />
+        <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarIcon: ({ color }) => <Cog size={21} color={color} /> }} />
       </Tab.Navigator>
       <MiniPlayer />
     </View>
@@ -1259,6 +1361,7 @@ export default function App() {
             <Stack.Screen name="NowPlaying" component={NowPlayingScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="Queue" component={QueueScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="Genre" component={GenreScreen} />
+            <Stack.Screen name="Charts" component={ChartsScreen} />
           </Stack.Navigator>
         </NavigationContainer>
         <AddToPlaylistSheet />
@@ -1487,6 +1590,17 @@ const styles = StyleSheet.create({
   mixMeta: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5, marginTop: 2, marginBottom: 2 },
   linkButton: { alignSelf: 'flex-start', paddingVertical: 10, paddingRight: 10 },
   linkText: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 12.5, textDecorationLine: 'underline' },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  chartRank: { width: 18, color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 12.5 },
+  chartMeta: { flex: 1 },
+  chartMetric: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5 },
   genreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   genreTile: {
     width: '100%',

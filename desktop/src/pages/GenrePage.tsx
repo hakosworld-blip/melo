@@ -29,7 +29,8 @@ export default function GenrePage() {
       return raw;
     }
   })();
-  const provider = useSettings((s) => s.provider);
+  // One source only.
+  const provider = "youtube" as const;
   const { data, error, loading, reload } = useApi<GenreResponse>(
     genre ? `/api/genre?provider=${provider}&genre=${encodeURIComponent(genre)}&limit=50` : null,
     [genre, provider],

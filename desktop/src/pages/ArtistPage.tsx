@@ -16,6 +16,20 @@ import { useLibrary } from "@/store/library";
 import { usePlayer } from "@/store/player";
 import type { Artist } from "@/lib/types";
 
+type ArtistChart = {
+  name: string;
+  rank: number;
+  monthlyListeners: number;
+  dailyChange: number;
+  peakRank: number;
+  peakListeners: number;
+  totalStreams: number;
+  dailyStreams: number;
+  trackCount: number;
+  worldwide: { position: number; title: string; streams: number }[];
+  updated: string | null;
+};
+
 export default function ArtistPage() {
   const params = useParams<{ id: string }>();
   const rawId = params?.id ?? "";
@@ -25,6 +39,13 @@ export default function ArtistPage() {
   const toggleFollow = useLibrary((s) => s.toggleFollow);
   const playTracks = usePlayer((s) => s.playTracks);
   const [bioOpen, setBioOpen] = useState(false);
+  // Chart figures are Spotify's, read from kworb.net; they load separately so an
+  // unavailable chart never blocks the artist page itself.
+  const { data: chartData } = useApi<{ artist: ArtistChart | null }>(
+    artist ? `/api/charts/artist?name=${encodeURIComponent(artist.name)}` : null,
+    [artist?.name],
+  );
+  const stats = chartData?.artist;
 
   if (loading && !artist) return <ArtistSkeleton />;
 
@@ -120,6 +141,39 @@ export default function ArtistPage() {
           </div>
         )}
 
+        {stats && (
+          <section className="mt-9 anim-rise">
+            <SectionTitle
+              title="Global streaming"
+              subtitle={`Spotify figures from kworb.net${stats.updated ? ` · ${stats.updated}` : ""}`}
+            />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <ChartStat label="Worldwide rank" value={stats.rank ? `#${stats.rank}` : "—"} note="by monthly listeners" />
+              <ChartStat
+                label="Monthly listeners"
+                value={formatCount(stats.monthlyListeners)}
+                note={stats.dailyChange === 0 ? "today" : `${stats.dailyChange > 0 ? "+" : "−"}${formatCount(Math.abs(stats.dailyChange))} today`}
+              />
+              <ChartStat label="Daily streams" value={formatCount(stats.dailyStreams)} note={`${formatCount(stats.trackCount)} tracked songs`} />
+              <ChartStat label="Total streams" value={formatCount(stats.totalStreams)} note="all time" />
+            </div>
+            {stats.worldwide.length > 0 && (
+              <div className="mt-4">
+                <p className="meta-label mb-1.5">Worldwide daily chart</p>
+                <div className="divide-y divide-[color-mix(in_srgb,var(--ink)_6%,transparent)]">
+                  {stats.worldwide.slice(0, 6).map((entry) => (
+                    <div key={`${entry.position}-${entry.title}`} className="flex items-center gap-3 py-2">
+                      <span className="w-9 shrink-0 text-[12px] tabular-nums text-muted">#{entry.position}</span>
+                      <span className="min-w-0 flex-1 truncate text-[13px]">{entry.title}</span>
+                      <span className="shrink-0 text-[11.5px] tabular-nums text-muted">{formatCount(entry.streams)} / day</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         {popular.length > 0 && (
           <section className="mt-9 anim-rise">
             <SectionTitle title="Popular" subtitle="Ordered by the source's real play counts" />
@@ -179,6 +233,16 @@ export default function ArtistPage() {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function ChartStat({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="glass-card rounded-[12px] px-3.5 py-3">
+      <p className="meta-label">{label}</p>
+      <p className="mt-1 text-[19px] font-semibold tracking-[-0.02em] tabular-nums">{value}</p>
+      <p className="mt-0.5 text-[11px] text-muted">{note}</p>
     </div>
   );
 }

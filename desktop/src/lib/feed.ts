@@ -14,7 +14,7 @@ import type { AlbumSummary, ArtistSummary, GenreSummary, HomeSection, MusicProvi
  */
 
 export interface TasteSeeds {
-  /** Unified artist ids (`audius:<id>`), most played first. */
+  /** Unified artist ids (`youtube:<id>`), most played first. */
   artists: string[];
   /** Genre names, most played first. */
   genres: string[];

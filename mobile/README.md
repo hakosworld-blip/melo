@@ -19,7 +19,7 @@ Now Playing is the dark stage from the phone mock it was designed against: the a
 
 ## Home and recommendations
 
-Home is built in `src/feed.ts` from the plays this phone has recorded (the only history melo keeps). The recent artists and genres seed the **daily mix**; a date-seeded shuffle means the same day returns the same order and tomorrow returns a different one. Genres are real Audius genres with real covers, and each opens a genre screen. **Pinned** songs sit at the top of Home for one-tap playback, and Settings can forget the listening history that seeds it all.
+Home comes from `src/feed.ts`: the server builds the shelves, and the plays this phone has recorded (the only history melo keeps) seed them. **Worldwide charts** in Settings read kworb.net's Spotify rankings — artist rank by monthly listeners, the day's change, and the artist's best worldwide position. **Pinned** songs sit at the top of Home for one-tap playback, and Settings can forget the listening history that seeds it all.
 
 ## Playlists and importing
 
@@ -27,7 +27,7 @@ Playlists live on the phone, in a JSON file in the app's private storage: create
 
 **Import** (`Library → Import`) accepts a public playlist link:
 
-- **Spotify** is read and matched entirely on the device — the public embed page gives the playlist's name and songs, each song is then searched in Audius with the same scoring rules as the desktop app (`src/importing.ts`). The playlist is saved with Spotify's name; songs that aren't in the catalogue are listed as skipped instead of being replaced.
+- **Spotify** playlists are read and matched on the melo server, with the same scoring rules as the desktop app, and saved under Spotify's name; songs that match nothing are listed as skipped instead of being replaced. Nothing imports without a server.
 - **YouTube Music** needs a melo server on the same network, because reading a YouTube playlist requires `yt-dlp`, which can't run inside the app. Run the desktop app, or start its engine on the LAN (`MELO_ENGINE_HOST=0.0.0.0 PORT=3000 node desktop/engine/server.cjs`), then put that address (e.g. `http://192.168.1.20:3000`) in **Settings → Melo server**. YouTube-imported songs also play through that server, so they only work while it is reachable; Spotify songs never need it.
 
 The manifest allows cleartext HTTP so a plain `http://` server on your LAN works. If you rerun `expo prebuild`, add `android:usesCleartextTraffic="true"` to `<application>` again.

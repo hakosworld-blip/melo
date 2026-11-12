@@ -21,6 +21,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 
 import { buildHomeFeed } from "@/lib/feed";
+import { artistStats, topArtists } from "@/lib/kworb";
 import { UpstreamError } from "@/lib/http";
 import { findLyrics, searchLyrics } from "@/lib/lyrics";
 import { pickBestMatch, pickYoutubeMatch, scoreCandidate, type MatchQuery } from "@/lib/match-import";
@@ -37,6 +38,21 @@ const PORT = Number(process.env.PORT || process.env.MELO_ENGINE_PORT || 3210);
 // reach the engine for YouTube playlist import.
 const HOST = process.env.MELO_ENGINE_HOST || "127.0.0.1";
 const RENDERER_DIR = process.env.MELO_RENDERER_DIR || path.join(__dirname, "..", "dist-renderer");
+
+/**
+ * The version of the app the user is running. Electron passes its own
+ * `app.getVersion()` down; when the engine is started on its own (development,
+ * or for a phone on the LAN) it reads the manifest beside it instead.
+ */
+function appVersion(): string {
+  if (process.env.MELO_APP_VERSION) return process.env.MELO_APP_VERSION;
+  try {
+    const pkg = require(path.join(process.cwd(), "package.json")) as { version?: string };
+    return pkg.version || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -137,14 +153,6 @@ async function openUpstream(url: string, range: string | undefined): Promise<Ups
 
 const KNOWN_HOSTS = ["i.ytimg.com", "yt3.ggpht.com", "yt3.googleusercontent.com", "lh3.googleusercontent.com"];
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
-const AUDIUS_MIRRORS = [
-  "https://v.monophonic.digital",
-  "https://audius-01.staked.cloud",
-  "https://audius-content-8.figment.io",
-  "https://audius-creator-1.theblueprint.xyz",
-  "https://cn4.mainnet.audiusindex.org",
-  "https://val011.open-audio-validator.com",
-];
 
 function isPrivateHost(hostname: string) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
@@ -160,16 +168,7 @@ function isPrivateHost(hostname: string) {
 function isAllowedImage(url: URL) {
   if (url.protocol !== "https:") return false;
   if (isPrivateHost(url.hostname)) return false;
-  if (KNOWN_HOSTS.includes(url.hostname)) return true;
-  return url.pathname.startsWith("/content/") && /\.(jpg|jpeg|png|webp)$/i.test(url.pathname);
-}
-
-function mirrorCandidates(url: URL): URL[] {
-  if (!/^\/content\/[^/]+\//.test(url.pathname)) return [];
-  const host = url.hostname.toLowerCase();
-  return AUDIUS_MIRRORS.filter((mirror) => new URL(mirror).hostname.toLowerCase() !== host).map(
-    (mirror) => new URL(url.pathname, mirror),
-  );
+  return KNOWN_HOSTS.includes(url.hostname);
 }
 
 async function fetchImage(url: URL) {
@@ -225,11 +224,7 @@ async function handleImage(res: ServerResponse, url: URL) {
     return;
   }
 
-  let image = await fetchImage(target);
-  for (const candidate of mirrorCandidates(target)) {
-    if (image) break;
-    image = await fetchImage(candidate);
-  }
+  const image = await fetchImage(target);
   if (!image) {
     sendText(res, 404, "Artwork unavailable");
     return;
@@ -382,6 +377,38 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): P
   if (parts[0] !== "api") return false;
   const method = req.method ?? "GET";
   const params = url.searchParams;
+
+  if (method === "GET" && parts[1] === "app" && parts.length === 2) {
+    sendJson(res, 200, {
+      version: appVersion(),
+      platform: process.platform,
+    });
+    return true;
+  }
+
+  if (method === "GET" && parts[1] === "charts") {
+    try {
+      if (parts[2] === "top" && parts.length === 3) {
+        const limit = Math.min(Math.max(Number(params.get("limit")) || 20, 1), 50);
+        sendJson(res, 200, await topArtists(limit));
+        return true;
+      }
+      if (parts[2] === "artist" && parts.length === 3) {
+        const name = (params.get("name") || "").trim().slice(0, 120);
+        if (!name) {
+          sendJson(res, 400, { error: "name is required" });
+          return true;
+        }
+        sendJson(res, 200, { artist: await artistStats(name) });
+        return true;
+      }
+    } catch (error) {
+      sendJson(res, 502, { error: error instanceof Error ? error.message : "Could not read chart data" });
+      return true;
+    }
+    sendJson(res, 404, { error: "Unknown chart" });
+    return true;
+  }
 
   if (method === "GET" && parts[1] === "home") {
     const provider = getProvider(params.get("provider"));

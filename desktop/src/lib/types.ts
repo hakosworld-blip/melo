@@ -5,7 +5,7 @@
  * downloads and offline library never need to know where a track came from.
  */
 
-export type ProviderId = "audius" | "youtube";
+export type ProviderId = "youtube";
 
 export interface TrackArtist {
   id: string;

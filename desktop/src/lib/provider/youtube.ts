@@ -63,7 +63,7 @@ export async function ytdlp(args: string[], timeout = 45_000): Promise<string> {
 
 function describeError(raw: string): string {
   if (/confirm you.{0,3}re not a bot|Sign in to confirm/i.test(raw)) {
-    return "YouTube is asking this server to verify it isn't a bot. melo's yt-dlp provider needs cookies on this host (YTDLP_COOKIES), or run melo from a residential connection. Audius works here — switch the music source in Settings.";
+    return "YouTube is asking this server to verify it isn't a bot. melo needs cookies on this host (YTDLP_COOKIES), or a residential connection.";
   }
   if (/Video unavailable|This video is not available|removed/i.test(raw)) return "This track is no longer available at the source.";
   if (/not installed|ENOENT/i.test(raw)) return "yt-dlp was not found. Install it, or set YTDLP_PATH.";
@@ -74,6 +74,9 @@ function describeError(raw: string): string {
 type FlatEntry = {
   id?: string;
   title?: string;
+  track?: string;
+  artist?: string;
+  album_artist?: string;
   duration?: number;
   channel?: string;
   channel_id?: string;
@@ -85,6 +88,7 @@ type FlatEntry = {
   ie_key?: string;
   _type?: string;
   description?: string;
+  artists?: { name?: string }[];
 };
 
 type FullInfo = FlatEntry & {
@@ -105,6 +109,45 @@ function bestThumb(entry: FlatEntry): string | undefined {
   if (!thumbs?.length) return undefined;
   const sorted = [...thumbs].sort((a, b) => (b.width ?? 0) - (a.width ?? 0));
   return sorted[0]?.url;
+}
+
+/**
+ * Artwork for a video id, independent of what the extractor reported.
+ *
+ * Flat search/playlist entries often arrive without a `thumbnails` array, and
+ * YouTube serves these sizes for every public video; without the fallback a
+ * whole shelf renders as grey placeholders even though the video is fine.
+ */
+function thumbForId(id: string | undefined, size: "big" | "small"): string | undefined {
+  if (!id) return undefined;
+  return `https://i.ytimg.com/vi/${id}/${size === "big" ? "hqdefault" : "mqdefault"}.jpg`;
+}
+
+function artworkFor(entry: FlatEntry): { artwork?: string; artworkSmall?: string } {
+  const reported = bestThumb(entry);
+  return {
+    artwork: reported || thumbForId(entry.id, "big"),
+    artworkSmall: thumbForId(entry.id, "small") || reported,
+  };
+}
+
+/** "Artist - Topic" and "ArtistVEVO" are uploads, not artist names. */
+function cleanArtistName(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const name = raw.replace(/\s*-\s*Topic$/i, "").replace(/\s*VEVO$/i, "").trim();
+  return name || undefined;
+}
+
+function artistFor(entry: FlatEntry, parsedArtist?: string): string {
+  return (
+    cleanArtistName(entry.artists?.find((artist) => artist?.name)?.name) ??
+    cleanArtistName(entry.artist) ??
+    cleanArtistName(entry.album_artist) ??
+    cleanArtistName(entry.channel) ??
+    cleanArtistName(entry.uploader) ??
+    parsedArtist ??
+    "Unknown artist"
+  );
 }
 
 /**
@@ -136,8 +179,8 @@ export function splitTitle(raw: string, channel?: string): { title: string; arti
 
 export function mapEntry(entry: FlatEntry): Track | null {
   if (!entry.id || entry.ie_key === "YoutubeTab") return null;
-  const parsed = splitTitle(entry.title || "");
-  const artist = entry.channel || entry.uploader || parsed.artist || "Unknown artist";
+  const parsed = entry.track ? { title: entry.track } : splitTitle(entry.title || "", entry.channel);
+  const artist = artistFor(entry, parsed.artist);
   return {
     id: `youtube:${entry.id}`,
     provider: "youtube",
@@ -147,12 +190,69 @@ export function mapEntry(entry: FlatEntry): Track | null {
     artistId: entry.channel_id ? `youtube:${entry.channel_id}` : undefined,
     featuredArtists: [],
     duration: Number(entry.duration) || 0,
-    artwork: bestThumb(entry),
-    artworkSmall: bestThumb(entry),
+    ...artworkFor(entry),
     playCount: entry.view_count,
     downloadable: false, // YouTube does not authorise downloads.
     streamable: true,
   };
+}
+
+/* ------------------------------------------------------- metadata rescue */
+
+type OEmbed = { title?: string; author_name?: string; thumbnail_url?: string };
+
+const oembedCache = new Map<string, OEmbed | null>();
+
+/**
+ * YouTube's public oEmbed endpoint answers with the channel name and artwork
+ * for any public video: no API key, and none of the bot checking that blocks
+ * yt-dlp on datacenter IPs. It is one small JSON document, so it is only used
+ * for rows whose extractor entry arrived incomplete, and cached in memory.
+ */
+async function oembed(id: string): Promise<OEmbed | null> {
+  if (oembedCache.has(id)) return oembedCache.get(id) ?? null;
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`,
+      { headers: { accept: "application/json" }, signal: AbortSignal.timeout(4000) },
+    );
+    if (!res.ok) throw new Error(`oembed ${res.status}`);
+    const data = (await res.json()) as OEmbed;
+    if (oembedCache.size > 800) oembedCache.clear();
+    oembedCache.set(id, data);
+    return data;
+  } catch {
+    oembedCache.set(id, null);
+    return null;
+  }
+}
+
+function needsArtist(track: Track) {
+  return !track.artist || track.artist === "Unknown artist";
+}
+
+/**
+ * Fills in the artist and artwork for rows that arrived without them, up to
+ * `cap` lookups per call. Exported so the rescue can be checked on its own.
+ */
+export async function enrichMissing(tracks: Track[], cap = 8): Promise<Track[]> {
+  const needy = tracks.filter((track) => needsArtist(track) || !track.artwork).slice(0, cap);
+  if (!needy.length) return tracks;
+  await Promise.all(
+    needy.map(async (track) => {
+      const meta = await oembed(track.providerId);
+      if (!meta) return;
+      if (needsArtist(track)) {
+        const name = cleanArtistName(meta.author_name);
+        if (name) track.artist = name;
+      }
+      if (!track.artwork && meta.thumbnail_url) {
+        track.artwork = meta.thumbnail_url;
+        track.artworkSmall = meta.thumbnail_url;
+      }
+    }),
+  );
+  return tracks;
 }
 
 async function searchTracks(query: string, limit: number): Promise<FlatEntry[]> {
@@ -226,7 +326,7 @@ export const youtubeProvider: MusicProvider = {
       rows.map(async (row) => {
         try {
           const entries = await searchTracks(row.query, 16);
-          const items = entries.map(mapEntry).filter((t): t is Track => Boolean(t));
+          const items = await enrichMissing(entries.map(mapEntry).filter((t): t is Track => Boolean(t)), 16);
           if (items.length >= 4) {
             sections.push({ id: row.id, title: row.title, subtitle: row.subtitle, kind: "tracks", items });
           }
@@ -264,7 +364,7 @@ export const youtubeProvider: MusicProvider = {
         artwork: bestThumb(c),
         verified: c.channel_is_verified,
       }));
-      return { tracks: tracks.slice(0, limit), artists, albums: [] };
+      return { tracks: await enrichMissing(tracks.slice(0, limit)), artists, albums: [] };
     });
   },
 
@@ -273,7 +373,7 @@ export const youtubeProvider: MusicProvider = {
       const json = await ytdlp(["-J", `https://music.youtube.com/watch?v=${id}`]);
       const info = JSON.parse(json) as FullInfo;
       const parsed = splitTitle(info.track || info.title || "");
-      const artist = info.artist || info.album_artist || info.channel || info.uploader || parsed.artist || "Unknown artist";
+      const artist = artistFor(info, parsed.artist);
       const year = info.release_year || (info.upload_date ? Number(info.upload_date.slice(0, 4)) : undefined);
       const track: Track = {
         id: `youtube:${id}`,
@@ -286,15 +386,14 @@ export const youtubeProvider: MusicProvider = {
         featuredArtists: (info.artists || []).map((a) => a.name || "").filter((n) => n && n !== artist),
         album: info.album || undefined,
         duration: Number(info.duration) || 0,
-        artwork: bestThumb(info),
-        artworkSmall: bestThumb(info),
+        ...artworkFor(info),
         playCount: info.view_count,
         releaseDate: year ? `${year}-01-01` : undefined,
         downloadable: false,
         streamable: true,
         permalink: `https://music.youtube.com/watch?v=${id}`,
       };
-      return track;
+      return (await enrichMissing([track], 1))[0];
     });
   },
 
@@ -307,13 +406,14 @@ export const youtubeProvider: MusicProvider = {
         .map((e) => mapEntry({ ...e, channel: e.channel || info.channel || info.title }))
         .filter((t): t is Track => Boolean(t));
       if (!tracks.length) return null;
+      await enrichMissing(tracks, 12);
       const byViews = [...tracks].sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0));
       const artist: Artist = {
         id: `youtube:${id}`,
         provider: "youtube",
         providerId: id,
-        name: (info.title || info.channel || "Unknown artist").replace(/\s*-\s*Topic$/, ""),
-        artwork: bestThumb(info),
+        name: cleanArtistName(info.title || info.channel) || "Unknown artist",
+        artwork: bestThumb(info) || tracks[0]?.artwork,
         bio: info.description?.trim() || undefined,
         albums: [],
         playlists: [],

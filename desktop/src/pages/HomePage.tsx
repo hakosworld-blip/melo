@@ -29,11 +29,29 @@ interface HomeResponse {
 /** The mix list is long on purpose; a dozen rows is what a phone shows well. */
 const MIX_PREVIEW = 12;
 
+type ChartArtist = {
+  name: string;
+  rank: number;
+  monthlyListeners: number;
+  dailyChange: number;
+  worldwide: { position: number; title: string } | null;
+};
+
+function compact(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(Math.round(value));
+}
+
 export default function HomePage() {
-  const provider = useSettings((s) => s.provider);
+  // One source only.
+  const provider = "youtube" as const;
   const recent = useLibrary((s) => s.recent);
   const pinned = useLibrary((s) => s.pinned);
   const playTracks = usePlayer((s) => s.playTracks);
+  // Rankings come from kworb.net independently of the music source.
+  const { data: charts } = useApi<{ updated: string | null; artists: ChartArtist[] }>("/api/charts/top?limit=10", []);
 
   /**
    * The taste snapshot is taken once per day. Without this, playing a song from
@@ -142,6 +160,33 @@ export default function HomePage() {
               </div>
             }
           />
+        )}
+
+        {charts && charts.artists.length > 0 && (
+          <section className="anim-fade mt-7">
+            <SectionTitle
+              title="Worldwide right now"
+              subtitle={`Artist rankings by monthly listeners · Spotify data from kworb.net${charts.updated ? ` · ${charts.updated}` : ""}`}
+            />
+            <div className="glass-card divide-y divide-[color-mix(in_srgb,var(--ink)_6%,transparent)] rounded-[18px] px-2 py-1">
+              {charts.artists.slice(0, 8).map((artist) => (
+                <div key={artist.name} className="flex items-center gap-3 py-2">
+                  <span className="w-5 shrink-0 text-[12px] tabular-nums text-muted">{artist.rank}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{artist.name}</span>
+                  <span className="hidden shrink-0 text-[11.5px] tabular-nums text-muted sm:block">
+                    {compact(artist.monthlyListeners)} monthly
+                  </span>
+                  <span className="w-14 shrink-0 text-right text-[11.5px] tabular-nums text-muted">
+                    {artist.dailyChange >= 0 ? "+" : "−"}
+                    {compact(Math.abs(artist.dailyChange))}
+                  </span>
+                  <span className="w-9 shrink-0 text-right text-[11.5px] tabular-nums text-muted">
+                    {artist.worldwide ? `#${artist.worldwide.position}` : "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {pinned.length > 0 && (

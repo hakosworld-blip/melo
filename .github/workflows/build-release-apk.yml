@@ -78,7 +78,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
+
+      - name: Set up Gradle (dependency + wrapper cache)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Dependency and wrapper downloads are cached across runs; that is the
+          # expensive part of this job. The signed APK itself is always built in
+          # this run — see the build step for why.
+          cache-read-only: false
+          validate-wrappers: false
 
       - name: Install dependencies
         run: npm ci
@@ -122,6 +130,7 @@ jobs:
             echo "::error::KEYSTORE_BASE64 is not set on this repository. Run: base64 -w 0 melo-release.jks"
             exit 1
           fi
+          rm -f android/app/melo-release.jks
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/melo-release.jks
           ls -lh android/app/melo-release.jks
           keytool -list -keystore android/app/melo-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null
@@ -150,7 +159,13 @@ jobs:
         # signing the release with the public debug key.
         run: |
           cd android
-          ./gradlew app:assembleRelease -PmeloRequireReleaseSigning=true --stacktrace
+          # A restored Gradle cache must never supply the APK we are about to
+          # publish: delete any previous outputs so this run signs its own.
+          rm -rf app/build/outputs/apk/release
+          # --no-build-cache on purpose: a cached packaging/signing task could
+          # hand back an APK signed with a previous keystore after a rotation,
+          # which is exactly the mismatch the verify step then reports.
+          ./gradlew app:assembleRelease -PmeloRequireReleaseSigning=true --no-build-cache --stacktrace
 
       - name: Detect changes after build (code, added & deleted files)
         # Second check: ensure the Gradle build itself did not leave the tree
@@ -181,21 +196,45 @@ jobs:
 
           APKSIGNER=$(ls -1 "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "::error::apksigner not found in the Android SDK"; exit 1; }
-          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/apk-certs.txt
-          if grep -qi 'CN=Android Debug' /tmp/apk-certs.txt; then
+          CERT_FILE=/tmp/apk-certs.txt
+          "$APKSIGNER" verify --print-certs "$APK" | tee "$CERT_FILE"
+          if grep -qi 'CN=Android Debug' "$CERT_FILE"; then
             echo "::error::APK is signed with the debug key, not your release keystore"
             exit 1
           fi
 
+          # keytool prints the fingerprint uppercase and colon-separated
+          # (C2:06:53:...) while apksigner prints it lowercase without
+          # separators (c20653...). Normalise both sides before comparing —
+          # comparing the raw strings is what failed here before.
+          normalise() { tr -d ':\n\r\t ' | tr '[:upper:]' '[:lower:]'; }
+
           RELEASE_SHA=$(keytool -list -v -keystore android/app/melo-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" \
-            | grep -m1 'SHA256:' | sed 's/.*SHA256: //; s/ //g')
-          if ! grep -qi "$RELEASE_SHA" /tmp/apk-certs.txt; then
-            echo "::error::APK certificate does not match the release keystore"
+            | grep -m1 -E '^[[:space:]]*SHA256:' \
+            | sed 's/.*SHA256:[[:space:]]*//' | normalise)
+          APK_SHA=$(grep -m1 -i 'certificate SHA-256 digest:' "$CERT_FILE" \
+            | sed 's/.*digest:[[:space:]]*//' | normalise)
+
+          if [ -z "$RELEASE_SHA" ]; then
+            echo "::error::Could not read a SHA-256 fingerprint from the release keystore (alias $KEY_ALIAS)."
+            exit 1
+          fi
+          if [ -z "$APK_SHA" ]; then
+            echo "::error::Could not read a SHA-256 fingerprint from the APK."
+            exit 1
+          fi
+          echo "keystore SHA-256: $RELEASE_SHA"
+          echo "apk SHA-256:      $APK_SHA"
+          if [ "$RELEASE_SHA" != "$APK_SHA" ]; then
+            echo "::error::APK certificate does not match the release keystore. KEYSTORE_BASE64 holds a different keystore than the one that signed this APK — upload the matching .jks as the secret."
             exit 1
           fi
           echo "APK is signed by the release keystore ($RELEASE_SHA)"
 
           AAPT2=$(ls -1 "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          if [ -z "$AAPT2" ]; then
+            echo "::warning::aapt2 not found in the Android SDK; skipping the versionName check"
+          fi
           if [ -n "$AAPT2" ]; then
             BADGING=$("$AAPT2" dump badging "$APK")
             echo "$BADGING" | head -1

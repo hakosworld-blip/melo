@@ -3,7 +3,6 @@
 import Link from "@/lib/router";
 import { useEffect, useRef, useState } from "react";
 import {
-  CheckCircle2,
   CloudOff,
   ImagePlus,
   Info,
@@ -21,13 +20,29 @@ import { Button, Segmented, Switch } from "@/components/ui/primitives";
 import { apiGet } from "@/lib/api-client";
 import { ACCENTS, useSettings, type BackgroundType, type SectionKey } from "@/store/settings";
 import { KEYS, idbDel, idbSet } from "@/lib/storage";
-import { PROVIDER_LABEL, PROVIDER_NOTE } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { toast } from "@/store/toast";
 
 type ProviderCheck = { provider: string; label: string; available: boolean; reason?: string };
 
 export default function SettingsPage() {
+  // The installed app reports its own version; nothing here is hardcoded.
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiGet<{ version?: string }>("/api/app")
+      .then((info) => {
+        if (!cancelled && info?.version) setAppVersion(info.version);
+      })
+      .catch(() => {
+        /* Settings still works without it. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const settings = useSettings();
   const [checks, setChecks] = useState<ProviderCheck[] | null>(null);
   const [checking, setChecking] = useState(false);
@@ -341,45 +356,26 @@ export default function SettingsPage() {
             </SettingRow>
           </SettingsGroup>
 
-          <SettingsGroup id="source" title="Music source" description="melo's provider layer is modular">
-            <div className="space-y-2 px-4 py-4 sm:px-5">
-              {(["audius", "youtube"] as const).map((provider) => {
-                const active = settings.provider === provider;
-                return (
-                  <button
-                    key={provider}
-                    onClick={() => {
-                      settings.update({ provider });
-                      toast(`Music source set to ${PROVIDER_LABEL[provider]}`, "success");
-                    }}
-                    className={cn(
-                      "press flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left",
-                      active
-                        ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--line))] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)]"
-                        : "border-line hover:bg-[color-mix(in_srgb,var(--ink)_4%,transparent)]",
-                    )}
-                  >
-                    <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", active ? "bg-accent/15 text-accent" : "bg-surface2 text-muted")}>
-                      <Music2 size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-[13px] font-medium">
-                        {PROVIDER_LABEL[provider]}
-                        {active && <CheckCircle2 size={13} className="text-accent" />}
-                      </span>
-                      <span className="mt-0.5 block text-[11.5px] leading-relaxed text-muted">{PROVIDER_NOTE[provider]}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="px-4 py-3.5 text-[11.5px] leading-relaxed text-muted sm:px-5">
-              Audius is keyless and streams full-length tracks. YouTube Music uses yt-dlp (yt-dlp-nightly) for metadata
-              and streaming; YouTube blocks datacenter IPs, so it needs cookies or a residential connection. melo never
-              downloads from YouTube — the artist-authorised download flag comes from the source.
+          <SettingsGroup id="source" title="Music source" description="One source, no switching">
+            <div className="px-4 py-4 sm:px-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+                  <Music2 size={16} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium">YouTube Music</p>
+                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted">
+                    Streaming only through yt-dlp · YouTube doesn&apos;t authorise downloads
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-[11.5px] leading-relaxed text-muted">
+                YouTube blocks datacenter IPs, so melo may need cookies on this machine or a residential connection.
+                There is no second catalogue to fall back to.
+              </p>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant="surface" onClick={() => void checkSources()} disabled={checking}>
-                  {checking ? <Loader2 size={13} className="anim-spin" /> : <CloudOff size={13} />} Test sources
+                  {checking ? <Loader2 size={13} className="anim-spin" /> : <CloudOff size={13} />} Test source
                 </Button>
                 <span className="text-[10.5px]">Runs a real search + stream resolution</span>
               </div>
@@ -414,15 +410,20 @@ export default function SettingsPage() {
               </p>
               <p className="flex items-start gap-2">
                 <Info size={15} className="mt-0.5 shrink-0" />
-                Lyrics come from{" "}
+                {/* One span keeps the sentence as flowing text instead of
+                    letting the link become its own flex column. */}
+                <span>
+                  Lyrics come from{" "}
                 <a href="https://lrclib.net" target="_blank" rel="noreferrer" className="text-ink underline decoration-line underline-offset-2">
                   LRCLIB
                 </a>
                 . Catalogue data and streams come from the selected provider; melo doesn&apos;t claim ownership of any
-                music and doesn&apos;t bypass paywalls, DRM or gated content.
+                  music and doesn&apos;t bypass paywalls, DRM or gated content.
+                </span>
               </p>
               <p className="text-[11px]">
-                melo v1.0 · <Link href="/" className="text-ink/80 underline decoration-line underline-offset-2">back home</Link>
+                melo{appVersion ? ` v${appVersion}` : ""} ·{" "}
+                <Link href="/" className="text-ink/80 underline decoration-line underline-offset-2">back home</Link>
               </p>
             </div>
           </SettingsGroup>

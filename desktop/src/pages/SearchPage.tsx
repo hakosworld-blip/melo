@@ -21,7 +21,8 @@ interface SearchResponse {
 const SUGGESTIONS = ["Lo-fi", "Ambient", "Jazz", "Hip-Hop", "House", "Electronic", "Chill", "R&B"];
 
 export default function SearchPage() {
-  const provider = useSettings((s) => s.provider);
+  // One source only.
+  const provider = "youtube" as const;
   const [query, setQuery] = useState("");
   const debounced = useDebounced(query, 350);
   const [tab, setTab] = useState<"all" | "songs" | "artists" | "albums">("all");
@@ -88,7 +89,7 @@ export default function SearchPage() {
             <div className="anim-rise">
               <h1 className="page-head">Search</h1>
               <p className="mt-2 text-[12.5px] text-muted">
-                {provider === "youtube" ? "Songs from YouTube Music" : "Songs, artists and albums from Audius"}
+                Songs from YouTube Music
               </p>
               <p className="mb-3 mt-7 text-[12.5px] font-semibold text-muted">Try a sound</p>
               <div className="flex flex-wrap gap-2">

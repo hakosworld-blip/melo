@@ -2,7 +2,6 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ProviderId } from "@/lib/types";
 
 export type ThemeMode = "dark" | "light" | "system";
 export type Density = "compact" | "comfortable" | "spacious";
@@ -32,7 +31,6 @@ export interface Settings {
   font: "sans" | "serif" | "mono";
   animations: "full" | "reduced";
   motion: "slide" | "fade" | "scale";
-  provider: ProviderId;
   backgrounds: Record<SectionKey, BackgroundConfig>;
   nowPlaying: {
     blurArtwork: boolean;
@@ -82,7 +80,6 @@ const defaultSettings: Settings = {
   font: "sans",
   animations: "full",
   motion: "slide",
-  provider: "youtube",
   backgrounds: {
     app: plainBackground("#0A0A0B"),
     home: plainBackground("#0A0A0B"),
@@ -139,13 +136,13 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "melo-settings",
-      version: 4,
-      /** v3 is the dark listening room: near-black canvas, white controls. */
+      version: 5,
+      /** v3 is the dark listening room; v5 drops the removed source switch. */
       migrate: (persisted, version) => {
-        const state = persisted as SettingsState;
+        const state = persisted as SettingsState & { provider?: unknown };
         if (version < 2) return { ...state, accent: "ink", radius: 10, theme: "dark" };
         if (version < 3) return { ...state, theme: "dark", radius: 10 };
-        if (version < 4) return { ...state, provider: "youtube" };
+        delete state.provider;
         return state;
       },
     },
