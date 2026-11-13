@@ -259,7 +259,14 @@ async function handleImage(res: ServerResponse, url: URL) {
       "cache-control": "public, max-age=31536000, immutable",
       ...(image.length ? { "content-length": String(image.length) } : {}),
     });
-    Readable.fromWeb(image.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+    // A slow image can hit fetchImage's timeout mid-body; an unhandled stream
+    // error would take the whole engine down, so fail the response instead.
+    const body = Readable.fromWeb(image.body as Parameters<typeof Readable.fromWeb>[0]);
+    body.on("error", () => {
+      if (!res.headersSent) sendText(res, 502, "Artwork failed");
+      else res.destroy();
+    });
+    body.pipe(res);
     return;
   }
   sendText(res, 404, "Artwork unavailable");
@@ -341,6 +348,7 @@ async function handleStream(
   }
 
   res.writeHead(upstream.status, headers);
+  upstream.stream.on("error", () => res.destroy());
   upstream.stream.pipe(res);
   req.on("close", () => upstream.stream.destroy());
 }
