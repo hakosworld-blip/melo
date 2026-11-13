@@ -6,6 +6,7 @@ import { useProgress } from "@/lib/progress";
 import { useTrackArtwork } from "@/lib/use-track-artwork";
 import { usePlayer } from "@/store/player";
 import { useUi } from "@/store/ui";
+import { Equalizer } from "@/components/track-row";
 
 /**
  * The floating now-playing capsule. It sits above the tab pill on phones and
@@ -40,16 +41,23 @@ export default function MiniPlayer() {
           className="press group flex min-w-0 flex-1 items-center gap-2.5 rounded-[12px] py-1 pl-0.5 text-left"
           aria-label="Open now playing"
         >
-          <Artwork
-            src={artworkUrl}
-            alt={track.title}
-            className="h-10 w-10 shrink-0"
-            rounded="rounded-[5px]"
-            iconSize={15}
-            eager
-          />
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold leading-tight">{track.title}</p>
+          {/* Keyed on the track so a new song fades and settles in rather
+              than swapping the cover under the cursor. */}
+          <span key={track.id} className="anim-scale shrink-0">
+            <Artwork
+              src={artworkUrl}
+              alt={track.title}
+              className="h-10 w-10"
+              rounded="rounded-[5px]"
+              iconSize={15}
+              eager
+            />
+          </span>
+          <div key={`meta-${track.id}`} className="anim-fade min-w-0">
+            <p className="flex items-center gap-1.5 truncate text-[13px] font-semibold leading-tight">
+              <span className="truncate">{track.title}</span>
+              {progress.playing && <Equalizer playing />}
+            </p>
             <p className="mt-0.5 truncate text-[11.5px] text-muted">{track.artist}</p>
           </div>
         </button>

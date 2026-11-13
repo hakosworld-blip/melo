@@ -423,6 +423,18 @@ nav {
 .anim-icon {
   animation: melo-icon-swap 0.18s var(--ease-out-quint) both;
 }
+/* One thumb glides under the selected segment; labels ride above it. */
+.seg-thumb {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 999px;
+  background: var(--ink);
+  pointer-events: none;
+  transition: transform 0.36s var(--ease-out-expo), width 0.36s var(--ease-out-expo), opacity 0.2s ease;
+  will-change: transform, width;
+}
 .empty-icon {
   animation: melo-float 6s ease-in-out infinite;
 }
@@ -659,6 +671,7 @@ nav {
 [data-animations="reduced"] .anim-scale,
 [data-animations="reduced"] .anim-sheet,
 [data-animations="reduced"] .anim-player-in,
+[data-animations="reduced"] .seg-thumb,
 [data-animations="reduced"] .anim-icon,
 [data-animations="reduced"] .empty-icon,
 [data-animations="reduced"] .view-in,

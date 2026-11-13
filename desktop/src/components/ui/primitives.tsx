@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IconClose } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -180,14 +180,40 @@ export function Segmented<T extends string>({
   className?: string;
   size?: "sm" | "md";
 }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ x: number; w: number } | null>(null);
+
+  // The selection is one thumb that glides between labels, so switching a tab
+  // reads as movement rather than a colour swap. Measured, because the labels
+  // change width with their counts.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      const index = options.findIndex((option) => option.value === value);
+      const node = list.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index];
+      if (node) setThumb({ x: node.offsetLeft, w: node.offsetWidth });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [value, options]);
+
   return (
     <div
+      ref={listRef}
       className={cn(
-        "inline-flex w-full items-center gap-1 overflow-x-auto rounded-full border border-line bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-1 no-scrollbar",
+        "relative inline-flex w-full items-center gap-1 overflow-x-auto rounded-full border border-line bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-1 no-scrollbar",
         className,
       )}
       role="tablist"
     >
+      <span
+        aria-hidden="true"
+        className="seg-thumb"
+        style={{ transform: `translateX(${thumb?.x ?? 0}px)`, width: thumb?.w ?? 0, opacity: thumb ? 1 : 0 }}
+      />
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -197,9 +223,9 @@ export function Segmented<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "press flex shrink-0 grow items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors",
+              "press relative z-10 flex shrink-0 grow items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors",
               size === "sm" ? "h-7 px-3 text-[12px]" : "h-8 px-3.5 text-[12.5px]",
-              selected ? "bg-ink text-bg" : "text-muted hover:text-ink",
+              selected ? "text-bg" : "text-muted hover:text-ink",
             )}
           >
             {option.icon && <span className="hidden shrink-0 items-center sm:flex">{option.icon}</span>}

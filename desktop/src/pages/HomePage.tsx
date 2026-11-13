@@ -15,6 +15,7 @@ import { dayKey } from "@/lib/feed";
 import { useLibrary } from "@/store/library";
 import { usePlayer } from "@/store/player";
 import { useSettings } from "@/store/settings";
+import { cn } from "@/lib/cn";
 import type { AlbumSummary, ArtistSummary, GenreSummary, HomeSection, Track } from "@/lib/types";
 
 interface HomeResponse {
@@ -155,7 +156,31 @@ export default function HomePage() {
                   <IconRefresh size={14} /> Try again
                 </Button>
                 <Link href="/settings#source">
-                  <Button variant="ghost">Choose a source</Button>
+                  <Button variant="ghost">Open settings</Button>
+                </Link>
+              </div>
+            }
+          />
+        )}
+
+        {/* A source can answer with empty shelves instead of an error — what a
+            host without a working yt-dlp does — and the page has to say so. */}
+        {!loading &&
+          !error &&
+          data?.sections.every((section) => section.items.length === 0) &&
+          !pinned.length &&
+          !recent.length && (
+          <EmptyState
+            icon={<IconCloudOff size={20} />}
+            title={`${PROVIDER_LABEL.youtube} answered, but with no songs`}
+            description={`${PROVIDER_LABEL.youtube} returned no shelves on this host. YouTube can block datacenter IPs or ask for cookies, so check the source before assuming the catalogue is empty.`}
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="surface" onClick={reload}>
+                  <IconRefresh size={14} /> Try again
+                </Button>
+                <Link href="/settings#source">
+                  <Button variant="ghost">Check the source</Button>
                 </Link>
               </div>
             }
@@ -163,29 +188,57 @@ export default function HomePage() {
         )}
 
         {charts && charts.artists.length > 0 && (
-          <section className="anim-fade mt-7">
+          <section className="anim-fade mt-8">
             <SectionTitle
               title="Worldwide right now"
-              subtitle={`Artist rankings by monthly listeners · Spotify data from kworb.net${charts.updated ? ` · ${charts.updated}` : ""}`}
+              subtitle="Artist rankings by monthly listeners · Spotify data from kworb.net"
+              action={
+                <span className="glass shrink-0 rounded-full px-2.5 py-1 text-[10.5px] uppercase tracking-[0.09em] text-muted">
+                  {charts.updated ?? "live"}
+                </span>
+              }
             />
-            <div className="glass-card divide-y divide-[color-mix(in_srgb,var(--ink)_6%,transparent)] rounded-[18px] px-2 py-1">
-              {charts.artists.slice(0, 8).map((artist) => (
-                <div key={artist.name} className="flex items-center gap-3 py-2">
-                  <span className="w-5 shrink-0 text-[12px] tabular-nums text-muted">{artist.rank}</span>
-                  <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{artist.name}</span>
-                  <span className="hidden shrink-0 text-[11.5px] tabular-nums text-muted sm:block">
-                    {compact(artist.monthlyListeners)} monthly
-                  </span>
-                  <span className="w-14 shrink-0 text-right text-[11.5px] tabular-nums text-muted">
-                    {artist.dailyChange >= 0 ? "+" : "−"}
-                    {compact(Math.abs(artist.dailyChange))}
-                  </span>
-                  <span className="w-9 shrink-0 text-right text-[11.5px] tabular-nums text-muted">
-                    {artist.worldwide ? `#${artist.worldwide.position}` : "—"}
-                  </span>
-                </div>
-              ))}
+            <div className="glass-card overflow-hidden rounded-[18px] px-1.5 py-1.5">
+              <div className="flex items-center gap-3 px-2.5 pb-1 pt-1.5 text-[9.5px] uppercase tracking-[0.1em] text-muted/80">
+                <span className="w-6 shrink-0">#</span>
+                <span className="min-w-0 flex-1">Artist</span>
+                <span className="hidden w-20 shrink-0 text-right sm:block">Today</span>
+                <span className="hidden w-20 shrink-0 text-right md:block">Monthly</span>
+                <span className="w-9 shrink-0 text-right">Chart</span>
+              </div>
+              <div className="rise-list">
+                {charts.artists.slice(0, 8).map((artist) => (
+                  <div
+                    key={artist.name}
+                    className="chart-row group flex items-center gap-3 rounded-[11px] px-2.5 py-2 transition-colors hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)]"
+                  >
+                    <span className="w-6 shrink-0 font-display text-[15px] tabular-nums text-muted transition-colors group-hover:text-ink">
+                      {artist.rank}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{artist.name}</span>
+                    <span
+                      className={cn(
+                        "hidden w-20 shrink-0 items-center justify-end gap-1 text-right text-[11.5px] tabular-nums sm:flex",
+                        artist.dailyChange >= 0 ? "text-[#7FDCC0]" : "text-[#F08C7E]",
+                      )}
+                    >
+                      <span aria-hidden="true" className="text-[8px]">{artist.dailyChange >= 0 ? "\u25b2" : "\u25bc"}</span>
+                      {compact(Math.abs(artist.dailyChange))}
+                    </span>
+                    <span className="hidden w-20 shrink-0 text-right text-[11.5px] tabular-nums text-muted md:block">
+                      {compact(artist.monthlyListeners)} / mo
+                    </span>
+                    <span className="w-9 shrink-0 text-right text-[11.5px] tabular-nums text-muted">
+                      {artist.worldwide ? `#${artist.worldwide.position}` : "\u2014"}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
+            <p className="mt-2 text-[10.5px] leading-relaxed text-muted/80">
+              Ranked by monthly listeners. The last column is the artist&apos;s best position on the worldwide
+              daily chart.
+            </p>
           </section>
         )}
 

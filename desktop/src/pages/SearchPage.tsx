@@ -75,8 +75,10 @@ export default function SearchPage() {
                   options={[
                     { value: "all", label: "All" },
                     { value: "songs", label: `Songs${tracks.length ? ` · ${tracks.length}` : ""}` },
-                    { value: "artists", label: "Artists" },
-                    { value: "albums", label: "Albums" },
+                    { value: "artists", label: `Artists${artists.length ? ` · ${artists.length}` : ""}` },
+                    // YouTube Music has no album catalogue, so this tab only exists when
+                    // the provider actually returned albums.
+                    ...(albums.length > 0 || tab === "albums" ? [{ value: "albums" as const, label: "Albums" }] : []),
                   ]}
                 />
               </div>
@@ -132,7 +134,7 @@ export default function SearchPage() {
             <EmptyState
               icon={<IconSearchX size={20} />}
               title="No matches"
-              description={`Nothing in the catalogue matched “${debounced.trim()}”. Try a different spelling or another source.`}
+              description={`Nothing in the catalogue matched “${debounced.trim()}”. Try a different spelling, or a shorter search.`}
             />
           )}
 

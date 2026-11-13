@@ -84,17 +84,34 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): ApiState<T
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
+    // A source that never answers must not leave the page as a skeleton
+    // forever; after this the UI gets a retryable error instead.
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 25_000);
     apiGet<T>(path, controller.signal)
       .then((result) => {
         setData(result);
         setLoading(false);
       })
       .catch((err) => {
-        if ((err as Error).name === "AbortError") return;
+        if ((err as Error).name === "AbortError") {
+          if (timedOut) {
+            setError("The music source took too long to answer. Try again, or check it in Settings.");
+            setLoading(false);
+          }
+          return;
+        }
         setError(err instanceof Error ? err.message : "Something went wrong");
         setLoading(false);
-      });
-    return () => controller.abort();
+      })
+      .finally(() => clearTimeout(timeout));
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, nonce, ...deps]);
 
