@@ -114,6 +114,10 @@ android {
         versionName appVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+
+        // The UI is written in English only, so there is no reason to ship the
+        // translated resources of AndroidX and its dependencies.
+        resourceConfigurations += ['en']
     }
     signingConfigs {
         debug {
@@ -171,6 +175,14 @@ android {
         jniLibs {
             def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
             useLegacyPackaging enableLegacyPackaging.toBoolean()
+        }
+        // Build metadata that nothing reads at runtime.
+        resources {
+            excludes += [
+                'META-INF/*.kotlin_module',
+                'META-INF/*.version',
+                'DebugProbesKt.bin',
+            ]
         }
     }
     androidResources {

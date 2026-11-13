@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
-import { ListPlus, Music2, Pause, Play, Plus, SkipForward, X } from 'lucide-react-native';
-import Svg, { Rect } from 'react-native-svg';
+import { ListPlus, Music2, Pause, Play, Plus, X } from 'lucide-react-native';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import { useNavigation } from '@react-navigation/native';
@@ -73,6 +73,24 @@ export function AmbientBackdrop() {
       <View style={[styles.orb, styles.orbInner, { bottom: -240, left: 70, backgroundColor: '#1FA97A' }]} />
     </View>
   );
+}
+
+/** Apple Music's transport glyph: two solid triangles, no bar. */
+function TrackSkip({ back, size = 24, color = colors.text }: { back?: boolean; size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Path d={back ? 'M11.6 5.4 4.9 12l6.7 6.6V5.4Z' : 'M12.4 5.4 19.1 12l-6.7 6.6V5.4Z'} />
+      <Path d={back ? 'M19.1 5.4 12.4 12l6.7 6.6V5.4Z' : 'M4.9 5.4 11.6 12l-6.7 6.6V5.4Z'} />
+    </Svg>
+  );
+}
+
+export function PreviousTrack(props: { size?: number; color?: string }) {
+  return <TrackSkip back {...props} />;
+}
+
+export function NextTrack(props: { size?: number; color?: string }) {
+  return <TrackSkip {...props} />;
 }
 
 /** Three books on a shelf, the last one leaning against the others. */
@@ -893,7 +911,7 @@ export function MiniPlayer() {
         )}
       </PressableScale>
       <Pressable style={styles.iconButton} onPress={skipNext} accessibilityRole="button" accessibilityLabel="Next track">
-        <SkipForward size={18} color={colors.text} />
+        <NextTrack size={18} color={colors.text} />
       </Pressable>
     </Pressable>
   );

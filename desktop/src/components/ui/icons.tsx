@@ -111,11 +111,12 @@ export function IconPause({ size = 20, ...props }: IconProps) {
   );
 }
 
+/** Two solid triangles, as Apple Music draws transport: no bars, no stroke. */
 export function IconPrev({ size = 20, ...props }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-      <path d="M18.2 6.1v11.8a1 1 0 0 1-1.53.85l-8.2-5.06a1.55 1.55 0 0 1 0-2.64l8.2-5.06a1 1 0 0 1 1.53.85v.26Z" />
-      <rect x="4.4" y="5" width="2.6" height="14" rx="1.3" />
+      <path d="M11.6 5.4 4.9 12l6.7 6.6V5.4Z" />
+      <path d="M19.1 5.4 12.4 12l6.7 6.6V5.4Z" />
     </svg>
   );
 }
@@ -123,8 +124,8 @@ export function IconPrev({ size = 20, ...props }: IconProps) {
 export function IconNext({ size = 20, ...props }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-      <path d="M5.8 6.1v11.8a1 1 0 0 0 1.53.85l8.2-5.06a1.55 1.55 0 0 0 0-2.64l-8.2-5.06a1 1 0 0 0-1.53.85V6.1Z" />
-      <rect x="17" y="5" width="2.6" height="14" rx="1.3" />
+      <path d="M12.4 5.4 19.1 12l-6.7 6.6V5.4Z" />
+      <path d="M4.9 5.4 11.6 12l-6.7 6.6V5.4Z" />
     </svg>
   );
 }

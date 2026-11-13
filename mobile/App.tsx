@@ -10,11 +10,15 @@ import { NavigationBar } from 'expo-navigation-bar';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import Slider from '@react-native-community/slider';
 import { useFonts } from 'expo-font';
-import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-google-fonts/manrope';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Cog, Home, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
+// Loaded straight from the package's weight folders: importing the barrel
+// makes Metro bundle all seven Manrope weights even though melo uses three.
+import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
+import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
+import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Cog, Home, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, Star, Trash2, Volume2, X } from 'lucide-react-native';
 import { fetchCharts, fetchGenreTracks, searchCatalogue, type ChartArtist } from './src/api';
 import { buildHomeFeed, type HomeFeed } from './src/feed';
-import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, LibraryBooks, LiquidBlur, LiquidGlass, LiquidSheen, MiniPlayer, PressableScale, PromptModal, RiseIn, SectionTitle, Segmented, Artwork, TrackRow, useLiquidGlass, useReduceMotion } from './src/components';
+import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, LibraryBooks, LiquidBlur, LiquidGlass, LiquidSheen, MiniPlayer, NextTrack, PreviousTrack, PressableScale, PromptModal, RiseIn, SectionTitle, Segmented, Artwork, TrackRow, useLiquidGlass, useReduceMotion } from './src/components';
 import { LyricsSheet } from './src/lyrics-view';
 import { useUi } from './src/ui';
 import { addToQueue, clearQueue, currentRepeat, currentVolume, cycleRepeat, initPlayer, playTracks, playlist, seekTo, setVolume, skipNext, skipPrevious, togglePlayback, usePlayer, type RepeatMode } from './src/player';
@@ -1256,7 +1260,7 @@ function NowPlayingScreen({ navigation }: any) {
 
           <View style={styles.nowControls}>
             <Pressable style={styles.nowControl} onPress={skipPrevious} accessibilityRole="button" accessibilityLabel="Previous track">
-              <SkipBack size={30} color="#FFFFFF" fill="#FFFFFF" />
+              <PreviousTrack size={30} color="#FFFFFF" />
             </Pressable>
             <PressableScale
               style={styles.nowPlay}
@@ -1267,7 +1271,7 @@ function NowPlayingScreen({ navigation }: any) {
               {status.playing ? <Pause size={44} color="#FFFFFF" fill="#FFFFFF" /> : <Play size={44} color="#FFFFFF" fill="#FFFFFF" />}
             </PressableScale>
             <Pressable style={styles.nowControl} onPress={skipNext} accessibilityRole="button" accessibilityLabel="Next track">
-              <SkipForward size={30} color="#FFFFFF" fill="#FFFFFF" />
+              <NextTrack size={30} color="#FFFFFF" />
             </Pressable>
           </View>
 
