@@ -98,6 +98,26 @@ jobs:
           VERSION_NAME: ${{ inputs.version }}
           VERSION_CODE: ${{ inputs.build_number }}
 
+      - name: Verify the version stamp
+        # Gradle reads mobile/app.json; fail here rather than shipping a stale
+        # version inside the APK.
+        env:
+          VERSION_NAME: ${{ inputs.version }}
+          VERSION_CODE: ${{ inputs.build_number }}
+        run: |
+          node -e "
+          const app = require('./app.json');
+          const wantName = process.env.VERSION_NAME;
+          const wantCode = Number(process.env.VERSION_CODE);
+          const gotName = app.expo.version;
+          const gotCode = Number(app.expo.android.versionCode);
+          if (gotName !== wantName || gotCode !== wantCode) {
+            console.error('::error::app.json was not stamped: got ' + gotName + ' / ' + gotCode + ', expected ' + wantName + ' / ' + wantCode);
+            process.exit(1);
+          }
+          console.log('app.json is stamped ' + gotName + ' (' + gotCode + ')');
+          "
+
       - name: Detect changes (code, added & deleted files)
         # Fails the run if no file changes are present after the version stamp.
         # Prints added/modified/deleted files so the reason is visible in logs.
@@ -188,6 +208,7 @@ jobs:
       - name: Verify signature and version of the built APK
         env:
           VERSION_NAME: ${{ inputs.version }}
+          VERSION_CODE: ${{ inputs.build_number }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
@@ -238,8 +259,18 @@ jobs:
           if [ -n "$AAPT2" ]; then
             BADGING=$("$AAPT2" dump badging "$APK")
             echo "$BADGING" | head -1
-            echo "$BADGING" | grep -q "versionName='"$VERSION_NAME"'" \
-              || { echo "::error::APK versionName does not match $VERSION_NAME"; exit 1; }
+            APK_NAME=$(echo "$BADGING" | head -1 | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+            APK_CODE=$(echo "$BADGING" | head -1 | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+            echo "apk versionName: '$APK_NAME' (expected '$VERSION_NAME')"
+            echo "apk versionCode: '$APK_CODE' (expected '$VERSION_CODE')"
+            if [ "$APK_NAME" != "$VERSION_NAME" ]; then
+              echo "::error::APK versionName is '$APK_NAME' but this run is $VERSION_NAME."
+              exit 1
+            fi
+            if [ -n "$VERSION_CODE" ] && [ "$APK_CODE" != "$VERSION_CODE" ]; then
+              echo "::error::APK versionCode is '$APK_CODE' but this run is $VERSION_CODE."
+              exit 1
+            fi
           fi
 
           cp "$APK" "melo-${{ inputs.tag }}.apk"

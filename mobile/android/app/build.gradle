@@ -85,12 +85,19 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 // into the APK; the hardcoded values are only a fallback if that file is gone.
 def appVersionName = "1.0.0"
 def appVersionCode = 1
-def appJsonFile = file("../app.json")
+// app.json lives in mobile/, one level above the android/ rootDir. Resolving
+// it from the app/ project dir (file("../app.json")) looked in android/ and
+// always fell back to the placeholder, which shipped 1.0.0 whatever the
+// workflow stamped.
+def appJsonFile = new File(rootDir, "../app.json")
 if (appJsonFile.exists()) {
     def appJson = new groovy.json.JsonSlurper().parseText(appJsonFile.text)
     appVersionName = appJson.expo?.version ?: appVersionName
     appVersionCode = (appJson.expo?.android?.versionCode ?: appVersionCode) as Integer
+} else {
+    println "melo: ${appJsonFile} not found; falling back to ${appVersionName} (${appVersionCode})"
 }
+println "melo: versionName=${appVersionName} versionCode=${appVersionCode} from ${appJsonFile}"
 
 android {
     ndkVersion rootProject.ext.ndkVersion
