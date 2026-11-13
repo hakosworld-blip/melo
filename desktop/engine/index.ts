@@ -206,6 +206,31 @@ async function fetchImage(url: URL) {
   return { body: upstream.body, type, length };
 }
 
+/**
+ * The same artwork at different sizes, best first.
+ *
+ * YouTube only generates `maxresdefault` for some videos, so high quality asks
+ * for it and walks down to the sizes every video has; low stays on the small
+ * thumbnails instead of downloading a 1280px cover.
+ */
+function imageCandidates(url: URL, quality: "low" | "high"): URL[] {
+  if (url.hostname === "i.ytimg.com") {
+    const match = url.pathname.match(/^\/vi\/([^/]+)\//);
+    if (match) {
+      const sizes = quality === "low" ? ["mqdefault"] : ["maxresdefault", "sddefault", "hqdefault"];
+      return sizes.map((size) => new URL(`https://i.ytimg.com/vi/${match[1]}/${size}.jpg`));
+    }
+  }
+  if (url.hostname.endsWith("googleusercontent.com") || url.hostname.endsWith("ggpht.com")) {
+    const raw = url.toString();
+    const cut = raw.lastIndexOf("=");
+    const base = cut > raw.lastIndexOf("/") ? raw.slice(0, cut) : raw;
+    const size = quality === "low" ? "w226-h226" : "w1200-h1200";
+    return [new URL(`${base}=${size}-l90-rj`), url];
+  }
+  return [url];
+}
+
 async function handleImage(res: ServerResponse, url: URL) {
   const src = url.searchParams.get("src");
   if (!src) {
@@ -224,23 +249,31 @@ async function handleImage(res: ServerResponse, url: URL) {
     return;
   }
 
-  const image = await fetchImage(target);
-  if (!image) {
-    sendText(res, 404, "Artwork unavailable");
+  const quality = url.searchParams.get("q") === "low" ? "low" : "high";
+  for (const candidate of imageCandidates(target, quality)) {
+    if (!isAllowedImage(candidate)) continue;
+    const image = await fetchImage(candidate);
+    if (!image) continue;
+    res.writeHead(200, {
+      "content-type": image.type || "image/jpeg",
+      "cache-control": "public, max-age=31536000, immutable",
+      ...(image.length ? { "content-length": String(image.length) } : {}),
+    });
+    Readable.fromWeb(image.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
     return;
   }
-
-  res.writeHead(200, {
-    "content-type": image.type || "image/jpeg",
-    "cache-control": "public, max-age=31536000, immutable",
-    ...(image.length ? { "content-length": String(image.length) } : {}),
-  });
-  Readable.fromWeb(image.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+  sendText(res, 404, "Artwork unavailable");
 }
 
 /* -------------------------------------------------------------------- API */
 
-async function handleStream(req: IncomingMessage, res: ServerResponse, parts: string[]) {
+async function handleStream(
+  req: IncomingMessage,
+  res: ServerResponse,
+  parts: string[],
+  params: URLSearchParams,
+) {
+  const quality = params.get("quality") === "low" ? "low" : "high";
   const providerId = decodeURIComponent(parts[2]);
   const id = decodeURIComponent(parts[3]);
   const provider = getProvider(providerId);
@@ -251,7 +284,7 @@ async function handleStream(req: IncomingMessage, res: ServerResponse, parts: st
 
   let upstreamUrl: string;
   try {
-    upstreamUrl = await provider.streamUrl(id);
+    upstreamUrl = await provider.streamUrl(id, { quality });
   } catch (error) {
     const message = error instanceof Error ? error.message : "This track cannot be streamed right now";
     const status = (error as { status?: number }).status === 404 ? 404 : 502;
@@ -274,7 +307,7 @@ async function handleStream(req: IncomingMessage, res: ServerResponse, parts: st
   if (upstream.status === 403) {
     upstream.stream.resume();
     try {
-      upstreamUrl = await provider.streamUrl(id, { fresh: true });
+      upstreamUrl = await provider.streamUrl(id, { fresh: true, quality });
       upstream = await openUpstream(upstreamUrl, range);
     } catch {
       /* fall through to the status check below */
@@ -522,7 +555,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): P
   }
 
   if ((method === "GET" || method === "HEAD") && parts[1] === "stream" && parts.length === 4) {
-    await handleStream(req, res, parts);
+    await handleStream(req, res, parts, url.searchParams);
     return true;
   }
 

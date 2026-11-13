@@ -7,6 +7,7 @@ export type ThemeMode = "dark" | "light" | "system";
 export type Density = "compact" | "comfortable" | "spacious";
 export type BackgroundType = "color" | "gradient" | "image" | "artwork";
 export type GlassStyle = "classic" | "liquid";
+export type MediaQuality = "low" | "high";
 export type SectionKey = "app" | "home" | "library" | "nowPlaying";
 
 export interface BackgroundConfig {
@@ -31,6 +32,10 @@ export interface Settings {
   radius: number;
   font: "sans" | "serif" | "mono";
   glass: GlassStyle;
+  /** Low asks for a smaller audio stream; high takes the best available. */
+  audioQuality: MediaQuality;
+  /** High loads the largest cover art, low uses thumbnails. */
+  artworkQuality: MediaQuality;
   animations: "full" | "reduced";
   motion: "slide" | "fade" | "scale";
   backgrounds: Record<SectionKey, BackgroundConfig>;
@@ -81,6 +86,8 @@ const defaultSettings: Settings = {
   radius: 10,
   font: "sans",
   glass: "classic",
+  audioQuality: "high",
+  artworkQuality: "high",
   animations: "full",
   motion: "slide",
   backgrounds: {
@@ -139,14 +146,22 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "melo-settings",
-      version: 6,
-      /** v3 is the dark listening room; v5 drops the source switch; v6 adds liquid glass. */
+      version: 7,
+      /** v3 is the dark listening room; v5 drops the source switch; v6 adds liquid
+       *  glass; v7 adds sound and artwork quality, which start high. */
       migrate: (persisted, version) => {
-        const state = persisted as SettingsState & { provider?: unknown; glass?: GlassStyle };
+        const state = persisted as SettingsState & {
+          provider?: unknown;
+          glass?: GlassStyle;
+          audioQuality?: MediaQuality;
+          artworkQuality?: MediaQuality;
+        };
         if (version < 2) return { ...state, accent: "ink", radius: 10, theme: "dark" };
         if (version < 3) return { ...state, theme: "dark", radius: 10 };
         delete state.provider;
         if (version < 6 || !state.glass) state.glass = "classic";
+        if (version < 7 || !state.audioQuality) state.audioQuality = "high";
+        if (version < 7 || !state.artworkQuality) state.artworkQuality = "high";
         return state;
       },
     },

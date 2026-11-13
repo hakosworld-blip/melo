@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Music2 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useSettings } from "@/store/settings";
 
 const gradients = [
   "linear-gradient(138deg,#3a2f28,#221f1d 55%,#151414)",
@@ -35,10 +36,11 @@ export function Artwork({
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const quality = useSettings((state) => state.artworkQuality);
   const proxied = src
     ? src.startsWith("blob:") || src.startsWith("data:")
       ? src
-      : `/api/image?src=${encodeURIComponent(src)}`
+      : `/api/image?src=${encodeURIComponent(src)}&q=${quality}`
     : null;
 
   return (

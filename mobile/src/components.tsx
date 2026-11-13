@@ -7,7 +7,7 @@ import { useAudioPlaylistStatus } from 'expo-audio';
 import { useNavigation } from '@react-navigation/native';
 import { playlist, togglePlayback, skipNext, usePlayer, playTrack, addToQueue } from './player';
 import { useLibrary } from './library';
-import { useSettings } from './settings';
+import { useSettings, type MediaQuality } from './settings';
 import { useUi } from './ui';
 import type { Track } from './types';
 
@@ -300,6 +300,33 @@ export function PressableScale({ style, children, disabled, ...rest }: Pressable
   );
 }
 
+/**
+ * The same cover at the size the user asked for.
+ *
+ * YouTube serves fixed names per video and `maxresdefault` only exists for some
+ * uploads, so high asks for it and steps down to `hqdefault` if that 404s.
+ */
+export function artworkUrl(source: string | undefined, quality: MediaQuality) {
+  if (!source) return source;
+  if (source.includes('i.ytimg.com/vi/')) {
+    const file = quality === 'low' ? 'mqdefault' : 'maxresdefault';
+    return source.replace(/\/vi\/([^/]+)\/[^/?#]+/, (_match, id: string) => `/vi/${id}/${file}.jpg`);
+  }
+  if (source.includes('googleusercontent.com') || source.includes('ggpht.com')) {
+    const cut = source.lastIndexOf('=');
+    const base = cut > source.lastIndexOf('/') ? source.slice(0, cut) : source;
+    return `${base}=${quality === 'low' ? 'w226-h226' : 'w1200-h1200'}-l90-rj`;
+  }
+  return source;
+}
+
+/** A smaller URL to try when the sharp one is missing. */
+function smallerArtwork(source: string) {
+  if (source.includes('maxresdefault')) return source.replace('maxresdefault', 'hqdefault');
+  if (source.includes('w1200-h1200')) return source.replace('w1200-h1200', 'w544-h544');
+  return null;
+}
+
 export function Artwork({
   source,
   size = 56,
@@ -311,13 +338,28 @@ export function Artwork({
   rounded?: number;
   blurred?: boolean;
 }) {
-  if (source) {
+  const quality = useSettings((state) => state.artworkQuality);
+  const wanted = artworkUrl(source, quality);
+  const [uri, setUri] = useState(wanted);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setUri(wanted);
+    setFailed(false);
+  }, [wanted]);
+
+  if (uri && !failed) {
     return (
       <Image
-        source={{ uri: source }}
+        source={{ uri }}
         style={[styles.artwork, { width: size, height: size, borderRadius: rounded }]}
         resizeMode="cover"
         blurRadius={blurred ? 40 : 0}
+        onError={() => {
+          const fallback = smallerArtwork(uri);
+          if (fallback) setUri(fallback);
+          else setFailed(true);
+        }}
       />
     );
   }

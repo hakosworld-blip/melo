@@ -1,6 +1,7 @@
 "use client";
 
 import { KEYS, getAssetUrl } from "@/lib/storage";
+import { useSettings } from "@/store/settings";
 import type { Track } from "@/lib/types";
 
 /**
@@ -21,7 +22,9 @@ export function audioElement(): HTMLAudioElement {
 }
 
 export function streamPath(track: Track) {
-  return `/api/stream/${track.provider}/${encodeURIComponent(track.providerId)}`;
+  // The chosen quality travels with the request so the engine picks the format.
+  const quality = useSettings.getState().audioQuality;
+  return `/api/stream/${track.provider}/${encodeURIComponent(track.providerId)}?quality=${quality}`;
 }
 
 export async function resolveSource(track: Track, useOffline: boolean): Promise<string> {

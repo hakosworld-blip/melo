@@ -864,6 +864,10 @@ function SettingsScreen({ navigation }: any) {
   const setGlassStyle = useSettings((s) => s.setGlassStyle);
   const displayMode = useSettings((s) => s.displayMode);
   const setDisplayMode = useSettings((s) => s.setDisplayMode);
+  const audioQuality = useSettings((s) => s.audioQuality);
+  const setAudioQuality = useSettings((s) => s.setAudioQuality);
+  const artworkQuality = useSettings((s) => s.artworkQuality);
+  const setArtworkQuality = useSettings((s) => s.setArtworkQuality);
   const [serverDraft, setServerDraft] = useState(savedServer);
   const [serverNote, setServerNote] = useState<string | null>(null);
   const [testingServer, setTestingServer] = useState(false);
@@ -930,6 +934,34 @@ function SettingsScreen({ navigation }: any) {
         <Text style={styles.fieldHint}>
           Liquid glass blurs the content behind every panel, then adds a moving specular highlight and a brighter rim. It
           stays smooth because one shared, GPU-driven animation draws every highlight.
+        </Text>
+
+        <SectionTitle title="Sound quality" subtitle="The audio stream your melo server sends" />
+        <Segmented
+          value={audioQuality}
+          onChange={setAudioQuality}
+          options={[
+            { value: 'low', label: 'Low' },
+            { value: 'high', label: 'High' },
+          ]}
+        />
+        <Text style={styles.fieldHint}>
+          High takes the best audio YouTube Music offers. Low asks for a roughly 96 kbps stream, which uses less data and
+          buffers faster on a weak connection.
+        </Text>
+
+        <SectionTitle title="Artwork quality" subtitle="How sharp covers look" />
+        <Segmented
+          value={artworkQuality}
+          onChange={setArtworkQuality}
+          options={[
+            { value: 'low', label: 'Low' },
+            { value: 'high', label: 'High' },
+          ]}
+        />
+        <Text style={styles.fieldHint}>
+          High loads the largest cover available and falls back to a smaller one only when the source has none. Low keeps
+          covers on small thumbnails.
         </Text>
 
         {Platform.OS === 'android' ? (

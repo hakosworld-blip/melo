@@ -629,13 +629,17 @@ export const youtubeProvider: MusicProvider = {
   },
 
   async streamUrl(id, options) {
-    const key = `yt:stream:${id}`;
+    const quality = options?.quality === "low" ? "low" : "high";
+    const key = `yt:stream:${id}:${quality}`;
     // A cached URL can expire or be rejected; callers that saw a 403 ask for a
     // fresh resolution instead of failing the same track for the next minute.
     if (options?.fresh) cacheDelete(key);
     return cached(key, 5 * 60_000, async () => {
+      // Low takes the smallest track the host is offered (audio-only when DASH
+      // formats exist, the muxed one otherwise); high takes the best audio.
+      const format = quality === "low" ? "worstaudio/worst" : "bestaudio/best";
       const urls = (
-        await ytdlp(["-f", "bestaudio/best", "-g", `https://music.youtube.com/watch?v=${id}`], 40_000)
+        await ytdlp(["-f", format, "-g", `https://music.youtube.com/watch?v=${id}`], 40_000)
       )
         .trim()
         .split("\n")

@@ -194,6 +194,31 @@ export default function SettingsPage() {
             </SettingRow>
           </SettingsGroup>
 
+          <SettingsGroup title="Playback" description="How much data each song and cover uses">
+            <SettingRow label="Sound quality" description="Streaming bitrate from the source">
+              <Segmented
+                value={settings.audioQuality}
+                onChange={(audioQuality) => settings.update({ audioQuality })}
+                size="sm"
+                options={[
+                  { value: "low", label: "Low" },
+                  { value: "high", label: "High" },
+                ]}
+              />
+            </SettingRow>
+            <SettingRow label="Artwork quality" description="Cover and thumbnail resolution">
+              <Segmented
+                value={settings.artworkQuality}
+                onChange={(artworkQuality) => settings.update({ artworkQuality })}
+                size="sm"
+                options={[
+                  { value: "low", label: "Low" },
+                  { value: "high", label: "High" },
+                ]}
+              />
+            </SettingRow>
+          </SettingsGroup>
+
           <SettingsGroup
             title="Backgrounds"
             description="Per-section colour, gradient, uploaded image or the current artwork"

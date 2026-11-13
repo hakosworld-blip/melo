@@ -137,7 +137,7 @@ export interface MusicProvider {
   artist(id: string): Promise<Artist | null>;
   album(id: string): Promise<Album | null>;
   /** Resolves a direct upstream audio URL for proxying. */
-  streamUrl(id: string, options?: { fresh?: boolean }): Promise<string>;
+  streamUrl(id: string, options?: { fresh?: boolean; quality?: "low" | "high" }): Promise<string>;
   availability(): Promise<ProviderAvailability>;
   /** Optional catalogue browsing, used by Home's genre row and daily mix. */
   genres?(): Promise<GenreSummary[]>;

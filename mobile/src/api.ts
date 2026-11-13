@@ -1,4 +1,4 @@
-import { getServerUrl } from './settings';
+import { getServerUrl, useSettings } from './settings';
 import type { ArtistSummary, HomeSection, SearchResults, Track } from './types';
 
 /**
@@ -125,7 +125,9 @@ export function streamUrl(track: Track): string {
   if (track.provider !== 'youtube') return '';
   const server = getServerUrl();
   if (!server) return '';
-  return `${server}/api/stream/youtube/${encodeURIComponent(track.providerId)}`;
+  // Low lets the server send a smaller stream; high asks for the best audio.
+  const quality = useSettings.getState().audioQuality;
+  return `${server}/api/stream/youtube/${encodeURIComponent(track.providerId)}?quality=${quality}`;
 }
 
 export type { ArtistSummary, HomeSection, SearchResults, Track };
