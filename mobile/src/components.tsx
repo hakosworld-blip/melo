@@ -195,6 +195,130 @@ export function SectionTitle({ title, subtitle, action }: { title: string; subti
   );
 }
 
+/**
+ * Three tiny bars that bounce while a song is playing.
+ *
+ * The bars keep their final height in the style and only animate scaleY, so
+ * the row they sit in never reflows. Reduced motion gets static bars.
+ */
+export function Equalizer({ playing = true, color = colors.text }: { playing?: boolean; color?: string }) {
+  const reduce = useReduceMotion();
+  const bars = useRef([new Animated.Value(0.35), new Animated.Value(0.75), new Animated.Value(0.5)]).current;
+  const heights = [10, 15, 7];
+
+  useEffect(() => {
+    if (!playing) {
+      bars[0].setValue(0.35);
+      bars[1].setValue(0.75);
+      bars[2].setValue(0.5);
+      return;
+    }
+    if (reduce) {
+      bars.forEach((bar) => bar.setValue(1));
+      return;
+    }
+    const loops = bars.map((bar, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 110),
+          Animated.timing(bar, { toValue: 1, duration: 330 + index * 55, useNativeDriver: true }),
+          Animated.timing(bar, { toValue: 0.3, duration: 380 + index * 45, useNativeDriver: true }),
+          Animated.delay(90),
+        ]),
+      ),
+    );
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [playing, reduce, bars]);
+
+  return (
+    <View style={styles.equalizer} accessible={false} pointerEvents="none">
+      {heights.map((height, index) => (
+        <Animated.View
+          key={height}
+          style={{
+            width: 2.5,
+            height,
+            borderRadius: 2,
+            backgroundColor: color,
+            transform: [{ scaleY: bars[index] }],
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * A segmented control whose selection is one thumb that glides between labels,
+ * so switching a tab reads as movement rather than a colour swap. Each label
+ * keeps an equal share, which is measured once from the track itself.
+ */
+export function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  const reduce = useReduceMotion();
+  const pad = 3;
+  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  const [trackWidth, setTrackWidth] = useState(0);
+  const itemWidth = trackWidth > pad * 2 ? (trackWidth - pad * 2) / options.length : 0;
+  const shift = useRef(new Animated.Value(0)).current;
+  const width = useRef(new Animated.Value(0)).current;
+  const placed = useRef(false);
+
+  useEffect(() => {
+    if (!itemWidth) return;
+    const target = index * itemWidth;
+    if (reduce || !placed.current) {
+      shift.setValue(target);
+      width.setValue(itemWidth);
+      placed.current = true;
+      return;
+    }
+    // Width is a layout property, so this pair cannot use the native driver.
+    Animated.parallel([
+      Animated.timing(shift, { toValue: target, duration: 320, useNativeDriver: false }),
+      Animated.timing(width, { toValue: itemWidth, duration: 320, useNativeDriver: false }),
+    ]).start();
+  }, [index, itemWidth, reduce, shift, width]);
+
+  return (
+    <View
+      style={styles.segmented}
+      onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+      accessibilityRole="tablist"
+    >
+      <Animated.View
+        style={[styles.segThumb, { width, transform: [{ translateX: shift }] }]}
+        accessible={false}
+        pointerEvents="none"
+      />
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            style={styles.segment}
+            onPress={() => onChange(option.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+          >
+            <Text style={[styles.segmentText, selected && styles.segmentTextActive]} numberOfLines={1}>
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export function ErrorBanner({ message }: { message: string }) {
   return (
     <View style={styles.errorBanner}>
@@ -269,9 +393,12 @@ export function TrackRow({
       >
         <Artwork source={track.artworkSmall || track.artwork} size={48} />
         <View style={styles.trackText}>
-          <Text style={[styles.trackTitle, isCurrent && styles.currentTrack]} numberOfLines={1}>
-            {track.title}
-          </Text>
+          <View style={styles.trackTitleRow}>
+            <Text style={[styles.trackTitle, isCurrent && styles.currentTrack]} numberOfLines={1}>
+              {track.title}
+            </Text>
+            {isCurrent && status.playing ? <Equalizer playing /> : null}
+          </View>
           <Text style={styles.trackSubtitle} numberOfLines={1}>
             {track.artist}
             {track.album ? ` · ${track.album}` : ''}
@@ -507,6 +634,28 @@ export function MiniPlayer() {
     if (track) useLibrary.getState().recordPlay(track);
   }, [trackId]);
 
+  // A new song settles in rather than swapping the cover under the thumb.
+  const reduce = useReduceMotion();
+  const enter = useRef(new Animated.Value(1)).current;
+  const coverScale = useRef(new Animated.Value(1)).current;
+  const firstTrack = useRef(true);
+
+  useEffect(() => {
+    if (!trackId) return;
+    if (firstTrack.current || reduce) {
+      firstTrack.current = false;
+      enter.setValue(1);
+      coverScale.setValue(1);
+      return;
+    }
+    enter.setValue(0);
+    coverScale.setValue(0.94);
+    Animated.parallel([
+      Animated.timing(enter, { toValue: 1, duration: 260, useNativeDriver: true }),
+      Animated.spring(coverScale, { toValue: 1, friction: 8, tension: 90, useNativeDriver: true }),
+    ]).start();
+  }, [trackId, reduce, enter, coverScale]);
+
   if (!track) return null;
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
   return (
@@ -516,18 +665,23 @@ export function MiniPlayer() {
       accessibilityRole="button"
       accessibilityLabel={`Open ${track.title}`}
     >
-      <Artwork source={track.artworkSmall || track.artwork} size={42} />
-      <View style={styles.miniText}>
-        <Text style={styles.miniTitle} numberOfLines={1}>
-          {track.title}
-        </Text>
+      <Animated.View style={{ transform: [{ scale: coverScale }] }}>
+        <Artwork source={track.artworkSmall || track.artwork} size={42} />
+      </Animated.View>
+      <Animated.View style={[styles.miniText, { opacity: enter }]}>
+        <View style={styles.miniTitleRow}>
+          <Text style={styles.miniTitle} numberOfLines={1}>
+            {track.title}
+          </Text>
+          {status.playing ? <Equalizer playing /> : null}
+        </View>
         <Text style={styles.miniSubtitle} numberOfLines={1}>
           {track.artist}
         </Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
-      </View>
+      </Animated.View>
       <PressableScale
         style={styles.miniPlay}
         onPress={togglePlayback}
@@ -580,6 +734,22 @@ export const styles = StyleSheet.create({
   sectionHeading: { flex: 1, minWidth: 0 },
   sectionTitle: { color: colors.text, fontFamily: fonts.sansBold, fontSize: 21, letterSpacing: -0.5 },
   sectionSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  equalizer: { flexDirection: 'row', alignItems: 'flex-end', gap: 2.5, height: 16 },
+  segmented: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.glass,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 999,
+    padding: 3,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  segThumb: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 999, backgroundColor: colors.accent },
+  segment: { flex: 1, height: 34, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  segmentText: { color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 12 },
+  segmentTextActive: { color: colors.accentInk, fontFamily: fonts.sansBold },
   errorBanner: { backgroundColor: colors.paleRed, borderColor: 'rgba(255,138,134,0.28)', borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 14 },
   errorText: { color: colors.danger, fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 18 },
   emptyState: { paddingVertical: 26, paddingHorizontal: 6 },
@@ -595,7 +765,8 @@ export const styles = StyleSheet.create({
   },
   trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 11 },
   trackText: { flex: 1, minWidth: 0 },
-  trackTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 14.5 },
+  trackTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  trackTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 14.5, flexShrink: 1 },
   currentTrack: { color: '#FFFFFF' },
   trackSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5, marginTop: 2 },
   duration: { color: colors.muted, fontFamily: fonts.mono, fontSize: 10.5 },
@@ -656,7 +827,8 @@ export const styles = StyleSheet.create({
     elevation: 14,
   },
   miniText: { flex: 1, minWidth: 0 },
-  miniTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13 },
+  miniTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  miniTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 13, flexShrink: 1 },
   miniSubtitle: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11, marginTop: 1 },
   miniPlay: {
     width: 34,

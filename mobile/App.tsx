@@ -13,7 +13,7 @@ import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-go
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Cog, Home, Library, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
 import { fetchCharts, fetchGenreTracks, searchCatalogue, type ChartArtist } from './src/api';
 import { buildHomeFeed, type HomeFeed } from './src/feed';
-import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PressableScale, PromptModal, RiseIn, SectionTitle, Artwork, TrackRow, useReduceMotion } from './src/components';
+import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PressableScale, PromptModal, RiseIn, SectionTitle, Segmented, Artwork, TrackRow, useReduceMotion } from './src/components';
 import { LyricsSheet } from './src/lyrics-view';
 import { useUi } from './src/ui';
 import { addToQueue, clearQueue, currentRepeat, currentVolume, cycleRepeat, initPlayer, playTracks, playlist, seekTo, setVolume, skipNext, skipPrevious, togglePlayback, usePlayer, type RepeatMode } from './src/player';
@@ -84,6 +84,13 @@ function HomeScreen({ navigation }: any) {
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const today = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const otherSections = (feed?.sections ?? []).filter((section) => section.id !== 'daily-mix');
+  // A source can answer with empty shelves instead of an error, and the page
+  // has to say so rather than look like an unfinished skeleton.
+  const hasContent =
+    mix.length > 0 ||
+    pinned.length > 0 ||
+    recent.length > 0 ||
+    otherSections.some((section) => section.items.length > 0);
 
   if (loading) return <Loading />;
 
@@ -199,22 +206,40 @@ function HomeScreen({ navigation }: any) {
               }
             />
             <View style={styles.glassPanel}>
-              {charts.map((artist) => (
-                <View key={artist.name} style={styles.chartRow}>
-                  <Text style={styles.chartRank}>{artist.rank}</Text>
-                  <View style={styles.chartMeta}>
-                    <Text style={styles.trackTitle} numberOfLines={1}>
-                      {artist.name}
+              <View style={styles.chartHead}>
+                <Text style={[styles.chartHeadCell, { width: 18 }]}>#</Text>
+                <Text style={[styles.chartHeadCell, styles.chartMeta]}>Artist</Text>
+                <Text style={[styles.chartHeadCell, { width: 64, textAlign: 'right' }]}>Today</Text>
+                <Text style={[styles.chartHeadCell, { width: 42, textAlign: 'right' }]}>Chart</Text>
+              </View>
+              {charts.map((artist, index) => (
+                <RiseIn key={artist.name} delay={index * 30}>
+                  <View style={styles.chartRow}>
+                    <Text style={styles.chartRank}>{artist.rank}</Text>
+                    <View style={styles.chartMeta}>
+                      <Text style={styles.trackTitle} numberOfLines={1}>
+                        {artist.name}
+                      </Text>
+                      <Text style={styles.trackSubtitle} numberOfLines={1}>
+                        {formatCompact(artist.monthlyListeners)} monthly
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.chartChange, artist.dailyChange >= 0 ? styles.chartUp : styles.chartDown]}
+                      numberOfLines={1}
+                    >
+                      {artist.dailyChange >= 0 ? '▲' : '▼'} {formatCompact(Math.abs(artist.dailyChange))}
                     </Text>
-                    <Text style={styles.trackSubtitle} numberOfLines={1}>
-                      {formatCompact(artist.monthlyListeners)} monthly · {artist.dailyChange >= 0 ? '+' : '−'}
-                      {formatCompact(Math.abs(artist.dailyChange))} today
+                    <Text style={styles.chartMetric} numberOfLines={1}>
+                      {artist.worldwide ? `#${artist.worldwide.position}` : '—'}
                     </Text>
                   </View>
-                  <Text style={styles.chartMetric}>{artist.worldwide ? `#${artist.worldwide.position}` : '—'}</Text>
-                </View>
+                </RiseIn>
               ))}
             </View>
+            <Text style={styles.chartNote}>
+              Ranked by monthly listeners. The last column is the artist's best position on the worldwide daily chart.
+            </Text>
           </View>
         ) : null}
 
@@ -244,8 +269,31 @@ function HomeScreen({ navigation }: any) {
           </View>
         ) : null}
 
-        {!mix.length && !error ? (
-          <EmptyState>Nothing came back from the catalogue just now. Pull down to try again.</EmptyState>
+        {!hasContent && !error ? (
+          <EmptyState
+            action={
+              <View style={styles.pillRow}>
+                <Pressable
+                  style={styles.ghostPill}
+                  onPress={() => {
+                    setRefreshing(true);
+                    void load(true);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <RefreshCw size={14} color={colors.muted} />
+                  <Text style={styles.ghostPillText}>Try again</Text>
+                </Pressable>
+                <Pressable style={styles.ghostPill} onPress={() => navigation.navigate('Settings')} accessibilityRole="button">
+                  <Cog size={14} color={colors.muted} />
+                  <Text style={styles.ghostPillText}>Open settings</Text>
+                </Pressable>
+              </View>
+            }
+          >
+            Your melo server answered, but YouTube Music returned no shelves. YouTube can block datacenter IPs or ask for
+            cookies, so check the source in Settings before assuming the catalogue is empty.
+          </EmptyState>
         ) : null}
 
         {otherSections.map((section) => (
@@ -333,17 +381,21 @@ function PersonCard({ name, artwork, subtitle, round = false }: { name: string; 
   );
 }
 
+type SearchTab = 'all' | 'songs' | 'artists' | 'albums';
+
 function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>({ tracks: [], artists: [], albums: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<SearchTab>('all');
 
   useEffect(() => {
     const term = query.trim();
     if (!term) {
       setResults({ tracks: [], artists: [], albums: [] });
       setError(null);
+      setTab('all');
       return;
     }
     setLoading(true);
@@ -356,6 +408,19 @@ function SearchScreen() {
     return () => clearTimeout(id);
   }, [query]);
 
+  const hasResults = results.tracks.length > 0 || results.artists.length > 0 || results.albums.length > 0;
+  const showSongs = tab === 'all' || tab === 'songs';
+  const showArtists = tab === 'all' || tab === 'artists';
+  const showAlbums = tab === 'all' || tab === 'albums';
+  const tabs: { value: SearchTab; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'songs', label: results.tracks.length ? `Songs · ${results.tracks.length}` : 'Songs' },
+    { value: 'artists', label: results.artists.length ? `Artists · ${results.artists.length}` : 'Artists' },
+  ];
+  // YouTube Music has no album catalogue, so this tab only exists when the
+  // source actually returned albums.
+  if (results.albums.length > 0 || tab === 'albums') tabs.push({ value: 'albums', label: 'Albums' });
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
@@ -365,28 +430,40 @@ function SearchScreen() {
         {loading ? <View style={styles.center}><ActivityIndicator color={colors.accent} /></View> : null}
         {error ? <ErrorBanner message={error} /> : null}
         {!query && !loading ? <EmptyState>Search YouTube Music. Add your melo server in Settings first.</EmptyState> : null}
-        {results.tracks.length ? <SectionTitle title="Songs" /> : null}
-        {results.tracks.map((track, index) => <TrackRow key={track.id} track={track} context={results.tracks} index={index} />)}
-        {results.artists.length ? <SectionTitle title="Artists" /> : null}
-        {results.artists.map((artist) => (
-          <View key={artist.id} style={styles.personRow}>
-            <Artwork source={artist.artwork} size={48} rounded={24} />
-            <View style={styles.personText}>
-              <Text style={styles.trackTitle} numberOfLines={1}>{artist.name}</Text>
-              <Text style={styles.trackSubtitle}>{artist.trackCount ? `${artist.trackCount} tracks` : 'Artist'}</Text>
-            </View>
-          </View>
-        ))}
-        {results.albums.length ? <SectionTitle title="Albums" /> : null}
-        {results.albums.map((album) => (
-          <View key={album.id} style={styles.personRow}>
-            <Artwork source={album.artwork} size={48} />
-            <View style={styles.personText}>
-              <Text style={styles.trackTitle} numberOfLines={1}>{album.name}</Text>
-              <Text style={styles.trackSubtitle} numberOfLines={1}>{album.artist}</Text>
-            </View>
-          </View>
-        ))}
+        {query.trim() && hasResults ? <Segmented value={tab} options={tabs} onChange={setTab} /> : null}
+        {query.trim() && !loading && !error && !hasResults ? (
+          <EmptyState>
+            No matches. Nothing in the catalogue matched “{query.trim()}”. Try a different spelling, or a shorter search.
+          </EmptyState>
+        ) : null}
+        {showSongs && results.tracks.length ? <SectionTitle title="Songs" /> : null}
+        {showSongs
+          ? results.tracks.map((track, index) => <TrackRow key={track.id} track={track} context={results.tracks} index={index} />)
+          : null}
+        {showArtists && results.artists.length ? <SectionTitle title="Artists" /> : null}
+        {showArtists
+          ? results.artists.map((artist) => (
+              <View key={artist.id} style={styles.personRow}>
+                <Artwork source={artist.artwork} size={48} rounded={24} />
+                <View style={styles.personText}>
+                  <Text style={styles.trackTitle} numberOfLines={1}>{artist.name}</Text>
+                  <Text style={styles.trackSubtitle}>{artist.trackCount ? `${artist.trackCount} tracks` : 'Artist'}</Text>
+                </View>
+              </View>
+            ))
+          : null}
+        {showAlbums && results.albums.length > 0 ? <SectionTitle title="Albums" /> : null}
+        {showAlbums
+          ? results.albums.map((album) => (
+              <View key={album.id} style={styles.personRow}>
+                <Artwork source={album.artwork} size={48} />
+                <View style={styles.personText}>
+                  <Text style={styles.trackTitle} numberOfLines={1}>{album.name}</Text>
+                  <Text style={styles.trackSubtitle} numberOfLines={1}>{album.artist}</Text>
+                </View>
+              </View>
+            ))
+          : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -944,21 +1021,45 @@ function ChartsScreen({ navigation }: any) {
             <ActivityIndicator color={colors.accent} />
           </View>
         ) : null}
-        {data?.artists.map((artist) => (
-          <View key={artist.name} style={styles.settingRow}>
-            <Text style={{ width: 26, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted }}>{artist.rank}</Text>
-            <View style={styles.settingText}>
-              <Text style={styles.trackTitle} numberOfLines={1}>
-                {artist.name}
-              </Text>
-              <Text style={styles.trackSubtitle}>
-                {formatCompact(artist.monthlyListeners)} monthly · {artist.dailyChange >= 0 ? '+' : '−'}
-                {formatCompact(Math.abs(artist.dailyChange))} today
-                {artist.worldwide ? ` · #${artist.worldwide.position} worldwide` : ''}
-              </Text>
+        {data?.artists.length ? (
+          <View style={styles.glassPanel}>
+            <View style={styles.chartHead}>
+              <Text style={[styles.chartHeadCell, { width: 26 }]}>#</Text>
+              <Text style={[styles.chartHeadCell, styles.chartMeta]}>Artist</Text>
+              <Text style={[styles.chartHeadCell, { width: 64, textAlign: 'right' }]}>Today</Text>
+              <Text style={[styles.chartHeadCell, { width: 42, textAlign: 'right' }]}>Chart</Text>
             </View>
+            {data.artists.map((artist, index) => (
+              <RiseIn key={artist.name} delay={index * 25}>
+                <View style={styles.chartRow}>
+                  <Text style={[styles.chartRank, { width: 26 }]}>{artist.rank}</Text>
+                  <View style={styles.chartMeta}>
+                    <Text style={styles.trackTitle} numberOfLines={1}>
+                      {artist.name}
+                    </Text>
+                    <Text style={styles.trackSubtitle} numberOfLines={1}>
+                      {formatCompact(artist.monthlyListeners)} monthly
+                    </Text>
+                  </View>
+                  <Text
+                    style={[styles.chartChange, artist.dailyChange >= 0 ? styles.chartUp : styles.chartDown]}
+                    numberOfLines={1}
+                  >
+                    {artist.dailyChange >= 0 ? '▲' : '▼'} {formatCompact(Math.abs(artist.dailyChange))}
+                  </Text>
+                  <Text style={styles.chartMetric} numberOfLines={1}>
+                    {artist.worldwide ? `#${artist.worldwide.position}` : '—'}
+                  </Text>
+                </View>
+              </RiseIn>
+            ))}
           </View>
-        ))}
+        ) : null}
+        {data?.artists.length ? (
+          <Text style={styles.chartNote}>
+            Ranked by monthly listeners. The last column is the artist's best position on the worldwide daily chart.
+          </Text>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1598,9 +1699,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
+  chartHead: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 4 },
+  chartHeadCell: {
+    color: colors.muted,
+    fontFamily: fonts.sansMedium,
+    fontSize: 9,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
   chartRank: { width: 18, color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 12.5 },
-  chartMeta: { flex: 1 },
-  chartMetric: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5 },
+  chartMeta: { flex: 1, minWidth: 0 },
+  chartChange: { width: 64, textAlign: 'right', fontFamily: fonts.sansMedium, fontSize: 11.5 },
+  chartUp: { color: '#7FDCC0' },
+  chartDown: { color: '#F08C7E' },
+  chartMetric: { width: 42, textAlign: 'right', color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5 },
+  chartNote: { color: colors.muted, fontFamily: fonts.sans, fontSize: 10.5, lineHeight: 16, marginTop: 8 },
   genreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   genreTile: {
     width: '100%',
