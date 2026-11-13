@@ -43,6 +43,10 @@ export async function cached<T>(
   return cacheSet(key, value, ttlMs);
 }
 
+export function cacheDelete(key: string) {
+  store.delete(key);
+}
+
 export function cacheSize() {
   return store.size;
 }

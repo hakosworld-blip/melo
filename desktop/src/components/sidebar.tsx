@@ -19,6 +19,10 @@ export default function Sidebar() {
   const playlists = useLibrary((s) => s.playlists);
   const followed = useLibrary((s) => s.followedArtists);
   const openSheet = useUi((s) => s.openSheet);
+  const activeIndex = Math.max(
+    0,
+    navItems.findIndex(({ href }) => (href === "/" ? pathname === "/" : pathname.startsWith(href))),
+  );
 
   return (
     <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-[var(--glass-line)] bg-[var(--glass)] backdrop-blur-2xl backdrop-saturate-150 lg:flex">
@@ -29,7 +33,17 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      <nav className="space-y-0.5 px-3">
+      {/* One lozenge slides between the tabs instead of each tab flashing
+          its own background. Equal item heights make the position pure CSS. */}
+      <nav className="nav-glide-wrap relative px-3">
+        <span
+          aria-hidden
+          className="nav-glide"
+          style={{
+            height: `${100 / navItems.length}%`,
+            transform: `translateY(${activeIndex * 100}%)`,
+          }}
+        />
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
@@ -38,7 +52,7 @@ export default function Sidebar() {
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "press isolate relative flex items-center gap-3 rounded-full px-3 py-2.5 text-[13.5px] font-medium transition-colors",
+                "press isolate relative z-10 flex items-center gap-3 rounded-full px-3 py-2.5 text-[13.5px] font-medium transition-colors",
                 active ? "nav-active text-ink" : "text-muted hover:bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] hover:text-ink",
               )}
             >

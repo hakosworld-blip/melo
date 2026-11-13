@@ -15,6 +15,7 @@ export default function ThemeApplier() {
     const apply = () => {
       root.dataset.theme = resolveTheme(settings.theme);
       root.dataset.font = settings.font;
+      root.dataset.glass = settings.glass;
       root.dataset.animations = settings.animations;
       root.dataset.motion = settings.motion;
       // "ink" is the monochrome default: the CTA is the text colour, so it
@@ -38,6 +39,7 @@ export default function ThemeApplier() {
   }, [
     settings.theme,
     settings.font,
+    settings.glass,
     settings.animations,
     settings.motion,
     settings.accent,

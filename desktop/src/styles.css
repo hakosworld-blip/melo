@@ -735,6 +735,145 @@ nav {
   box-shadow: inset 0 1px 0 var(--glass-highlight), 0 30px 60px -32px rgba(0, 0, 0, 0.85);
 }
 
+/* ---------- liquid glass (opt-in) ---------- */
+/* The alternative surface language from Settings. Every animated highlight is
+   a transform on a single pseudo-element, so the compositor moves a rasterised
+   gradient instead of repainting the panel or re-blurring the backdrop. */
+[data-glass="liquid"] .glass,
+[data-glass="liquid"] .glass-strong,
+[data-glass="liquid"] .glass-card {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0.04) 34%,
+      rgba(255, 255, 255, 0) 66%
+    ),
+    radial-gradient(120% 80% at 12% 0%, rgba(255, 255, 255, 0.1), transparent 58%),
+    var(--glass);
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 26px rgba(255, 255, 255, 0.05),
+    0 6px 14px -8px rgba(0, 0, 0, 0.55),
+    0 22px 52px -24px rgba(0, 0, 0, 0.9);
+  backdrop-filter: saturate(200%) blur(32px);
+  -webkit-backdrop-filter: saturate(200%) blur(32px);
+}
+[data-glass="liquid"] .glass-strong {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.19) 0%,
+      rgba(255, 255, 255, 0.05) 36%,
+      rgba(255, 255, 255, 0) 68%
+    ),
+    radial-gradient(120% 90% at 12% 0%, rgba(255, 255, 255, 0.12), transparent 62%),
+    var(--glass-strong);
+  border-color: color-mix(in srgb, var(--ink) 18%, transparent);
+  backdrop-filter: saturate(210%) blur(40px);
+  -webkit-backdrop-filter: saturate(210%) blur(40px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 30px rgba(255, 255, 255, 0.06),
+    0 8px 18px -8px rgba(0, 0, 0, 0.6),
+    0 30px 64px -26px rgba(0, 0, 0, 0.95);
+}
+[data-glass="liquid"] .glass-card {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.03) 42%,
+      rgba(255, 255, 255, 0) 72%
+    ),
+    var(--glass-card);
+  border-color: color-mix(in srgb, var(--ink) 14%, transparent);
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 22px rgba(255, 255, 255, 0.04),
+    0 6px 16px -8px rgba(0, 0, 0, 0.5),
+    0 20px 44px -22px rgba(0, 0, 0, 0.8);
+}
+[data-glass="liquid"] .glass-card:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 22px rgba(255, 255, 255, 0.04),
+    0 10px 22px -10px rgba(0, 0, 0, 0.55),
+    0 32px 64px -26px rgba(0, 0, 0, 0.9);
+}
+
+/* Panels that are safe to clip get the iridescent edge and the moving sheen.
+   Pills keep the richer static glass above so their layout never changes. */
+[data-glass="liquid"] .glass-strong,
+[data-glass="liquid"] .glass-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  contain: paint;
+}
+[data-glass="liquid"] .glass-strong::before,
+[data-glass="liquid"] .glass-card::before,
+[data-glass="liquid"] .glass-strong::after,
+[data-glass="liquid"] .glass-card::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+}
+/* A faint warm-to-cool fringe, like light bending at the rim. */
+[data-glass="liquid"] .glass-strong::before,
+[data-glass="liquid"] .glass-card::before {
+  inset: 0;
+  background:
+    linear-gradient(112deg, rgba(255, 128, 120, 0.15) 0%, rgba(255, 255, 255, 0) 30%),
+    linear-gradient(292deg, rgba(110, 190, 255, 0.16) 0%, rgba(255, 255, 255, 0) 36%);
+}
+/* One specular band crosses the panel every few seconds. */
+[data-glass="liquid"] .glass-strong::after,
+[data-glass="liquid"] .glass-card::after {
+  top: -60%;
+  bottom: -60%;
+  left: 0;
+  width: 44%;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 8%,
+    rgba(255, 255, 255, 0.3) 46%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(255, 255, 255, 0) 90%
+  );
+  transform: translate3d(-140%, 0, 0) rotate(8deg);
+  animation: melo-liquid-sheen 9.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+@keyframes melo-liquid-sheen {
+  0%,
+  62% {
+    transform: translate3d(-140%, 0, 0) rotate(8deg);
+  }
+  100% {
+    transform: translate3d(340%, 0, 0) rotate(8deg);
+  }
+}
+[data-animations="reduced"] [data-glass="liquid"] .glass-strong::after,
+[data-animations="reduced"] [data-glass="liquid"] .glass-card::after {
+  animation: none;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-glass="liquid"] .glass-strong::after,
+  [data-glass="liquid"] .glass-card::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* ---------- ambient room light ---------- */
 /* Fixed colour orbs below the content; the only reason a glass panel looks
    like glass on a black canvas. Kept very dim so text contrast is untouched. */
@@ -783,6 +922,64 @@ nav {
 }
 .lift:hover {
   transform: translateY(-2px);
+}
+
+/* The sidebar's active lozenge slides between tabs rather than fading in. */
+.nav-glide {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  z-index: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 0.44s var(--ease-out-expo), height 0.44s var(--ease-out-expo);
+  will-change: transform;
+}
+/* Main tabs are drawn by the glide; other .nav-active rows keep their pill. */
+.nav-glide-wrap .nav-active::before {
+  display: none;
+}
+[data-glass="liquid"] .nav-glide {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 6px 14px -8px rgba(0, 0, 0, 0.55);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+}
+[data-glass="liquid"] .nav-glide::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: 0;
+  width: 60%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 10%, rgba(255, 255, 255, 0.28) 46%, rgba(255, 255, 255, 0) 88%);
+  transform: translate3d(-140%, 0, 0) rotate(8deg);
+  animation: melo-liquid-sheen 9.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+[data-animations="reduced"] .nav-glide {
+  transition: none;
+}
+[data-animations="reduced"] [data-glass="liquid"] .nav-glide::after {
+  animation: none;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-glide {
+    transition: none;
+  }
+  [data-glass="liquid"] .nav-glide::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 /* The active tab glides in as a soft glass lozenge. */

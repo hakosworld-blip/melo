@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import { ListPlus, Music2, Pause, Play, Plus, SkipForward, X } from 'lucide-react-native';
+import Svg, { Rect } from 'react-native-svg';
+import { BlurView } from 'expo-blur';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import { useNavigation } from '@react-navigation/native';
 import { playlist, togglePlayback, skipNext, usePlayer, playTrack, addToQueue } from './player';
 import { useLibrary } from './library';
+import { useSettings } from './settings';
 import { useUi } from './ui';
 import type { Track } from './types';
 
@@ -72,6 +75,34 @@ export function AmbientBackdrop() {
   );
 }
 
+/** Three books on a shelf, the last one leaning against the others. */
+export function LibraryBooks({
+  size = 21,
+  color = colors.text,
+  strokeWidth = 1.8,
+}: {
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <Rect x={3.6} y={4.6} width={3.4} height={14.8} rx={1} />
+      <Rect x={8.2} y={4.6} width={3.4} height={14.8} rx={1} />
+      <Rect x={14.1} y={4.8} width={3.4} height={14.2} rx={1} transform="rotate(-12 15.8 11.9)" />
+    </Svg>
+  );
+}
+
 /** The OS setting wins: motion is skipped, not just shortened, when it's off. */
 export function useReduceMotion() {
   const [reduce, setReduce] = useState(false);
@@ -91,6 +122,120 @@ export function useReduceMotion() {
   }, []);
 
   return reduce;
+}
+
+/** True when the user picked the animated liquid surface language. */
+export function useLiquidGlass() {
+  return useSettings((state) => state.glassStyle === 'liquid');
+}
+
+// Every liquid surface reads the same clock, so the app runs one native-driven
+// loop no matter how many panels are on screen.
+const liquidClock = new Animated.Value(0);
+let liquidLoop: Animated.CompositeAnimation | null = null;
+
+function useLiquidClock(active: boolean) {
+  useEffect(() => {
+    if (!active || liquidLoop) return;
+    liquidLoop = Animated.loop(
+      Animated.timing(liquidClock, {
+        toValue: 1,
+        duration: 11000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    liquidLoop.start();
+  }, [active]);
+}
+
+/**
+ * The real backdrop blur a liquid surface needs to read as glass.
+ *
+ * iOS uses the native blur view. Android needs the render-effect path, and only
+ * on SDK 31+ where it stays smooth, so it falls back to a plain translucent
+ * panel on older devices instead of dropping frames.
+ */
+export function LiquidBlur({ radius = 18, intensity = 45 }: { radius?: number; intensity?: number }) {
+  const liquid = useLiquidGlass();
+  if (!liquid) return null;
+  return (
+    <BlurView
+      pointerEvents="none"
+      accessible={false}
+      tint="dark"
+      intensity={intensity}
+      blurMethod="dimezisBlurViewSdk31Plus"
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius, overflow: 'hidden' }}
+    />
+  );
+}
+
+/**
+ * The moving highlight on a liquid surface.
+ *
+ * Transform-only and native-driven, clipped to the panel's radius, so it never
+ * touches the JS thread or forces a reflow. A whole screen shares one clock.
+ */
+export function LiquidSheen({ radius = 18 }: { radius?: number }) {
+  const liquid = useLiquidGlass();
+  useLiquidClock(liquid);
+  const [box, setBox] = useState({ width: 0, height: 0 });
+
+  if (!liquid) return null;
+  const travel = liquidClock.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-box.width * 0.9, box.width * 1.1],
+  });
+
+  return (
+    <View
+      pointerEvents="none"
+      accessible={false}
+      style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        if (width !== box.width || height !== box.height) setBox({ width, height });
+      }}
+    >
+      <View style={styles.liquidFringe} />
+      <View style={styles.liquidEdge} />
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: -box.height * 0.4,
+          bottom: -box.height * 0.4,
+          left: 0,
+          width: Math.max(30, box.width * 0.32),
+          backgroundColor: 'rgba(255,255,255,0.12)',
+          transform: [{ translateX: travel }, { skewX: '-16deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
+/**
+ * A glass container that becomes liquid glass when the setting is on. Classic
+ * keeps exactly the styles the caller passes, so the default is untouched.
+ */
+export function LiquidGlass({
+  style,
+  radius = 18,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  radius?: number;
+  children: ReactNode;
+}) {
+  const liquid = useLiquidGlass();
+  return (
+    <View style={[style, liquid && styles.liquidSurface]}>
+      {liquid ? <LiquidBlur radius={radius} /> : null}
+      {liquid ? <LiquidSheen radius={radius} /> : null}
+      {children}
+    </View>
+  );
 }
 
 /** Sections rise in, one after another, instead of snapping into place. */
@@ -266,6 +411,7 @@ export function Segmented<T extends string>({
   const reduce = useReduceMotion();
   const pad = 3;
   const index = Math.max(0, options.findIndex((option) => option.value === value));
+  const liquid = useLiquidGlass();
   const [trackWidth, setTrackWidth] = useState(0);
   const itemWidth = trackWidth > pad * 2 ? (trackWidth - pad * 2) / options.length : 0;
   const shift = useRef(new Animated.Value(0)).current;
@@ -290,12 +436,13 @@ export function Segmented<T extends string>({
 
   return (
     <View
-      style={styles.segmented}
+      style={[styles.segmented, liquid && styles.segmentedLiquid]}
       onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
       accessibilityRole="tablist"
     >
+      {liquid ? <LiquidBlur radius={999} intensity={38} /> : null}
       <Animated.View
-        style={[styles.segThumb, { width, transform: [{ translateX: shift }] }]}
+        style={[styles.segThumb, liquid && styles.segThumbLiquid, { width, transform: [{ translateX: shift }] }]}
         accessible={false}
         pointerEvents="none"
       />
@@ -461,6 +608,7 @@ export function PromptModal({
   onClose: () => void;
 }) {
   const [value, setValue] = useState(initialValue);
+  const liquid = useLiquidGlass();
 
   useEffect(() => {
     if (visible) setValue(initialValue);
@@ -475,7 +623,9 @@ export function PromptModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={styles.dialog}>
+        <View style={[styles.dialog, liquid && styles.liquidDark]}>
+          {liquid ? <LiquidBlur radius={12} intensity={52} /> : null}
+          {liquid ? <LiquidSheen radius={12} /> : null}
           <Text style={styles.label}>Playlist</Text>
           <Text style={styles.dialogTitle}>{title}</Text>
           <TextInput
@@ -513,6 +663,7 @@ export function AddToPlaylistSheet() {
   const pendingTrack = useUi((s) => s.pendingTrack);
   const close = useUi((s) => s.closeAddToPlaylist);
   const playlists = useLibrary((s) => s.playlists);
+  const liquid = useLiquidGlass();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [added, setAdded] = useState<string | null>(null);
@@ -549,7 +700,9 @@ export function AddToPlaylistSheet() {
   return (
     <Modal visible={Boolean(pendingTrack)} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.sheetBackdrop} onPress={close} accessibilityRole="button" accessibilityLabel="Close">
-        <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable style={[styles.sheet, liquid && styles.liquidDark]} onPress={() => {}}>
+          {liquid ? <LiquidBlur radius={24} intensity={52} /> : null}
+          {liquid ? <LiquidSheen radius={24} /> : null}
           <Text style={styles.label}>Add to playlist</Text>
           {pendingTrack ? (
             <Text style={styles.sheetSubtitle} numberOfLines={1}>
@@ -635,6 +788,7 @@ export function MiniPlayer() {
   }, [trackId]);
 
   // A new song settles in rather than swapping the cover under the thumb.
+  const liquid = useLiquidGlass();
   const reduce = useReduceMotion();
   const enter = useRef(new Animated.Value(1)).current;
   const coverScale = useRef(new Animated.Value(1)).current;
@@ -660,11 +814,13 @@ export function MiniPlayer() {
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
   return (
     <Pressable
-      style={styles.miniPlayer}
+      style={[styles.miniPlayer, liquid && styles.miniPlayerLiquid]}
       onPress={() => navigation.navigate('NowPlaying')}
       accessibilityRole="button"
       accessibilityLabel={`Open ${track.title}`}
     >
+      {liquid ? <LiquidBlur radius={18} intensity={55} /> : null}
+      {liquid ? <LiquidSheen radius={18} /> : null}
       <Animated.View style={{ transform: [{ scale: coverScale }] }}>
         <Artwork source={track.artworkSmall || track.artwork} size={42} />
       </Animated.View>
@@ -747,6 +903,22 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   segThumb: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 999, backgroundColor: colors.accent },
+  segmentedLiquid: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  segThumbLiquid: {
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 5,
+  },
   segment: { flex: 1, height: 34, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   segmentText: { color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 12 },
   segmentTextActive: { color: colors.accentInk, fontFamily: fonts.sansBold },
@@ -764,6 +936,40 @@ export const styles = StyleSheet.create({
     borderBottomColor: colors.line,
   },
   trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  liquidSurface: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(255,255,255,0.22)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.55,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 20 },
+    elevation: 18,
+  },
+  liquidDark: {
+    backgroundColor: 'rgba(26,26,31,0.66)',
+    borderColor: 'rgba(255,255,255,0.22)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.55,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 20,
+  },
+  liquidFringe: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(120,190,255,0.05)',
+  },
+  liquidEdge: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    top: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
   trackText: { flex: 1, minWidth: 0 },
   trackTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   trackTitle: { color: colors.text, fontFamily: fonts.sansMedium, fontSize: 14.5, flexShrink: 1 },
@@ -825,6 +1031,13 @@ export const styles = StyleSheet.create({
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 14 },
     elevation: 14,
+  },
+  miniPlayerLiquid: {
+    backgroundColor: 'rgba(24,24,30,0.58)',
+    borderColor: 'rgba(255,255,255,0.24)',
+    shadowOpacity: 0.6,
+    shadowRadius: 28,
+    elevation: 18,
   },
   miniText: { flex: 1, minWidth: 0 },
   miniTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

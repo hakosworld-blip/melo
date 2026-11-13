@@ -134,8 +134,10 @@ export async function buildHomeFeed(
     throw baseError instanceof Error ? baseError : new Error("The music source returned nothing");
   }
 
+  // Every shelf the source returned feeds the mix, not just a "trending" id:
+  // filtering by id here emptied Home whenever the source used its own ids.
   const baseTracks = base
-    .filter((section) => section.kind === "tracks" && section.id === "trending")
+    .filter((section) => section.kind === "tracks")
     .flatMap((section) => section.items as Track[]);
 
   // --- taste pools -------------------------------------------------------
@@ -230,14 +232,16 @@ export async function buildHomeFeed(
     });
   }
 
-  // Keep only the parts of the provider feed the new Home doesn't already say.
+  // Keep the source's own shelves after the mix. Earlier only a section called
+  // "trending" survived, so a source whose rows used other ids — YouTube Music
+  // uses hits/chill/focus/throwback — arrived on Home as nothing at all.
   for (const section of base) {
     if (section.id === "trending") {
       sections.push({ ...section, title: "Popular right now", subtitle: "What the community is playing this week" });
     } else if (section.id === "artists" && mixArtists.length < 4) {
       sections.push(section);
-    } else if (section.kind === "albums") {
-      sections.push(section);
+    } else if (section.kind === "albums" || section.kind === "tracks" || section.kind === "artists") {
+      if (section.items.length >= 4) sections.push(section);
     }
   }
 

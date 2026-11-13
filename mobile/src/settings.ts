@@ -10,10 +10,19 @@ import { loadJson, saveJsonSoon } from './storage';
 
 const FILE = 'melo-settings';
 
+export type GlassStyle = 'classic' | 'liquid';
+/** Android only: system bars stay visible (edge to edge) or hide entirely. */
+export type DisplayMode = 'edge' | 'fullscreen';
+
 interface SettingsState {
   ready: boolean;
   serverUrl: string;
+  /** Classic is the flat frosted look; liquid adds animated specular glass. */
+  glassStyle: GlassStyle;
+  displayMode: DisplayMode;
   setServerUrl: (value: string) => void;
+  setGlassStyle: (value: GlassStyle) => void;
+  setDisplayMode: (value: DisplayMode) => void;
 }
 
 export function normaliseServerUrl(value: string) {
@@ -25,7 +34,11 @@ export function normaliseServerUrl(value: string) {
 export const useSettings = create<SettingsState>((set) => ({
   ready: false,
   serverUrl: '',
+  glassStyle: 'classic',
+  displayMode: 'edge',
   setServerUrl: (value) => set({ serverUrl: normaliseServerUrl(value) }),
+  setGlassStyle: (value) => set({ glassStyle: value }),
+  setDisplayMode: (value) => set({ displayMode: value }),
 }));
 
 /** Non-hook read, for the player and API layer. */
@@ -34,11 +47,16 @@ export function getServerUrl() {
 }
 
 export async function hydrateSettings() {
-  const saved = await loadJson<{ serverUrl?: string }>(FILE);
-  useSettings.setState({ serverUrl: normaliseServerUrl(saved?.serverUrl ?? ''), ready: true });
+  const saved = await loadJson<{ serverUrl?: string; glassStyle?: GlassStyle; displayMode?: DisplayMode }>(FILE);
+  useSettings.setState({
+    serverUrl: normaliseServerUrl(saved?.serverUrl ?? ''),
+    glassStyle: saved?.glassStyle === 'liquid' ? 'liquid' : 'classic',
+    displayMode: saved?.displayMode === 'fullscreen' ? 'fullscreen' : 'edge',
+    ready: true,
+  });
 }
 
 useSettings.subscribe((state) => {
   if (!state.ready) return;
-  saveJsonSoon(FILE, { serverUrl: state.serverUrl });
+  saveJsonSoon(FILE, { serverUrl: state.serverUrl, glassStyle: state.glassStyle, displayMode: state.displayMode });
 });

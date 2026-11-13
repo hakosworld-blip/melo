@@ -170,6 +170,17 @@ export default function SettingsPage() {
                 ]}
               />
             </SettingRow>
+            <SettingRow label="Interface" description="Flat frosted glass, or animated liquid glass">
+              <Segmented
+                value={settings.glass}
+                onChange={(glass) => settings.update({ glass })}
+                size="sm"
+                options={[
+                  { value: "classic", label: "Glass" },
+                  { value: "liquid", label: "Liquid" },
+                ]}
+              />
+            </SettingRow>
             <SettingRow label="Animations" description="Smooth transitions across the app">
               <Segmented
                 value={settings.animations}

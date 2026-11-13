@@ -268,6 +268,19 @@ async function handleStream(req: IncomingMessage, res: ServerResponse, parts: st
     return;
   }
 
+  // googlevideo URLs are short-lived and tied to the resolving host. A 403 here
+  // used to end the track with "the source refused this stream"; ask the
+  // provider for a fresh URL once and retry before giving up.
+  if (upstream.status === 403) {
+    upstream.stream.resume();
+    try {
+      upstreamUrl = await provider.streamUrl(id, { fresh: true });
+      upstream = await openUpstream(upstreamUrl, range);
+    } catch {
+      /* fall through to the status check below */
+    }
+  }
+
   if (upstream.status >= 400) {
     upstream.stream.resume();
     sendJson(res, upstream.status === 404 ? 404 : 502, {

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-import { cached } from "@/lib/cache";
+import { cached, cacheDelete } from "@/lib/cache";
 import { normalise, UpstreamError } from "@/lib/http";
 import type {
   Album,
@@ -40,6 +40,17 @@ function runtimeArgs(): string[] {
   return ["--js-runtimes", "node"];
 }
 
+/**
+ * yt-dlp's default player clients mint googlevideo URLs that Google answers
+ * with 403 from many hosts, which surfaced as "couldn't be played". The
+ * android and tv_simply clients hand out URLs that actually stream; override
+ * with YTDLP_PLAYER_CLIENT if a host needs its own list.
+ */
+function clientArgs(): string[] {
+  const client = process.env.YTDLP_PLAYER_CLIENT || "android,tv_simply";
+  return ["--extractor-args", `youtube:player_client=${client}`];
+}
+
 function cookieArgs(): string[] {
   if (process.env.YTDLP_COOKIES) return ["--cookies", process.env.YTDLP_COOKIES];
   if (process.env.YTDLP_COOKIES_FROM_BROWSER) return ["--cookies-from-browser", process.env.YTDLP_COOKIES_FROM_BROWSER];
@@ -48,11 +59,15 @@ function cookieArgs(): string[] {
 
 export async function ytdlp(args: string[], timeout = 45_000): Promise<string> {
   try {
-    const { stdout } = await exec(resolveBinary(), [...runtimeArgs(), ...cookieArgs(), "--no-warnings", ...args], {
+    const { stdout } = await exec(
+      resolveBinary(),
+      [...runtimeArgs(), ...cookieArgs(), ...clientArgs(), "--no-warnings", ...args],
+      {
       timeout,
-      maxBuffer: 48 * 1024 * 1024,
-      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
-    });
+        maxBuffer: 48 * 1024 * 1024,
+        env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+      },
+    );
     return stdout;
   } catch (err) {
     const e = err as { stderr?: string; message?: string; code?: string };
@@ -267,26 +282,171 @@ async function searchTracks(query: string, limit: number): Promise<FlatEntry[]> 
  * imports), where a missing duration or artist would defeat matching.
  */
 export async function youtubeSearchTracks(query: string, limit: number): Promise<Track[]> {
-  const entries = await searchTracks(query, Math.min(Math.max(limit, 1), 10));
+  const capped = Math.min(Math.max(limit, 1), 10);
+  const music = await musicSearch(query, capped).catch(() => ({ songs: [] as FlatEntry[], channels: [] as FlatEntry[] }));
+  const entries = music.songs.length ? music.songs : await searchTracks(query, capped);
   return entries.map(mapEntry).filter((track): track is Track => Boolean(track));
 }
 
+/**
+ * Search on music.youtube.com itself. Throws when the surface is unreachable
+ * so callers can report the real reason instead of pretending the catalogue is
+ * empty; callers that can live with no results catch it locally.
+ */
 async function musicSearch(query: string, limit: number): Promise<{ songs: FlatEntry[]; channels: FlatEntry[] }> {
-  try {
-    const json = await ytdlp([
-      "--flat-playlist",
-      "-J",
-      `https://music.youtube.com/search?q=${encodeURIComponent(query)}`,
-    ]);
-    const parsed = JSON.parse(json) as { entries?: FlatEntry[] };
-    const entries = parsed.entries || [];
-    return {
-      songs: entries.filter((e) => e.ie_key !== "YoutubeTab" && e.id).slice(0, limit),
-      channels: entries.filter((e) => e.ie_key === "YoutubeTab" && e.id).slice(0, 6),
-    };
-  } catch {
-    return { songs: [], channels: [] };
-  }
+  const json = await ytdlp([
+    "--flat-playlist",
+    "-J",
+    `https://music.youtube.com/search?q=${encodeURIComponent(query)}`,
+  ]);
+  const parsed = JSON.parse(json) as { entries?: FlatEntry[] };
+  const entries = parsed.entries || [];
+  return {
+    songs: entries.filter((e) => e.ie_key !== "YoutubeTab" && e.id).slice(0, limit),
+    channels: entries.filter((e) => e.ie_key === "YoutubeTab" && e.id).slice(0, 6),
+  };
+}
+
+/* ------------------------------------------------ YouTube Music web search */
+
+/**
+ * YouTube Music has no key-free public API, but its own web client answers
+ * "songs only" searches with exactly what a music app needs: title, artist,
+ * album, duration and artwork. This is the source discovery uses, so melo asks
+ * music.youtube.com — never youtube.com search — and no yt-dlp round trip is
+ * needed to fill Home or Search.
+ */
+const YTM_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+/** Encoded WEB_REMIX search filter for "Songs". */
+const YTM_SONGS_PARAMS = "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Loose = Record<string, any>;
+
+type YtmRun = { text?: string; navigationEndpoint?: { browseEndpoint?: { browseId?: string } } };
+
+type YtmSong = {
+  id: string;
+  title: string;
+  artist?: string;
+  artistId?: string;
+  album?: string;
+  duration: number;
+  artwork?: string;
+};
+
+let ytmClient: { key: string; version: string; at: number } | null = null;
+
+async function ytmClientInfo(): Promise<{ key: string; version: string }> {
+  if (ytmClient && Date.now() - ytmClient.at < 6 * 60 * 60_000) return ytmClient;
+  const res = await fetch("https://music.youtube.com/", {
+    headers: { "user-agent": YTM_UA, "accept-language": "en-US,en" },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new UpstreamError(`YouTube Music answered ${res.status}`);
+  const html = await res.text();
+  const key = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/)?.[1];
+  const version = html.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/)?.[1];
+  if (!key || !version) throw new UpstreamError("YouTube Music did not expose its web client");
+  ytmClient = { key, version, at: Date.now() };
+  return ytmClient;
+}
+
+function clockSeconds(raw: string): number {
+  const parts = raw.split(":").map(Number);
+  if (!parts.length || parts.some((part) => !Number.isFinite(part))) return 0;
+  return parts.reduce((total, part) => total * 60 + part, 0);
+}
+
+/** Pulls the song rows out of a WEB_REMIX search response. */
+function readYtmSongs(payload: unknown): YtmSong[] {
+  const songs: YtmSong[] = [];
+  const seen = new Set<string>();
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    const record = node as Loose;
+    const renderer = record.musicResponsiveListItemRenderer as Loose | undefined;
+    if (renderer) {
+      const columns = (renderer.flexColumns ?? []) as Loose[];
+      const runs = (index: number): YtmRun[] =>
+        (columns[index]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs ?? []) as YtmRun[];
+      const title = runs(0).map((run) => run.text ?? "").join("");
+      const meta = runs(1);
+      const id = renderer.playlistItemData?.videoId as string | undefined;
+      if (title && id && !seen.has(id)) {
+        seen.add(id);
+        const clock = meta.map((run) => run.text ?? "").find((text) => /^\d{1,2}(:\d{2})+$/.test(text));
+        const thumbs = (renderer.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails ?? []) as Loose[];
+        songs.push({
+          id,
+          title,
+          artist: cleanArtistName(meta[0]?.text),
+          artistId: meta[0]?.navigationEndpoint?.browseEndpoint?.browseId,
+          album: meta[2]?.text,
+          duration: clock ? clockSeconds(clock) : 0,
+          artwork: (thumbs.at(-1)?.url as string | undefined) || undefined,
+        });
+      }
+    }
+    for (const value of Object.values(record)) visit(value);
+  };
+  visit(payload);
+  return songs;
+}
+
+async function ytmSearchSongs(query: string, limit: number): Promise<YtmSong[]> {
+  return cached(`ytm:songs:${query}:${limit}`, 5 * 60_000, async () => {
+    const client = await ytmClientInfo();
+    const res = await fetch(
+      `https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=${client.key}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "user-agent": YTM_UA,
+          "accept-language": "en-US,en",
+          origin: "https://music.youtube.com",
+        },
+        body: JSON.stringify({
+          context: { client: { clientName: "WEB_REMIX", clientVersion: client.version, hl: "en", gl: "US" } },
+          query,
+          params: YTM_SONGS_PARAMS,
+        }),
+        signal: AbortSignal.timeout(12_000),
+      },
+    );
+    if (!res.ok) throw new UpstreamError(`YouTube Music answered ${res.status}`);
+    // "Songs" still includes hour-long compilations uploaded as songs; a shelf
+    // of those is not a shelf of songs, so anything past 15 minutes is dropped.
+    const songs = readYtmSongs(await res.json()).filter(
+      (song) => song.duration === 0 || (song.duration >= 30 && song.duration <= 900),
+    );
+    if (!songs.length) throw new UpstreamError("YouTube Music answered, but returned no songs for this host.");
+    return songs.slice(0, limit);
+  });
+}
+
+function trackFromYtm(song: YtmSong): Track {
+  return {
+    id: `youtube:${song.id}`,
+    provider: "youtube",
+    providerId: song.id,
+    title: song.title,
+    artist: song.artist ?? "Unknown artist",
+    artistId: song.artistId ? `youtube:${song.artistId}` : undefined,
+    featuredArtists: [],
+    album: song.album,
+    duration: song.duration,
+    artwork: song.artwork,
+    artworkSmall: thumbForId(song.id, "small") || song.artwork,
+    downloadable: false,
+    streamable: true,
+  };
 }
 
 export const youtubeProvider: MusicProvider = {
@@ -296,10 +456,10 @@ export const youtubeProvider: MusicProvider = {
   async availability(): Promise<ProviderAvailability> {
     return cached("yt:availability", 2 * 60_000, async () => {
       try {
-        const entries = await searchTracks("music", 1);
-        if (!entries.length) throw new UpstreamError("YouTube returned no results");
-        const first = entries[0];
-        if (!first.id) throw new UpstreamError("YouTube returned no results");
+        // Probe the same surface discovery uses: YouTube Music, not youtube.com.
+        const songs = await ytmSearchSongs("top hits", 5);
+        const first = songs[0];
+        if (!first?.id) throw new UpstreamError("YouTube Music returned no results");
         // Resolution is what actually matters for playback.
         await ytdlp(["-f", "bestaudio/best", "-g", `https://music.youtube.com/watch?v=${first.id}`], 30_000);
         return { provider: "youtube" as const, available: true };
@@ -314,57 +474,94 @@ export const youtubeProvider: MusicProvider = {
   },
 
   async home(): Promise<HomeSection[]> {
-    // Honest labels: these are real YouTube Music searches, not invented charts.
+    // Discovery runs on music.youtube.com only. Plain youtube.com search used to
+    // back these shelves, and on hosts where YouTube Music still answers it
+    // came back empty — the app then claimed the source had no songs at all.
     const rows: { id: string; title: string; subtitle: string; query: string }[] = [
       { id: "hits", title: "Popular on YouTube Music", subtitle: "Top results for this week's hits", query: "top hits" },
       { id: "chill", title: "Chill", subtitle: "Laid-back songs for a slower pace", query: "chill songs" },
-      { id: "focus", title: "Focus", subtitle: "Instrumental and lo-fi", query: "lofi instrumental" },
+      { id: "focus", title: "Focus", subtitle: "Instrumental and lo-fi", query: "lofi songs" },
       { id: "throwback", title: "Throwbacks", subtitle: "Songs you grew up with", query: "throwback hits" },
     ];
     const sections: HomeSection[] = [];
+    let failure: unknown = null;
     await Promise.all(
       rows.map(async (row) => {
         try {
-          const entries = await searchTracks(row.query, 16);
-          const items = await enrichMissing(entries.map(mapEntry).filter((t): t is Track => Boolean(t)), 16);
-          if (items.length >= 4) {
-            sections.push({ id: row.id, title: row.title, subtitle: row.subtitle, kind: "tracks", items });
+          // Songs come from YouTube Music's own search; yt-dlp's flat search is
+          // the fallback for hosts where the web client refuses to answer.
+          let items: Track[] = [];
+          try {
+            items = (await ytmSearchSongs(row.query, 18)).map(trackFromYtm);
+          } catch {
+            const { songs } = await musicSearch(row.query, 18);
+            items = songs.map(mapEntry).filter((t): t is Track => Boolean(t));
           }
-        } catch {
-          // A blocked/unavailable YouTube host simply yields no rows.
+          items = await enrichMissing(items, 10);
+          if (items.length) {
+            sections.push({ id: row.id, title: row.title, subtitle: row.subtitle, kind: "tracks", items });
+          } else if (!failure) {
+            failure = new UpstreamError("YouTube Music answered, but returned no songs for this host.");
+          }
+        } catch (err) {
+          if (!failure) failure = err;
         }
       }),
     );
     const order = ["hits", "chill", "focus", "throwback"];
-    return sections.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    sections.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    // Nothing to show and a real reason why: surface it instead of no shelves.
+    if (!sections.length && failure) throw failure;
+    return sections;
   },
 
   async search(query, limit = 20): Promise<SearchResults> {
     const term = query.trim();
     if (!term) return { tracks: [], artists: [], albums: [] };
     return cached(`yt:search:${term}:${limit}`, 3 * 60_000, async () => {
-      const [music, flat] = await Promise.all([
-        musicSearch(term, limit),
-        searchTracks(term, limit).catch(() => [] as FlatEntry[]),
-      ]);
-      const seen = new Set<string>();
-      const tracks: Track[] = [];
-      for (const entry of [...music.songs, ...flat]) {
-        const track = mapEntry(entry);
-        if (track && !seen.has(track.id)) {
-          seen.add(track.id);
-          tracks.push(track);
+      // YouTube Music's own song search first: real songs, real durations, and
+      // no youtube.com detour. yt-dlp only answers if that surface fails.
+      let tracks: Track[] = [];
+      let artists: ArtistSummary[] = [];
+      try {
+        const songs = await ytmSearchSongs(term, limit);
+        tracks = songs.map(trackFromYtm);
+        const byArtist = new Map<string, ArtistSummary>();
+        for (const song of songs) {
+          if (!song.artistId || !song.artist || byArtist.has(song.artistId)) continue;
+          byArtist.set(song.artistId, {
+            id: `youtube:${song.artistId}`,
+            provider: "youtube",
+            providerId: song.artistId,
+            name: song.artist,
+            artwork: song.artwork,
+          });
         }
+        artists = [...byArtist.values()].slice(0, 6);
+      } catch {
+        const music = await musicSearch(term, limit).catch(() => ({
+          songs: [] as FlatEntry[],
+          channels: [] as FlatEntry[],
+        }));
+        const flat = music.songs.length ? [] : await searchTracks(term, limit).catch(() => [] as FlatEntry[]);
+        const seen = new Set<string>();
+        for (const entry of [...music.songs, ...flat]) {
+          const track = mapEntry(entry);
+          if (track && !seen.has(track.id)) {
+            seen.add(track.id);
+            tracks.push(track);
+          }
+        }
+        artists = music.channels.map((c) => ({
+          id: `youtube:${c.id}`,
+          provider: "youtube",
+          providerId: c.id!,
+          name: (c.title || "Unknown artist").replace(/\s*-\s*Topic$/, ""),
+          artwork: bestThumb(c),
+          verified: c.channel_is_verified,
+        }));
       }
-      const artists: ArtistSummary[] = music.channels.map((c) => ({
-        id: `youtube:${c.id}`,
-        provider: "youtube",
-        providerId: c.id!,
-        name: (c.title || "Unknown artist").replace(/\s*-\s*Topic$/, ""),
-        artwork: bestThumb(c),
-        verified: c.channel_is_verified,
-      }));
-      return { tracks: await enrichMissing(tracks.slice(0, limit)), artists, albums: [] };
+      return { tracks: await enrichMissing(tracks.slice(0, limit), 8), artists, albums: [] };
     });
   },
 
@@ -431,14 +628,20 @@ export const youtubeProvider: MusicProvider = {
     return null;
   },
 
-  async streamUrl(id) {
-    return cached(`yt:stream:${id}`, 15 * 60_000, async () => {
-      const url = (
+  async streamUrl(id, options) {
+    const key = `yt:stream:${id}`;
+    // A cached URL can expire or be rejected; callers that saw a 403 ask for a
+    // fresh resolution instead of failing the same track for the next minute.
+    if (options?.fresh) cacheDelete(key);
+    return cached(key, 5 * 60_000, async () => {
+      const urls = (
         await ytdlp(["-f", "bestaudio/best", "-g", `https://music.youtube.com/watch?v=${id}`], 40_000)
       )
         .trim()
-        .split("\n")[0];
-      if (!url?.startsWith("http")) throw new UpstreamError("YouTube did not return a playable stream");
+        .split("\n")
+        .filter((line) => line.startsWith("http"));
+      const url = urls[0];
+      if (!url) throw new UpstreamError("YouTube did not return a playable stream");
       return url;
     });
   },

@@ -173,7 +173,7 @@ export default function HomePage() {
           <EmptyState
             icon={<IconCloudOff size={20} />}
             title={`${PROVIDER_LABEL.youtube} answered, but with no songs`}
-            description={`${PROVIDER_LABEL.youtube} returned no shelves on this host. YouTube can block datacenter IPs or ask for cookies, so check the source before assuming the catalogue is empty.`}
+            description={`${PROVIDER_LABEL.youtube} returned no songs on this host. YouTube Music can block datacenter IPs or ask for cookies, so check the source before assuming the catalogue is empty.`}
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 <Button variant="surface" onClick={reload}>

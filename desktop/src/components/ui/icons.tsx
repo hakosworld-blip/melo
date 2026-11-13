@@ -66,13 +66,20 @@ export function IconSearchX(props: IconProps) {
   );
 }
 
+/** Three books on a shelf, the last one leaning against the others. */
 export function IconLibrary(props: IconProps) {
   return (
     <Svg {...props}>
-      <rect x="4.1" y="4.1" width="15.8" height="15.8" rx="4.4" />
-      <path d="M10.7 15.2V9.4l4-1v5.6" />
-      <ellipse cx="9.3" cy="15.4" rx="1.4" ry="1.2" />
-      <ellipse cx="13.3" cy="14.3" rx="1.4" ry="1.2" />
+      <rect x="3.6" y="4.6" width="3.4" height="14.8" rx="1" />
+      <rect x="8.2" y="4.6" width="3.4" height="14.8" rx="1" />
+      <rect
+        x="14.1"
+        y="4.8"
+        width="3.4"
+        height="14.2"
+        rx="1"
+        transform="rotate(-12 15.8 11.9)"
+      />
     </Svg>
   );
 }

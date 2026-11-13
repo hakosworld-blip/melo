@@ -6,6 +6,7 @@ import { persist } from "zustand/middleware";
 export type ThemeMode = "dark" | "light" | "system";
 export type Density = "compact" | "comfortable" | "spacious";
 export type BackgroundType = "color" | "gradient" | "image" | "artwork";
+export type GlassStyle = "classic" | "liquid";
 export type SectionKey = "app" | "home" | "library" | "nowPlaying";
 
 export interface BackgroundConfig {
@@ -29,6 +30,7 @@ export interface Settings {
   density: Density;
   radius: number;
   font: "sans" | "serif" | "mono";
+  glass: GlassStyle;
   animations: "full" | "reduced";
   motion: "slide" | "fade" | "scale";
   backgrounds: Record<SectionKey, BackgroundConfig>;
@@ -78,6 +80,7 @@ const defaultSettings: Settings = {
   density: "comfortable",
   radius: 10,
   font: "sans",
+  glass: "classic",
   animations: "full",
   motion: "slide",
   backgrounds: {
@@ -136,13 +139,14 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "melo-settings",
-      version: 5,
-      /** v3 is the dark listening room; v5 drops the removed source switch. */
+      version: 6,
+      /** v3 is the dark listening room; v5 drops the source switch; v6 adds liquid glass. */
       migrate: (persisted, version) => {
-        const state = persisted as SettingsState & { provider?: unknown };
+        const state = persisted as SettingsState & { provider?: unknown; glass?: GlassStyle };
         if (version < 2) return { ...state, accent: "ink", radius: 10, theme: "dark" };
         if (version < 3) return { ...state, theme: "dark", radius: 10 };
         delete state.provider;
+        if (version < 6 || !state.glass) state.glass = "classic";
         return state;
       },
     },

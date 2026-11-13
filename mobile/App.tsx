@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Animated, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import { NavigationBar } from 'expo-navigation-bar';
 import { useAudioPlaylistStatus } from 'expo-audio';
 import Slider from '@react-native-community/slider';
 import { useFonts } from 'expo-font';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-google-fonts/manrope';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Cog, Home, Library, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Cog, Home, Link2, ListMusic, MessageCircle, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Repeat, Repeat1, Search, SkipBack, SkipForward, Star, Trash2, Volume2, X } from 'lucide-react-native';
 import { fetchCharts, fetchGenreTracks, searchCatalogue, type ChartArtist } from './src/api';
 import { buildHomeFeed, type HomeFeed } from './src/feed';
-import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, MiniPlayer, PressableScale, PromptModal, RiseIn, SectionTitle, Segmented, Artwork, TrackRow, useReduceMotion } from './src/components';
+import { AddToPlaylistSheet, AmbientBackdrop, colors, EmptyState, ErrorBanner, fonts, formatTime, LibraryBooks, LiquidBlur, LiquidGlass, LiquidSheen, MiniPlayer, PressableScale, PromptModal, RiseIn, SectionTitle, Segmented, Artwork, TrackRow, useLiquidGlass, useReduceMotion } from './src/components';
 import { LyricsSheet } from './src/lyrics-view';
 import { useUi } from './src/ui';
 import { addToQueue, clearQueue, currentRepeat, currentVolume, cycleRepeat, initPlayer, playTracks, playlist, seekTo, setVolume, skipNext, skipPrevious, togglePlayback, usePlayer, type RepeatMode } from './src/player';
@@ -177,11 +178,11 @@ function HomeScreen({ navigation }: any) {
               {mix.length} songs · {mixMinutes} min
               {feed?.personalised ? ' · from your plays on this device' : ''}
             </Text>
-            <View style={styles.glassPanel}>
+            <LiquidGlass style={styles.glassPanel} radius={18}>
               {(showAllMix ? mix : mix.slice(0, 5)).map((track, index) => (
                 <TrackRow key={track.id} track={track} context={mix} index={index} />
               ))}
-            </View>
+            </LiquidGlass>
             {mix.length > 5 ? (
               <Pressable
                 style={styles.linkButton}
@@ -205,7 +206,7 @@ function HomeScreen({ navigation }: any) {
                 </Pressable>
               }
             />
-            <View style={styles.glassPanel}>
+            <LiquidGlass style={styles.glassPanel} radius={18}>
               <View style={styles.chartHead}>
                 <Text style={[styles.chartHeadCell, { width: 18 }]}>#</Text>
                 <Text style={[styles.chartHeadCell, styles.chartMeta]}>Artist</Text>
@@ -236,7 +237,7 @@ function HomeScreen({ navigation }: any) {
                   </View>
                 </RiseIn>
               ))}
-            </View>
+            </LiquidGlass>
             <Text style={styles.chartNote}>
               Ranked by monthly listeners. The last column is the artist's best position on the worldwide daily chart.
             </Text>
@@ -291,8 +292,8 @@ function HomeScreen({ navigation }: any) {
               </View>
             }
           >
-            Your melo server answered, but YouTube Music returned no shelves. YouTube can block datacenter IPs or ask for
-            cookies, so check the source in Settings before assuming the catalogue is empty.
+            Your melo server answered, but YouTube Music returned no songs. YouTube Music can block datacenter IPs or ask
+            for cookies, so check the source in Settings before assuming the catalogue is empty.
           </EmptyState>
         ) : null}
 
@@ -859,6 +860,10 @@ function SettingsScreen({ navigation }: any) {
   const appVersion = appConfig.expo?.version ?? '1.0.0';
   const savedServer = useSettings((s) => s.serverUrl);
   const setServerUrl = useSettings((s) => s.setServerUrl);
+  const glassStyle = useSettings((s) => s.glassStyle);
+  const setGlassStyle = useSettings((s) => s.setGlassStyle);
+  const displayMode = useSettings((s) => s.displayMode);
+  const setDisplayMode = useSettings((s) => s.setDisplayMode);
   const [serverDraft, setServerDraft] = useState(savedServer);
   const [serverNote, setServerNote] = useState<string | null>(null);
   const [testingServer, setTestingServer] = useState(false);
@@ -912,6 +917,38 @@ function SettingsScreen({ navigation }: any) {
             </Text>
           </View>
         </View>
+
+        <SectionTitle title="Interface" subtitle="How melo's glass surfaces are drawn" />
+        <Segmented
+          value={glassStyle}
+          onChange={setGlassStyle}
+          options={[
+            { value: 'classic', label: 'Classic glass' },
+            { value: 'liquid', label: 'Liquid glass' },
+          ]}
+        />
+        <Text style={styles.fieldHint}>
+          Liquid glass blurs the content behind every panel, then adds a moving specular highlight and a brighter rim. It
+          stays smooth because one shared, GPU-driven animation draws every highlight.
+        </Text>
+
+        {Platform.OS === 'android' ? (
+          <>
+            <SectionTitle title="Android display" subtitle="How melo sits against the system bars" />
+            <Segmented
+              value={displayMode}
+              onChange={setDisplayMode}
+              options={[
+                { value: 'edge', label: 'Edge to edge' },
+                { value: 'fullscreen', label: 'Full screen' },
+              ]}
+            />
+            <Text style={styles.fieldHint}>
+              Edge to edge keeps the status and navigation bars visible and lets melo draw behind them. Full screen hides
+              both for an immersive window — swipe from an edge to bring the bars back.
+            </Text>
+          </>
+        ) : null}
 
         <SectionTitle title="Charts" subtitle="Artist rankings, daily streams and worldwide positions" />
         <Pressable
@@ -1022,7 +1059,7 @@ function ChartsScreen({ navigation }: any) {
           </View>
         ) : null}
         {data?.artists.length ? (
-          <View style={styles.glassPanel}>
+          <LiquidGlass style={styles.glassPanel} radius={18}>
             <View style={styles.chartHead}>
               <Text style={[styles.chartHeadCell, { width: 26 }]}>#</Text>
               <Text style={[styles.chartHeadCell, styles.chartMeta]}>Artist</Text>
@@ -1053,7 +1090,7 @@ function ChartsScreen({ navigation }: any) {
                 </View>
               </RiseIn>
             ))}
-          </View>
+          </LiquidGlass>
         ) : null}
         {data?.artists.length ? (
           <Text style={styles.chartNote}>
@@ -1403,28 +1440,97 @@ function QueueScreen({ navigation }: any) {
   );
 }
 
+const TAB_ITEMS = [
+  { name: 'Home', Icon: Home },
+  { name: 'Search', Icon: Search },
+  { name: 'Library', Icon: LibraryBooks },
+  { name: 'Settings', Icon: Cog },
+] as const;
+
+/**
+ * Bottom tabs with one glass lozenge that springs from tab to tab instead of
+ * each tab lighting up on its own. Only its translateX animates, on the native
+ * driver, and it gains the liquid sheen when that interface is selected.
+ */
+function SlideTabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const liquid = useLiquidGlass();
+  const reduceMotion = useReduceMotion();
+  const [width, setWidth] = useState(0);
+  const index = useRef(new Animated.Value(state.index)).current;
+
+  useEffect(() => {
+    if (reduceMotion) {
+      index.setValue(state.index);
+      return;
+    }
+    Animated.spring(index, {
+      toValue: state.index,
+      useNativeDriver: true,
+      stiffness: 240,
+      damping: 26,
+      mass: 0.7,
+    }).start();
+  }, [index, reduceMotion, state.index]);
+
+  const slot = width / TAB_ITEMS.length;
+  const translateX = index.interpolate({
+    inputRange: TAB_ITEMS.map((_, i) => i),
+    outputRange: TAB_ITEMS.map((_, i) => i * slot),
+  });
+
+  return (
+    <View
+      style={[styles.tabBar, liquid && styles.tabBarLiquid, { paddingBottom: Math.max(insets.bottom, 8) }]}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      {liquid ? <LiquidBlur radius={0} intensity={28} /> : null}
+      {width > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          accessible={false}
+          style={[
+            styles.tabPill,
+            liquid && styles.tabPillLiquid,
+            { width: Math.max(0, slot - 16), transform: [{ translateX }] },
+          ]}
+        >
+          {liquid ? <LiquidBlur radius={16} intensity={42} /> : null}
+          {liquid ? <LiquidSheen radius={16} /> : null}
+        </Animated.View>
+      ) : null}
+
+      {TAB_ITEMS.map(({ name, Icon }, i) => {
+        const focused = state.index === i;
+        return (
+          <Pressable
+            key={name}
+            style={styles.tabItem}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: focused }}
+            accessibilityLabel={name}
+            onPress={() => {
+              const event = navigation.emit({ type: 'tabPress', target: state.routes[i].key, canPreventDefault: true });
+              if (!focused && !event.defaultPrevented) navigation.navigate(name);
+            }}
+            onLongPress={() => navigation.emit({ type: 'tabLongPress', target: state.routes[i].key })}
+          >
+            <Icon size={20} color={focused ? colors.text : colors.muted} strokeWidth={focused ? 2.1 : 1.8} />
+            <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{name}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function MainTabs() {
   return (
     <View style={styles.root}>
-      <Tab.Navigator
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: 'rgba(16,16,20,0.94)',
-            borderTopColor: 'rgba(255,255,255,0.10)',
-            borderTopWidth: StyleSheet.hairlineWidth,
-            height: 64,
-            paddingTop: 7,
-            paddingBottom: 8,
-          },
-          tabBarActiveTintColor: colors.text,
-          tabBarInactiveTintColor: colors.muted,
-          tabBarLabelStyle: { fontFamily: fonts.sansMedium, fontSize: 10, letterSpacing: 0.1, marginTop: 2 },
-        }}
-      >
+      <Tab.Navigator tabBar={(props) => <SlideTabBar {...props} />} screenOptions={{ headerShown: false }}>
         <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: ({ color }) => <Home size={21} color={color} /> }} />
         <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarIcon: ({ color }) => <Search size={21} color={color} /> }} />
-        <Tab.Screen name="Library" component={LibraryScreen} options={{ tabBarIcon: ({ color }) => <Library size={21} color={color} /> }} />
+        <Tab.Screen name="Library" component={LibraryScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarIcon: ({ color }) => <Cog size={21} color={color} /> }} />
       </Tab.Navigator>
       <MiniPlayer />
@@ -1435,6 +1541,7 @@ function MainTabs() {
 export default function App() {
   const libraryReady = useLibrary((s) => s.ready);
   const settingsReady = useSettings((s) => s.ready);
+  const displayMode = useSettings((s) => s.displayMode);
   const [fontsLoaded] = useFonts({
     Manrope_400Regular,
     Manrope_500Medium,
@@ -1454,7 +1561,8 @@ export default function App() {
       <GestureHandlerRootView style={styles.root}>
         <AmbientBackdrop />
         <NavigationContainer>
-          <StatusBar style="light" />
+          <StatusBar style="light" hidden={displayMode === 'fullscreen'} />
+          <NavigationBar hidden={displayMode === 'fullscreen'} style="dark" />
           <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Playlist" component={PlaylistScreen} />
@@ -1807,4 +1915,46 @@ const styles = StyleSheet.create({
   playingText: { flex: 1, minWidth: 0 },
   queueMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   queueMeta: { color: colors.muted, fontFamily: fonts.sans, fontSize: 11.5 },
+
+  // --- bottom tabs -------------------------------------------------------
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 8,
+    backgroundColor: 'rgba(16,16,20,0.96)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.10)',
+  },
+  tabBarLiquid: {
+    backgroundColor: 'rgba(18,18,23,0.6)',
+    borderTopColor: 'rgba(255,255,255,0.16)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.45,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: -10 },
+    elevation: 16,
+  },
+  tabPill: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    height: 46,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  tabPillLiquid: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.24)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  tabItem: { flex: 1, height: 46, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  tabLabel: { color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 10, letterSpacing: 0.1 },
+  tabLabelActive: { color: colors.text, fontFamily: fonts.sansBold },
 });
